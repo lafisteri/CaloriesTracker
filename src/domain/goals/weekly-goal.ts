@@ -1,6 +1,9 @@
-import type { Nutrition } from '@/domain/nutrition/nutrition'
-
-export type DailyMacroGoal = Nutrition
+export interface DailyMacroGoal {
+  calories: number
+  protein: number
+  fat: number
+  carbs: number
+}
 
 export interface WeeklyGoal {
   id: string

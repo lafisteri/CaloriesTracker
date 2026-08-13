@@ -14,6 +14,10 @@ export class DexieDiaryRepository implements DiaryRepository {
   }
 
   getForDate(date: string): Promise<DiaryEntry[]> {
-    return this.database.diaryEntries.where('date').equals(date).sortBy('createdAt')
+    return this.database.diaryEntries
+      .where('date')
+      .equals(date)
+      .and((entry) => entry.deletedAt === undefined)
+      .sortBy('createdAt')
   }
 }

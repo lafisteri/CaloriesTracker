@@ -4,14 +4,40 @@ import { registerSW } from 'virtual:pwa-register'
 
 import { initializeApplication } from '@/application/initialize-application'
 import { App } from '@/app/app'
+import { StartupError } from '@/app/startup-error'
 import '@/app/styles.css'
 
-void initializeApplication().then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
-})
+async function mountApplication(): Promise<void> {
+  const rootElement = document.getElementById('root')
 
-registerSW({ immediate: true })
+  if (rootElement === null) {
+    throw new Error('Application root element is missing.')
+  }
+
+  const root = createRoot(rootElement)
+
+  try {
+    await initializeApplication()
+    root.render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+  } catch (error) {
+    console.error('Failed to initialize the local database.', error)
+    root.render(
+      <StrictMode>
+        <StartupError />
+      </StrictMode>,
+    )
+  }
+}
+
+void mountApplication()
+
+registerSW({
+  immediate: true,
+  onRegisterError(error) {
+    console.error('Failed to register the service worker.', error)
+  },
+})

@@ -6,8 +6,22 @@ import { appDatabase, type CalorieDatabase } from '@/data/database/calorie-datab
 export class DexieProductRepository implements ProductRepository {
   constructor(private readonly database: CalorieDatabase = appDatabase) {}
 
-  async save(product: Product): Promise<void> {
+  async create(product: Product, initialVersion: ProductVersion): Promise<void> {
+    await this.database.transaction('rw', this.database.products, this.database.productVersions, async () => {
+      await this.database.productVersions.add(initialVersion)
+      await this.database.products.add(product)
+    })
+  }
+
+  async update(product: Product): Promise<void> {
     await this.database.products.put(product)
+  }
+
+  async addVersionAndUpdateProduct(product: Product, version: ProductVersion): Promise<void> {
+    await this.database.transaction('rw', this.database.products, this.database.productVersions, async () => {
+      await this.database.productVersions.add(version)
+      await this.database.products.put(product)
+    })
   }
 
   getById(id: string): Promise<Product | undefined> {
@@ -20,10 +34,6 @@ export class DexieProductRepository implements ProductRepository {
 
   getByBarcode(barcode: string): Promise<Product | undefined> {
     return this.database.products.where('barcode').equals(barcode).and((product) => product.deletedAt === undefined).first()
-  }
-
-  async saveVersion(version: ProductVersion): Promise<void> {
-    await this.database.productVersions.put(version)
   }
 
   getVersions(productId: string): Promise<ProductVersion[]> {

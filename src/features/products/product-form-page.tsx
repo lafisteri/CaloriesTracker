@@ -1,0 +1,259 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState } from 'react'
+import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+
+import { productService } from '@/application/products/product-service'
+import type { ProductDetails } from '@/application/products/product-service'
+import type { ProductBaseUnit } from '@/domain/products/product-version'
+import {
+  baseUnitOptions,
+  productFormSchema,
+  toProductDraft,
+  type ProductFormValues,
+} from '@/features/products/product-form-schema'
+
+const defaultValues: ProductFormValues = {
+  name: '',
+  barcode: '',
+  baseUnitType: 'g',
+  calories: 0,
+  protein: 0,
+  fat: 0,
+  carbs: 0,
+  servingUnits: [],
+}
+
+export function ProductFormPage() {
+  const { productId } = useParams()
+  const navigate = useNavigate()
+  const isEditing = productId !== undefined
+  const [isLoading, setIsLoading] = useState(isEditing)
+  const [loadError, setLoadError] = useState<string | undefined>()
+  const [submitError, setSubmitError] = useState<string | undefined>()
+  const [isSaving, setIsSaving] = useState(false)
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productFormSchema),
+    defaultValues,
+  })
+  const { control, formState: { errors }, handleSubmit, register, reset, watch } = form
+  const { fields, append, remove } = useFieldArray({ control, name: 'servingUnits' })
+  const baseUnitType = watch('baseUnitType')
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProduct(): Promise<void> {
+      if (productId === undefined) {
+        return
+      }
+
+      setIsLoading(true)
+      setLoadError(undefined)
+
+      try {
+        const product = await productService.getById(productId)
+
+        if (!isMounted) {
+          return
+        }
+
+        if (product === undefined) {
+          setLoadError('Продукт не найден.')
+          return
+        }
+
+        reset(toFormValues(product))
+      } catch (error) {
+        console.error('Failed to load product for editing.', error)
+
+        if (isMounted) {
+          setLoadError('Не удалось загрузить продукт. Попробуйте ещё раз.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadProduct()
+
+    return () => {
+      isMounted = false
+    }
+  }, [productId, reset])
+
+  const onSubmit = handleSubmit(async (values) => {
+    setIsSaving(true)
+    setSubmitError(undefined)
+
+    try {
+      const details = productId === undefined
+        ? await productService.create(toProductDraft(values))
+        : await productService.update(productId, toProductDraft(values))
+
+      navigate(`/products/${details.product.id}`, { replace: true })
+    } catch (error) {
+      console.error('Failed to save product.', error)
+      setSubmitError('Не удалось сохранить продукт. Проверьте данные и попробуйте ещё раз.')
+    } finally {
+      setIsSaving(false)
+    }
+  })
+
+  if (isLoading) {
+    return <p className="status-message">Загрузка…</p>
+  }
+
+  if (loadError !== undefined) {
+    return (
+      <section className="empty-state" aria-labelledby="product-form-error-title">
+        <h1 id="product-form-error-title">Не удалось открыть продукт</h1>
+        <p>{loadError}</p>
+        <Link className="button button--secondary" to="/products">К продуктам</Link>
+      </section>
+    )
+  }
+
+  return (
+    <section className="product-form-page" aria-labelledby="product-form-title">
+      <Link className="back-link" to={productId === undefined ? '/products' : `/products/${productId}`}>‹ Назад</Link>
+      <div className="page-heading">
+        <div>
+          <h1 id="product-form-title">{isEditing ? 'Изменить продукт' : 'Новый продукт'}</h1>
+          <p>{isEditing ? 'Изменение КБЖУ или единиц создаст новую версию.' : 'Пищевая ценность сохранится в первой версии продукта.'}</p>
+        </div>
+      </div>
+
+      <form className="product-form" noValidate onSubmit={(event) => void onSubmit(event)}>
+        <div className="form-field">
+          <label htmlFor="product-name">Название</label>
+          <input id="product-name" autoComplete="off" autoFocus={!isEditing} {...register('name')} />
+          <FieldError message={errors.name?.message} />
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="product-barcode">Штрихкод <span>необязательно</span></label>
+          <input id="product-barcode" inputMode="numeric" autoComplete="off" {...register('barcode')} />
+          <FieldError message={errors.barcode?.message} />
+        </div>
+
+        <fieldset className="form-fieldset">
+          <legend>Базовая единица</legend>
+          <div className="base-unit-options">
+            {baseUnitOptions.map((option) => (
+              <label key={option.value} className={baseUnitType === option.value ? 'base-unit-option base-unit-option--selected' : 'base-unit-option'}>
+                <input type="radio" value={option.value} {...register('baseUnitType')} />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="form-fieldset">
+          <legend>Пищевая ценность</legend>
+          <p className="form-hint">Укажите значения на выбранную базовую единицу.</p>
+          <div className="macro-input-grid">
+            <NumberField label="Калории" unit="ккал" error={errors.calories?.message} inputProps={register('calories', { valueAsNumber: true })} />
+            <NumberField label="Белки" unit="г" error={errors.protein?.message} inputProps={register('protein', { valueAsNumber: true })} />
+            <NumberField label="Жиры" unit="г" error={errors.fat?.message} inputProps={register('fat', { valueAsNumber: true })} />
+            <NumberField label="Углеводы" unit="г" error={errors.carbs?.message} inputProps={register('carbs', { valueAsNumber: true })} />
+          </div>
+        </fieldset>
+
+        <fieldset className="form-fieldset">
+          <div className="fieldset-header">
+            <div>
+              <legend>Дополнительные единицы</legend>
+              <p className="form-hint">Например: 1 кусочек = 32 г.</p>
+            </div>
+            <button
+              className="button button--secondary button--small"
+              type="button"
+              onClick={() => append({ name: '', conversionAmount: 1, conversionUnit: 'g' })}
+            >
+              Добавить
+            </button>
+          </div>
+          {fields.length === 0 ? <p className="form-empty">Нет дополнительных единиц.</p> : null}
+          <div className="serving-unit-fields">
+            {fields.map((field, index) => (
+              <div key={field.id} className="serving-unit-field">
+                <div className="form-field">
+                  <label htmlFor={`serving-name-${field.id}`}>Название</label>
+                  <input id={`serving-name-${field.id}`} placeholder="Кусочек" {...register(`servingUnits.${index}.name`)} />
+                  <FieldError message={errors.servingUnits?.[index]?.name?.message} />
+                </div>
+                <div className="form-field">
+                  <label htmlFor={`serving-amount-${field.id}`}>Равно</label>
+                  <input id={`serving-amount-${field.id}`} type="number" inputMode="decimal" min="0" step="any" {...register(`servingUnits.${index}.conversionAmount`, { valueAsNumber: true })} />
+                  <FieldError message={errors.servingUnits?.[index]?.conversionAmount?.message} />
+                </div>
+                <div className="form-field">
+                  <label htmlFor={`serving-unit-${field.id}`}>Единица</label>
+                  <select id={`serving-unit-${field.id}`} {...register(`servingUnits.${index}.conversionUnit`)}>
+                    <option value="g">г</option>
+                    <option value="ml">мл</option>
+                    <option value="piece">шт</option>
+                  </select>
+                </div>
+                <button className="icon-button" type="button" aria-label={`Удалить единицу ${index + 1}`} onClick={() => remove(index)}>×</button>
+              </div>
+            ))}
+          </div>
+          <FieldError message={errors.servingUnits?.message} />
+        </fieldset>
+
+        {submitError === undefined ? null : <p className="form-submit-error" role="alert">{submitError}</p>}
+        <div className="form-actions">
+          <Link className="button button--secondary" to={productId === undefined ? '/products' : `/products/${productId}`}>Отмена</Link>
+          <button className="button button--primary" disabled={isSaving} type="submit">{isSaving ? 'Сохранение…' : 'Сохранить'}</button>
+        </div>
+      </form>
+    </section>
+  )
+}
+
+interface NumberFieldProps {
+  label: string
+  unit: string
+  error: string | undefined
+  inputProps: UseFormRegisterReturn
+}
+
+function NumberField({ label, unit, error, inputProps }: NumberFieldProps) {
+  const id = `nutrition-${label}`
+
+  return (
+    <div className="form-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="input-with-unit">
+        <input id={id} type="number" inputMode="decimal" min="0" step="any" {...inputProps} />
+        <span>{unit}</span>
+      </div>
+      <FieldError message={error} />
+    </div>
+  )
+}
+
+function FieldError({ message }: { message: string | undefined }) {
+  return message === undefined ? null : <span className="field-error" role="alert">{message}</span>
+}
+
+function toFormValues(details: ProductDetails): ProductFormValues {
+  return {
+    name: details.product.name,
+    barcode: details.product.barcode ?? '',
+    baseUnitType: details.currentVersion.baseUnitType as ProductBaseUnit,
+    calories: details.currentVersion.calories,
+    protein: details.currentVersion.protein,
+    fat: details.currentVersion.fat,
+    carbs: details.currentVersion.carbs,
+    servingUnits: details.currentVersion.servingUnits.map((unit) => ({
+      name: unit.name,
+      conversionAmount: unit.conversionAmount,
+      conversionUnit: unit.conversionUnit,
+    })),
+  }
+}

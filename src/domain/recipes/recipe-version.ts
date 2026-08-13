@@ -1,12 +1,14 @@
-import type { Nutrition } from '@/domain/nutrition/nutrition'
-
 import type { RecipeIngredient } from './recipe-ingredient'
 
-export interface RecipeVersion extends Nutrition {
+export interface RecipeVersion {
   id: string
   recipeId: string
   versionNumber: number
   ingredients: RecipeIngredient[]
+  totalCalories: number
+  totalProtein: number
+  totalFat: number
+  totalCarbs: number
   cookedWeight?: number
   servingsCount?: number
   createdAt: string

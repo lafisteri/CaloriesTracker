@@ -1,6 +1,6 @@
-import { initializeLocalDatabase } from '@/data/database/calorie-database'
+import { initializeRepositories } from '@/data/repositories'
 
-/** Starts infrastructure before the UI is mounted. */
+/** Starts repository infrastructure before the UI is mounted. */
 export async function initializeApplication(): Promise<void> {
-  await initializeLocalDatabase()
+  await initializeRepositories()
 }
