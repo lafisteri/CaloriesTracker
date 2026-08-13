@@ -1,7 +1,10 @@
 import type { DiaryEntry } from '@/domain/diary/diary-entry'
 
 export interface DiaryRepository {
-  save(entry: DiaryEntry): Promise<void>
-  getById(id: string): Promise<DiaryEntry | undefined>
-  getForDate(date: string): Promise<DiaryEntry[]>
+  createEntry(entry: DiaryEntry): Promise<void>
+  updateEntry(entry: DiaryEntry): Promise<void>
+  getEntryById(id: string): Promise<DiaryEntry | undefined>
+  getEntriesByDate(date: string): Promise<DiaryEntry[]>
+  getRecentProductEntries(): Promise<DiaryEntry[]>
+  softDeleteEntry(id: string, deletedAt: string): Promise<void>
 }
