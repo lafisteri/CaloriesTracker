@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
-import { productService } from '@/application/products/product-service'
 import type { ProductDetails } from '@/application/products/product-service'
+import { applicationServices } from '@/app/providers/application-services'
 import type { ProductBaseUnit } from '@/domain/products/product-version'
+import { getServingConversionUnitForBase } from '@/domain/products/product-units'
 import {
   baseUnitOptions,
   productFormSchema,
@@ -17,6 +18,7 @@ const defaultValues: ProductFormValues = {
   name: '',
   barcode: '',
   baseUnitType: 'g',
+  baseAmount: 100,
   calories: 0,
   protein: 0,
   fat: 0,
@@ -36,9 +38,23 @@ export function ProductFormPage() {
     resolver: zodResolver(productFormSchema),
     defaultValues,
   })
-  const { control, formState: { errors }, handleSubmit, register, reset, watch } = form
-  const { fields, append, remove } = useFieldArray({ control, name: 'servingUnits' })
+  const { control, formState: { errors }, handleSubmit, register, reset, setValue, watch } = form
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'servingUnits' })
   const baseUnitType = watch('baseUnitType')
+  const servingConversionUnit = getServingConversionUnitForBase(baseUnitType)
+
+  useEffect(() => {
+    if (servingConversionUnit === undefined) {
+      if (fields.length > 0) {
+        replace([])
+      }
+      return
+    }
+
+    fields.forEach((_, index) => {
+      setValue(`servingUnits.${index}.conversionUnit`, servingConversionUnit, { shouldValidate: true })
+    })
+  }, [fields, replace, servingConversionUnit, setValue])
 
   useEffect(() => {
     let isMounted = true
@@ -52,7 +68,7 @@ export function ProductFormPage() {
       setLoadError(undefined)
 
       try {
-        const product = await productService.getById(productId)
+        const product = await applicationServices.products.getById(productId)
 
         if (!isMounted) {
           return
@@ -90,13 +106,15 @@ export function ProductFormPage() {
 
     try {
       const details = productId === undefined
-        ? await productService.create(toProductDraft(values))
-        : await productService.update(productId, toProductDraft(values))
+        ? await applicationServices.products.create(toProductDraft(values))
+        : await applicationServices.products.update(productId, toProductDraft(values))
 
       navigate(`/products/${details.product.id}`, { replace: true })
     } catch (error) {
       console.error('Failed to save product.', error)
-      setSubmitError('Не удалось сохранить продукт. Проверьте данные и попробуйте ещё раз.')
+      setSubmitError(error instanceof Error && error.name === 'DuplicateBarcodeError'
+        ? 'Продукт с таким штрихкодом уже существует.'
+        : 'Не удалось сохранить продукт. Проверьте данные и попробуйте ещё раз.')
     } finally {
       setIsSaving(false)
     }
@@ -149,6 +167,14 @@ export function ProductFormPage() {
               </label>
             ))}
           </div>
+          <div className="form-field">
+            <label htmlFor="product-base-amount">Базовое количество</label>
+            <div className="input-with-unit">
+              <input id="product-base-amount" type="number" inputMode="decimal" min="0" step="any" {...register('baseAmount', { valueAsNumber: true })} />
+              <span>{formatBaseUnit(baseUnitType)}</span>
+            </div>
+            <FieldError message={errors.baseAmount?.message} />
+          </div>
         </fieldset>
 
         <fieldset className="form-fieldset">
@@ -171,12 +197,18 @@ export function ProductFormPage() {
             <button
               className="button button--secondary button--small"
               type="button"
-              onClick={() => append({ name: '', conversionAmount: 1, conversionUnit: 'g' })}
+              disabled={servingConversionUnit === undefined}
+              onClick={() => {
+                if (servingConversionUnit !== undefined) {
+                  append({ name: '', conversionAmount: 1, conversionUnit: servingConversionUnit })
+                }
+              }}
             >
               Добавить
             </button>
           </div>
-          {fields.length === 0 ? <p className="form-empty">Нет дополнительных единиц.</p> : null}
+          {servingConversionUnit === undefined ? <p className="form-empty">Для продукта «на порцию» дополнительная единица требует отдельной связи и пока недоступна.</p> : null}
+          {servingConversionUnit !== undefined && fields.length === 0 ? <p className="form-empty">Нет дополнительных единиц.</p> : null}
           <div className="serving-unit-fields">
             {fields.map((field, index) => (
               <div key={field.id} className="serving-unit-field">
@@ -192,11 +224,9 @@ export function ProductFormPage() {
                 </div>
                 <div className="form-field">
                   <label htmlFor={`serving-unit-${field.id}`}>Единица</label>
-                  <select id={`serving-unit-${field.id}`} {...register(`servingUnits.${index}.conversionUnit`)}>
-                    <option value="g">г</option>
-                    <option value="ml">мл</option>
-                    <option value="piece">шт</option>
-                  </select>
+                  <input id={`serving-unit-${field.id}`} readOnly value={formatBaseUnit(baseUnitType)} />
+                  <input type="hidden" {...register(`servingUnits.${index}.conversionUnit`)} />
+                  <FieldError message={errors.servingUnits?.[index]?.conversionUnit?.message} />
                 </div>
                 <button className="icon-button" type="button" aria-label={`Удалить единицу ${index + 1}`} onClick={() => remove(index)}>×</button>
               </div>
@@ -246,6 +276,7 @@ function toFormValues(details: ProductDetails): ProductFormValues {
     name: details.product.name,
     barcode: details.product.barcode ?? '',
     baseUnitType: details.currentVersion.baseUnitType as ProductBaseUnit,
+    baseAmount: details.currentVersion.baseAmount,
     calories: details.currentVersion.calories,
     protein: details.currentVersion.protein,
     fat: details.currentVersion.fat,
@@ -256,4 +287,15 @@ function toFormValues(details: ProductDetails): ProductFormValues {
       conversionUnit: unit.conversionUnit,
     })),
   }
+}
+
+function formatBaseUnit(unit: ProductBaseUnit): string {
+  const labels: Record<ProductBaseUnit, string> = {
+    g: 'г',
+    ml: 'мл',
+    piece: 'шт',
+    serving: 'порция',
+  }
+
+  return labels[unit]
 }

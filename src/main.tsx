@@ -2,8 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 
-import { initializeApplication } from '@/application/initialize-application'
 import { App } from '@/app/app'
+import { initializeApplication } from '@/app/providers/initialize-application'
 import { StartupError } from '@/app/startup-error'
 import '@/app/styles.css'
 

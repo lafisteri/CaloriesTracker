@@ -215,6 +215,12 @@ a {
   border-color: #d7e2da;
 }
 
+.button--danger {
+  color: #9b3a32;
+  background: #fff4f1;
+  border-color: #f4d3cc;
+}
+
 .button--small {
   min-height: 38px;
   padding: 8px 12px;
@@ -248,6 +254,33 @@ a {
 .form-field select:focus {
   border-color: #3a7560;
   box-shadow: 0 0 0 3px rgb(58 117 96 / 14%);
+}
+
+.catalog-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: #eaf0e9;
+  border-radius: 14px;
+}
+
+.catalog-tabs__tab {
+  min-height: 44px;
+  color: #607066;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.catalog-tabs__tab--active {
+  color: #244f42;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(31 41 35 / 8%);
 }
 
 .status-message,
@@ -466,19 +499,45 @@ a {
   justify-content: space-between;
 }
 
+.version-history__button {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.version-history__button > span {
+  display: flex;
+  justify-content: space-between;
+}
+
 .version-history__item strong {
   color: #244f42;
 }
 
-.version-history__item span,
+.version-history__item em,
 .version-history__item p {
   margin: 0;
   color: #718077;
   font-size: 13px;
+  font-style: normal;
 }
 
-.version-history__item--current strong {
+.version-history__item--selected strong {
   color: #1e5543;
+}
+
+.version-history__item--selected .version-history__button {
+  padding: 10px;
+  margin: -10px;
+  background: #f0f6ef;
+  border-radius: 12px;
 }
 
 .form-fieldset {
@@ -612,6 +671,13 @@ a {
 
 .form-actions {
   padding-top: 4px;
+}
+
+.product-details__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .form-actions .button {

@@ -5,6 +5,7 @@ export interface ProductRepository {
   create(product: Product, initialVersion: ProductVersion): Promise<void>
   update(product: Product): Promise<void>
   addVersionAndUpdateProduct(product: Product, version: ProductVersion): Promise<void>
+  softDelete(id: string, deletedAt: string): Promise<void>
   getById(id: string): Promise<Product | undefined>
   getActive(): Promise<Product[]>
   getByBarcode(barcode: string): Promise<Product | undefined>

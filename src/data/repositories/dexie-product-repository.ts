@@ -24,6 +24,10 @@ export class DexieProductRepository implements ProductRepository {
     })
   }
 
+  async softDelete(id: string, deletedAt: string): Promise<void> {
+    await this.database.products.update(id, { deletedAt, updatedAt: deletedAt })
+  }
+
   getById(id: string): Promise<Product | undefined> {
     return this.database.products.get(id)
   }

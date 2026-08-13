@@ -1,7 +1,7 @@
-import { repositories } from '@/data/repositories'
 import type { Product } from '@/domain/products/product'
 import type { ProductDraft } from '@/domain/products/product-draft'
 import type { ProductVersion } from '@/domain/products/product-version'
+import { getServingConversionUnitForBase } from '@/domain/products/product-units'
 import type { ServingUnit } from '@/domain/products/serving-unit'
 import type { ProductRepository } from '@/domain/repositories/product-repository'
 import { createUuid } from '@/shared/utils/create-uuid'
@@ -61,13 +61,17 @@ export class ProductService {
   }
 
   async create(draft: ProductDraft): Promise<ProductDetails> {
+    assertValidProductDraft(draft)
+
     const now = new Date().toISOString()
     const productId = createUuid()
+    const barcode = normalizeBarcode(draft.barcode)
+    await this.assertBarcodeIsAvailable(barcode)
     const version = createVersion(productId, 1, draft, now)
     const product: Product = {
       id: productId,
       name: draft.name.trim(),
-      barcode: normalizeBarcode(draft.barcode),
+      barcode,
       currentVersionId: version.id,
       createdAt: now,
       updatedAt: now,
@@ -79,6 +83,8 @@ export class ProductService {
   }
 
   async update(id: string, draft: ProductDraft): Promise<ProductDetails> {
+    assertValidProductDraft(draft)
+
     const details = await this.getById(id)
 
     if (details === undefined) {
@@ -86,10 +92,12 @@ export class ProductService {
     }
 
     const now = new Date().toISOString()
+    const barcode = normalizeBarcode(draft.barcode)
+    await this.assertBarcodeIsAvailable(barcode, details.product.id)
     const updatedProduct: Product = {
       ...details.product,
       name: draft.name.trim(),
-      barcode: normalizeBarcode(draft.barcode),
+      barcode,
       updatedAt: now,
     }
 
@@ -110,6 +118,28 @@ export class ProductService {
       versions: [...details.versions, version],
     }
   }
+
+  async softDelete(id: string): Promise<void> {
+    const product = await this.productRepository.getById(id)
+
+    if (product === undefined || product.deletedAt !== undefined) {
+      throw new ProductNotFoundError()
+    }
+
+    await this.productRepository.softDelete(id, new Date().toISOString())
+  }
+
+  private async assertBarcodeIsAvailable(barcode: string | undefined, productId?: string): Promise<void> {
+    if (barcode === undefined) {
+      return
+    }
+
+    const productWithBarcode = await this.productRepository.getByBarcode(barcode)
+
+    if (productWithBarcode !== undefined && productWithBarcode.id !== productId) {
+      throw new DuplicateBarcodeError()
+    }
+  }
 }
 
 export class ProductNotFoundError extends Error {
@@ -119,7 +149,19 @@ export class ProductNotFoundError extends Error {
   }
 }
 
-export const productService = new ProductService(repositories.products)
+export class DuplicateBarcodeError extends Error {
+  constructor() {
+    super('A product with this barcode already exists.')
+    this.name = 'DuplicateBarcodeError'
+  }
+}
+
+export class InvalidProductDraftError extends Error {
+  constructor() {
+    super('Product draft contains invalid values.')
+    this.name = 'InvalidProductDraftError'
+  }
+}
 
 function createVersion(productId: string, versionNumber: number, draft: ProductDraft, createdAt: string): ProductVersion {
   return {
@@ -173,4 +215,29 @@ function normalizeBarcode(barcode: string | undefined): string | undefined {
   const normalizedBarcode = barcode?.trim()
 
   return normalizedBarcode === '' ? undefined : normalizedBarcode
+}
+
+function assertValidProductDraft(draft: ProductDraft): void {
+  if (draft.name.trim().length === 0 || !Number.isFinite(draft.baseAmount) || draft.baseAmount <= 0) {
+    throw new InvalidProductDraftError()
+  }
+
+  const nutritionValues = [draft.calories, draft.protein, draft.fat, draft.carbs]
+
+  if (nutritionValues.some((value) => !Number.isFinite(value) || value < 0)) {
+    throw new InvalidProductDraftError()
+  }
+
+  if (draft.servingUnits.some((unit) => unit.name.trim().length === 0
+    || !Number.isFinite(unit.conversionAmount)
+    || unit.conversionAmount <= 0)) {
+    throw new InvalidProductDraftError()
+  }
+
+  const expectedConversionUnit = getServingConversionUnitForBase(draft.baseUnitType)
+
+  if ((expectedConversionUnit === undefined && draft.servingUnits.length > 0)
+    || draft.servingUnits.some((unit) => unit.conversionUnit !== expectedConversionUnit)) {
+    throw new InvalidProductDraftError()
+  }
 }

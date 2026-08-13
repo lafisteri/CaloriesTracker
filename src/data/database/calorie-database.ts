@@ -29,6 +29,15 @@ export class CalorieDatabase extends Dexie {
       diaryEntries: '&id, date, mealType, sourceType, sourceId, sourceVersionId, deletedAt',
       weeklyGoals: '&id, effectiveFrom, createdAt',
     })
+
+    this.version(2).stores({
+      products: '&id, name, &barcode, currentVersionId, updatedAt, deletedAt',
+      productVersions: '&id, productId, &[productId+versionNumber], createdAt',
+      recipes: '&id, name, currentVersionId, updatedAt, deletedAt',
+      recipeVersions: '&id, recipeId, [recipeId+versionNumber], createdAt',
+      diaryEntries: '&id, date, mealType, sourceType, sourceId, sourceVersionId, deletedAt',
+      weeklyGoals: '&id, effectiveFrom, createdAt',
+    })
   }
 }
 
