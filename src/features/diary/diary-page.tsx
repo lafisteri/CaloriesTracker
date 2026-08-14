@@ -4,10 +4,12 @@ import { useLocation } from 'react-router-dom'
 import type { DiaryDay } from '@/application/diary/diary-service'
 import { applicationServices } from '@/app/providers/application-services'
 import type { MealType } from '@/domain/diary/diary-entry'
+import type { DailyMacroGoal } from '@/domain/goals/weekly-goal'
 import { toLocalDateKey, shiftLocalDateKey } from '@/shared/utils/local-date-key'
 
 import { DiaryDateNavigation } from './diary-date-navigation'
-import { formatDiaryNumber, mealTypes } from './diary-formatters'
+import { DailyGoalSummary } from './daily-goal-summary'
+import { mealTypes } from './diary-formatters'
 import { FoodPickerSheet } from './food-picker-sheet'
 import { MealSection } from './meal-section'
 
@@ -15,6 +17,7 @@ export function DiaryPage() {
   const location = useLocation()
   const [date, setDate] = useState(toLocalDateKey)
   const [day, setDay] = useState<DiaryDay | undefined>()
+  const [dailyGoal, setDailyGoal] = useState<DailyMacroGoal | undefined>()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
   const [pickerMealType, setPickerMealType] = useState<MealType | undefined>()
@@ -26,10 +29,14 @@ export function DiaryPage() {
     setError(undefined)
 
     try {
-      const loadedDay = await applicationServices.diary.getDay(dateKey)
+      const [loadedDay, loadedGoal] = await Promise.all([
+        applicationServices.diary.getDay(dateKey),
+        applicationServices.goals.getGoalForDate(dateKey),
+      ])
 
       if (requestId === loadRequestId.current) {
         setDay(loadedDay)
+        setDailyGoal(loadedGoal)
       }
     } catch (loadError) {
       console.error('Failed to load diary day.', loadError)
@@ -84,15 +91,7 @@ export function DiaryPage() {
       )}
       {day === undefined || isLoading || error !== undefined ? null : (
         <>
-          <section className="diary-totals" aria-labelledby="diary-totals-title">
-            <h2 id="diary-totals-title">За день</h2>
-            <dl>
-              <div><dt>Калории</dt><dd>{formatDiaryNumber(day.totals.calories)}</dd></div>
-              <div><dt>Белки</dt><dd>{formatDiaryNumber(day.totals.protein)} г</dd></div>
-              <div><dt>Жиры</dt><dd>{formatDiaryNumber(day.totals.fat)} г</dd></div>
-              <div><dt>Углеводы</dt><dd>{formatDiaryNumber(day.totals.carbs)} г</dd></div>
-            </dl>
-          </section>
+          <DailyGoalSummary date={date} totals={day.totals} goal={dailyGoal} />
 
           {day.entries.length === 0 ? <p className="diary-empty">{date === toLocalDateKey() ? 'Сегодня пока ничего не добавлено' : 'На этот день пока ничего не добавлено'}</p> : null}
           <div className="meal-sections">

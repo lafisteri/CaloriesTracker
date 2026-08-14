@@ -1,8 +1,10 @@
 import type { WeeklyGoal } from '@/domain/goals/weekly-goal'
 
 export interface GoalRepository {
-  save(goal: WeeklyGoal): Promise<void>
+  /** Returns false when a goal already starts on the same effective date. */
+  create(goal: WeeklyGoal): Promise<boolean>
   getById(id: string): Promise<WeeklyGoal | undefined>
   getAll(): Promise<WeeklyGoal[]>
+  getLatest(): Promise<WeeklyGoal | undefined>
   getEffectiveOn(date: string): Promise<WeeklyGoal | undefined>
 }

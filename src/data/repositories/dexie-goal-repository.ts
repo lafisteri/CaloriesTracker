@@ -5,8 +5,18 @@ import type { GoalRepository } from '@/domain/repositories/goal-repository'
 export class DexieGoalRepository implements GoalRepository {
   constructor(private readonly database: CalorieDatabase = appDatabase) {}
 
-  async save(goal: WeeklyGoal): Promise<void> {
-    await this.database.weeklyGoals.put(goal)
+  create(goal: WeeklyGoal): Promise<boolean> {
+    return this.database.transaction('rw', this.database.weeklyGoals, async () => {
+      const existingGoal = await this.database.weeklyGoals.where('effectiveFrom').equals(goal.effectiveFrom).first()
+
+      if (existingGoal !== undefined) {
+        return false
+      }
+
+      await this.database.weeklyGoals.add(goal)
+
+      return true
+    })
   }
 
   getById(id: string): Promise<WeeklyGoal | undefined> {
@@ -14,10 +24,33 @@ export class DexieGoalRepository implements GoalRepository {
   }
 
   getAll(): Promise<WeeklyGoal[]> {
-    return this.database.weeklyGoals.orderBy('effectiveFrom').reverse().toArray()
+    return this.database.weeklyGoals.orderBy('effectiveFrom').toArray()
   }
 
   async getEffectiveOn(date: string): Promise<WeeklyGoal | undefined> {
-    return this.database.weeklyGoals.where('effectiveFrom').belowOrEqual(date).last()
+    const goals = await this.database.weeklyGoals.where('effectiveFrom').belowOrEqual(date).toArray()
+
+    return getMostRecentGoal(goals)
   }
+
+  async getLatest(): Promise<WeeklyGoal | undefined> {
+    return getMostRecentGoal(await this.database.weeklyGoals.toArray())
+  }
+}
+
+function getMostRecentGoal(goals: WeeklyGoal[]): WeeklyGoal | undefined {
+  return goals.reduce<WeeklyGoal | undefined>((latest, goal) => {
+    if (latest === undefined || compareGoals(latest, goal) < 0) {
+      return goal
+    }
+
+    return latest
+  }, undefined)
+}
+
+/** Resolves legacy duplicate effective dates deterministically. */
+function compareGoals(left: WeeklyGoal, right: WeeklyGoal): number {
+  return left.effectiveFrom.localeCompare(right.effectiveFrom)
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id)
 }

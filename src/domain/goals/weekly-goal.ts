@@ -5,6 +5,19 @@ export interface DailyMacroGoal {
   carbs: number
 }
 
+export const weeklyGoalDays = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const
+
+export type WeeklyGoalDay = (typeof weeklyGoalDays)[number]
+export type WeeklyGoalsByDay = Record<WeeklyGoalDay, DailyMacroGoal>
+
 export interface WeeklyGoal {
   id: string
   effectiveFrom: string
