@@ -5,6 +5,7 @@ import { nutritionCalculator } from '@/domain/nutrition/nutrition-calculator'
 import type { Nutrition } from '@/domain/nutrition/nutrition'
 import type { Product } from '@/domain/products/product'
 import type { ProductVersion } from '@/domain/products/product-version'
+import { normalizeBarcode } from '@/domain/products/barcode'
 import type { DiaryRepository } from '@/domain/repositories/diary-repository'
 import type { ProductRepository } from '@/domain/repositories/product-repository'
 import type { Recipe } from '@/domain/recipes/recipe'
@@ -140,10 +141,11 @@ export class DiaryService {
 
   async searchProducts(query = ''): Promise<DiaryProduct[]> {
     const normalizedQuery = query.trim().toLocaleLowerCase()
+    const normalizedBarcode = normalizeBarcode(query)
     const products = await this.productRepository.getActive()
     const matches = products.filter((product) => normalizedQuery.length === 0
       || product.name.toLocaleLowerCase().includes(normalizedQuery)
-      || product.barcode?.includes(query.trim()) === true)
+      || product.barcode === normalizedBarcode)
 
     return this.resolveCurrentProducts(matches)
   }

@@ -146,7 +146,12 @@ export function FoodSelectionPage() {
             <section aria-labelledby="database-products-title">
               <div className="diary-selection-sections__heading">
                 <h2 id="database-products-title">{isSearching ? 'Результаты поиска' : 'Моя база'}</h2>
-                {!isSearching ? <Link to={createProductPath}>+ Создать продукт</Link> : null}
+                {!isSearching ? (
+                  <span className="diary-selection-sections__actions">
+                    <Link to={`${selectionPath}/scan`} state={{ scannerInHistory: true }}>Сканировать</Link>
+                    <Link to={createProductPath}>+ Создать продукт</Link>
+                  </span>
+                ) : null}
               </div>
               {sources.length === 0 ? (
                 <div className="form-empty">

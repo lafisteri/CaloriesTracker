@@ -26,6 +26,10 @@ const RecipeFormPage = lazy(async () => {
   const module = await import('@/features/recipes/recipe-form-page')
   return { default: module.RecipeFormPage }
 })
+const BarcodeScannerPage = lazy(async () => {
+  const module = await import('@/features/barcode/barcode-scanner-page')
+  return { default: module.BarcodeScannerPage }
+})
 
 export function AppRouter() {
   return (
@@ -36,10 +40,12 @@ export function AppRouter() {
           <Route path="today" element={<TodayPage />} />
           <Route path="diary" element={<DiaryPage />} />
           <Route path="diary/:date/:mealType/add" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodSelectionPage /></Suspense>} />
+          <Route path="diary/:date/:mealType/add/scan" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><BarcodeScannerPage /></Suspense>} />
           <Route path="diary/:date/:mealType/add/:sourceType/:sourceId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodAmountPage /></Suspense>} />
           <Route path="diary/:date/:mealType/add/:sourceId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodAmountPage /></Suspense>} />
           <Route path="diary/entries/:entryId" element={<DiaryEntryDetailsPage />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="products/scan" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><BarcodeScannerPage /></Suspense>} />
           <Route path="products/new" element={<ProductFormPage />} />
           <Route path="products/:productId" element={<ProductDetailsPage />} />
           <Route path="products/:productId/edit" element={<ProductFormPage />} />

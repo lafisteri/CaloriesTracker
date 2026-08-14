@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
-import type { ProductDetails } from '@/application/products/product-service'
+import { DuplicateBarcodeError, type ProductDetails } from '@/application/products/product-service'
 import { applicationServices } from '@/app/providers/application-services'
+import { normalizeBarcode } from '@/domain/products/barcode'
 import type { ProductBaseUnit } from '@/domain/products/product-version'
 import { getServingConversionUnitForBase } from '@/domain/products/product-units'
 import { getDiaryAddSelectionPathFromReturnTo } from '@/features/diary/diary-add-routes'
@@ -35,14 +36,16 @@ export function ProductFormPage() {
   const diarySelectionPath = isEditing
     ? undefined
     : getDiaryAddSelectionPathFromReturnTo(new URLSearchParams(location.search).get('returnTo'))
+  const scannedBarcode = isEditing ? undefined : normalizeBarcode(new URLSearchParams(location.search).get('barcode'))
   const returnPath = diarySelectionPath ?? (productId === undefined ? '/products' : `/products/${productId}`)
   const [isLoading, setIsLoading] = useState(isEditing)
   const [loadError, setLoadError] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | undefined>()
+  const [duplicateProductId, setDuplicateProductId] = useState<string | undefined>()
   const [isSaving, setIsSaving] = useState(false)
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
-    defaultValues,
+    defaultValues: { ...defaultValues, barcode: scannedBarcode ?? '' },
   })
   const { control, formState: { errors }, handleSubmit, register, reset, setValue, watch } = form
   const { fields, append, remove, replace } = useFieldArray({ control, name: 'servingUnits' })
@@ -109,6 +112,7 @@ export function ProductFormPage() {
   const onSubmit = handleSubmit(async (values) => {
     setIsSaving(true)
     setSubmitError(undefined)
+    setDuplicateProductId(undefined)
 
     try {
       const details = productId === undefined
@@ -118,9 +122,14 @@ export function ProductFormPage() {
       navigate(diarySelectionPath ?? `/products/${details.product.id}`, { replace: true })
     } catch (error) {
       console.error('Failed to save product.', error)
-      setSubmitError(error instanceof Error && error.name === 'DuplicateBarcodeError'
-        ? 'Продукт с таким штрихкодом уже существует.'
-        : 'Не удалось сохранить продукт. Проверьте данные и попробуйте ещё раз.')
+      if (error instanceof DuplicateBarcodeError) {
+        setDuplicateProductId(error.belongsToDeletedProduct ? undefined : error.productId)
+        setSubmitError(error.belongsToDeletedProduct
+          ? 'Этот штрихкод закреплён за удалённым продуктом и пока недоступен для повторного использования.'
+          : 'Продукт с таким штрихкодом уже существует.')
+      } else {
+        setSubmitError('Не удалось сохранить продукт. Проверьте данные и попробуйте ещё раз.')
+      }
     } finally {
       setIsSaving(false)
     }
@@ -241,7 +250,12 @@ export function ProductFormPage() {
           <FieldError message={errors.servingUnits?.message} />
         </fieldset>
 
-        {submitError === undefined ? null : <p className="form-submit-error" role="alert">{submitError}</p>}
+        {submitError === undefined ? null : (
+          <div className="form-submit-error" role="alert">
+            <p>{submitError}</p>
+            {duplicateProductId === undefined ? null : <Link to={`/products/${duplicateProductId}`}>Открыть существующий продукт</Link>}
+          </div>
+        )}
         <div className="form-actions">
           <Link className="button button--secondary" to={returnPath}>Отмена</Link>
           <button className="button button--primary" disabled={isSaving} type="submit">{isSaving ? 'Сохранение…' : 'Сохранить'}</button>

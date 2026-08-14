@@ -1,6 +1,7 @@
 import type { Product } from '@/domain/products/product'
 import type { ProductDraft } from '@/domain/products/product-draft'
 import type { ProductVersion } from '@/domain/products/product-version'
+import { normalizeBarcode } from '@/domain/products/barcode'
 import { getServingConversionUnitForBase } from '@/domain/products/product-units'
 import type { ServingUnit } from '@/domain/products/serving-unit'
 import type { ProductRepository } from '@/domain/repositories/product-repository'
@@ -20,6 +21,7 @@ export class ProductService {
 
   async search(query = ''): Promise<ProductListItem[]> {
     const normalizedQuery = query.trim().toLocaleLowerCase()
+    const normalizedBarcode = normalizeBarcode(query)
     const products = await this.productRepository.getActive()
     const matchedProducts = products.filter((product) => {
       if (normalizedQuery.length === 0) {
@@ -27,7 +29,7 @@ export class ProductService {
       }
 
       return product.name.toLocaleLowerCase().includes(normalizedQuery)
-        || product.barcode?.includes(query.trim()) === true
+        || product.barcode === normalizedBarcode
     })
 
     const items = await Promise.all(
@@ -137,7 +139,7 @@ export class ProductService {
     const productWithBarcode = await this.productRepository.getByBarcode(barcode)
 
     if (productWithBarcode !== undefined && productWithBarcode.id !== productId) {
-      throw new DuplicateBarcodeError()
+      throw new DuplicateBarcodeError(productWithBarcode.id, productWithBarcode.deletedAt !== undefined)
     }
   }
 }
@@ -150,7 +152,10 @@ export class ProductNotFoundError extends Error {
 }
 
 export class DuplicateBarcodeError extends Error {
-  constructor() {
+  constructor(
+    readonly productId: string,
+    readonly belongsToDeletedProduct: boolean,
+  ) {
     super('A product with this barcode already exists.')
     this.name = 'DuplicateBarcodeError'
   }
@@ -209,12 +214,6 @@ function areServingUnitsEqual(
       && unit.conversionAmount === draft.conversionAmount
       && unit.conversionUnit === draft.conversionUnit
   })
-}
-
-function normalizeBarcode(barcode: string | undefined): string | undefined {
-  const normalizedBarcode = barcode?.trim()
-
-  return normalizedBarcode === '' ? undefined : normalizedBarcode
 }
 
 function assertValidProductDraft(draft: ProductDraft): void {

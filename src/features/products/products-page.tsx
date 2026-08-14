@@ -78,9 +78,12 @@ export function ProductsPage() {
           <h1 id="products-title">Продукты</h1>
           <p>Ваша личная база продуктов.</p>
         </div>
-        <Link className="button button--primary" to={catalogTab === 'products' ? '/products/new' : '/recipes/new'}>
-          {catalogTab === 'products' ? 'Добавить' : 'Создать рецепт'}
-        </Link>
+        {catalogTab === 'products' ? (
+          <div className="product-details__actions">
+            <Link className="button button--secondary" to="/products/scan" state={{ scannerInHistory: true }}>Сканировать</Link>
+            <Link className="button button--primary" to="/products/new">Добавить</Link>
+          </div>
+        ) : <Link className="button button--primary" to="/recipes/new">Создать рецепт</Link>}
       </div>
 
       <div className="catalog-tabs" role="tablist" aria-label="Каталог">

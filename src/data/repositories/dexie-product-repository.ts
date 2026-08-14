@@ -37,7 +37,7 @@ export class DexieProductRepository implements ProductRepository {
   }
 
   getByBarcode(barcode: string): Promise<Product | undefined> {
-    return this.database.products.where('barcode').equals(barcode).and((product) => product.deletedAt === undefined).first()
+    return this.database.products.where('barcode').equals(barcode).first()
   }
 
   getVersions(productId: string): Promise<ProductVersion[]> {

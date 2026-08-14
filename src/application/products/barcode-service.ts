@@ -1,5 +1,6 @@
 import type { Product } from '@/domain/products/product'
 import type { ProductVersion } from '@/domain/products/product-version'
+import { normalizeBarcode } from '@/domain/products/barcode'
 import type { ProductRepository } from '@/domain/repositories/product-repository'
 
 export interface BarcodeLookupResult {
@@ -12,15 +13,15 @@ export class BarcodeService {
   constructor(private readonly productRepository: ProductRepository) {}
 
   async lookup(barcode: string): Promise<BarcodeLookupResult | undefined> {
-    const normalizedBarcode = barcode.trim()
+    const normalizedBarcode = normalizeBarcode(barcode)
 
-    if (normalizedBarcode.length === 0) {
+    if (normalizedBarcode === undefined) {
       return undefined
     }
 
     const product = await this.productRepository.getByBarcode(normalizedBarcode)
 
-    if (product === undefined) {
+    if (product === undefined || product.deletedAt !== undefined) {
       return undefined
     }
 
