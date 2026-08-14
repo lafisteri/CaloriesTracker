@@ -11,52 +11,22 @@ interface DailyGoalSummaryProps {
   goal: DailyMacroGoal | undefined
 }
 
-const goalMetrics: Array<{ key: keyof DailyMacroGoal; label: string; unit: string }> = [
-  { key: 'calories', label: 'Калории', unit: 'ккал' },
-  { key: 'protein', label: 'Белки', unit: 'г' },
-  { key: 'fat', label: 'Жиры', unit: 'г' },
-  { key: 'carbs', label: 'Углеводы', unit: 'г' },
-]
-
 export function DailyGoalSummary({ date, totals, goal }: DailyGoalSummaryProps) {
+  const calorieGoal = goal?.calories
+  const hasCalorieGoal = calorieGoal !== undefined && calorieGoal > 0
+  const calorieOverage = hasCalorieGoal ? totals.calories - calorieGoal : 0
+
   return (
     <section className="diary-totals" aria-labelledby="diary-totals-title">
-      <h2 id="diary-totals-title">За день</h2>
-      <dl>
-        {goalMetrics.map((metric) => {
-          const actual = totals[metric.key]
-          const target = goal?.[metric.key]
-
-          return (
-            <div key={metric.key}>
-              <dt>{metric.label}</dt>
-              <dd>{formatMetricValue(actual, target, metric.unit)}</dd>
-              {target === undefined ? null : <small>{formatGoalDifference(actual, target, metric.unit)}</small>}
-            </div>
-          )
-        })}
-      </dl>
-      {goal === undefined ? <Link className="diary-goal-link" to="/goals" state={{ effectiveFrom: date }}>Задать цели</Link> : null}
+      <div className="diary-totals__heading">
+        <h2 id="diary-totals-title">За день</h2>
+        {goal === undefined ? <Link className="diary-goal-link" to="/goals" state={{ effectiveFrom: date }}>Задать цели</Link> : null}
+      </div>
+      <p className="diary-totals__calories">
+        <strong>{formatDiaryNumber(totals.calories)}{hasCalorieGoal ? ` / ${formatDiaryNumber(calorieGoal)}` : ''} ккал</strong>
+        {calorieOverage > 0 ? <span> · +{formatDiaryNumber(calorieOverage)}</span> : null}
+      </p>
+      <p className="diary-totals__macros">Б {formatDiaryNumber(totals.protein)} · Ж {formatDiaryNumber(totals.fat)} · У {formatDiaryNumber(totals.carbs)}</p>
     </section>
   )
-}
-
-function formatMetricValue(actual: number, target: number | undefined, unit: string): string {
-  if (target === undefined || target === 0) {
-    return `${formatDiaryNumber(actual)} ${unit}`
-  }
-
-  return `${formatDiaryNumber(actual)} / ${formatDiaryNumber(target)} ${unit}`
-}
-
-function formatGoalDifference(actual: number, target: number, unit: string): string {
-  if (target === 0) {
-    return 'Цель не задана'
-  }
-
-  const difference = target - actual
-
-  return difference >= 0
-    ? `Осталось ${formatDiaryNumber(difference)} ${unit}`
-    : `+${formatDiaryNumber(Math.abs(difference))} ${unit} к цели`
 }

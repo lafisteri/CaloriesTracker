@@ -169,7 +169,6 @@ a {
 
 .page-heading,
 .section-heading,
-.fieldset-header,
 .form-actions {
   display: flex;
   gap: 16px;
@@ -632,42 +631,11 @@ a {
   gap: 7px;
 }
 
-.form-hint,
 .form-empty {
   margin: -5px 0 0;
   color: #718077;
   font-size: 13px;
   line-height: 1.4;
-}
-
-.base-unit-options {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.base-unit-option {
-  display: grid;
-  min-height: 44px;
-  place-items: center;
-  color: #56675d;
-  background: #fff;
-  border: 1px solid #d9e0db;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.base-unit-option--selected {
-  color: #285342;
-  background: #e7f0e9;
-  border-color: #8daf9d;
-}
-
-.base-unit-option input {
-  position: absolute;
-  opacity: 0;
 }
 
 .macro-input-grid {
@@ -692,21 +660,6 @@ a {
   font-size: 13px;
   pointer-events: none;
   transform: translateY(-50%);
-}
-
-.serving-unit-fields {
-  display: grid;
-  gap: 12px;
-}
-
-.serving-unit-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(76px, 0.8fr) minmax(64px, 0.65fr) 44px;
-  gap: 8px;
-  align-items: end;
-  padding: 14px;
-  background: #f7f9f6;
-  border-radius: 16px;
 }
 
 .icon-button {
@@ -815,43 +768,50 @@ a {
   letter-spacing: -0.02em;
 }
 
-.diary-totals dl {
+.diary-totals {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  padding: 0;
-  margin: 14px 0 0;
+  gap: 3px;
+  padding: 12px 16px;
+  border-radius: 16px;
 }
 
-.diary-totals dl div {
-  padding: 11px;
-  background: #f5f8f4;
-  border-radius: 12px;
+.diary-totals__heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.diary-totals dt {
-  color: #6b7b70;
-  font-size: 12px;
+.diary-totals__calories,
+.diary-totals__macros {
+  margin: 0;
 }
 
-.diary-totals dd {
-  margin: 4px 0 0;
+.diary-totals__calories {
   color: #244f42;
   font-size: 16px;
-  font-weight: 750;
 }
 
-.diary-totals small {
-  display: block;
-  margin-top: 4px;
-  color: #718077;
-  font-size: 11px;
-  line-height: 1.3;
+.diary-totals__calories strong {
+  font-weight: 760;
+}
+
+.diary-totals__calories span {
+  color: #a3483c;
+  font-weight: 720;
+}
+
+.diary-totals__macros {
+  color: #64716a;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .diary-goal-link {
   display: inline-flex;
-  margin-top: 14px;
+  min-height: 32px;
+  align-items: center;
+  margin: 0;
   color: #285342;
   font-size: 14px;
   font-weight: 720;
@@ -1075,12 +1035,6 @@ a {
   text-decoration: none;
 }
 
-.diary-selection-sections__empty {
-  margin: -2px 0 0;
-  color: #718077;
-  font-size: 14px;
-}
-
 .diary-add-page__empty {
   min-height: min(46dvh, 360px);
   align-content: center;
@@ -1092,6 +1046,16 @@ a {
 
 .diary-amount-page__scroll .diary-entry-form {
   min-height: 100%;
+}
+
+.diary-amount-page__form {
+  gap: 12px;
+  padding: 16px;
+}
+
+.diary-amount-page__fields {
+  display: grid;
+  gap: 12px;
 }
 
 .diary-add-page__actions {
@@ -1114,31 +1078,18 @@ a {
   line-height: 1.35;
 }
 
-.food-source-list--recent {
-  gap: 6px;
-}
-
-.food-source-list--recent .product-list__item {
-  gap: 2px;
-  padding: 12px 14px;
-  border-radius: 14px;
-}
-
-.food-source-list--recent .product-list__name {
-  font-size: 15px;
-}
-
-.food-source-list--recent .product-list__details,
-.food-source-list--recent .product-list__macros,
-.food-source-list--recent .food-source-list__type {
-  font-size: 12px;
-}
-
-.diary-selection-sections__actions {
-  display: flex;
-  flex-wrap: wrap;
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  justify-content: flex-end;
+}
+
+.quick-actions .button {
+  min-width: 0;
+}
+
+.quick-actions--single {
+  grid-template-columns: 1fr;
 }
 
 .barcode-scanner {
@@ -1476,10 +1427,6 @@ a {
     justify-content: flex-start;
   }
 
-  .diary-selection-sections__actions {
-    justify-content: flex-start;
-  }
-
   .barcode-scanner__manual > div {
     display: grid;
   }
@@ -1619,79 +1566,6 @@ a {
   font-size: 12px;
 }
 
-.dashboard-calories {
-  gap: 8px;
-  background: linear-gradient(135deg, #f2f8f1, #fff 68%);
-}
-
-.dashboard-calories__value {
-  margin: 4px 0 0;
-  color: #193e32;
-  font-size: clamp(32px, 9vw, 42px);
-  font-weight: 770;
-  letter-spacing: -0.055em;
-  line-height: 1;
-}
-
-.dashboard-calories__value span {
-  color: #64716a;
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: 0;
-}
-
-.dashboard-calories__status {
-  margin: 0;
-  color: #356450;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.dashboard-macros dl {
-  display: grid;
-  gap: 16px;
-  padding: 0;
-  margin: 0;
-}
-
-.dashboard-macro {
-  display: grid;
-  gap: 8px;
-}
-
-.dashboard-macro__values {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.dashboard-macro dt {
-  color: #33433a;
-  font-size: 14px;
-  font-weight: 720;
-}
-
-.dashboard-macro dd {
-  margin: 0;
-  color: #244f42;
-  font-size: 14px;
-  font-weight: 720;
-}
-
-.dashboard-macro__track {
-  height: 8px;
-  overflow: hidden;
-  background: #edf1ed;
-  border-radius: 999px;
-}
-
-.dashboard-macro__fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-
 .dashboard-macro__fill--protein {
   background: #587fc2;
 }
@@ -1702,16 +1576,6 @@ a {
 
 .dashboard-macro__fill--carbs {
   background: #5e9a72;
-}
-
-.dashboard-macro__fill--over {
-  filter: saturate(1.3) brightness(0.9);
-}
-
-.dashboard-macro__no-goal {
-  margin: -3px 0 0;
-  color: #718077;
-  font-size: 12px;
 }
 
 .weekly-calories__chart,

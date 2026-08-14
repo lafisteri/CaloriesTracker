@@ -10,7 +10,7 @@ import {
   getDiaryFoodSourceType,
   getDiaryPath,
 } from './diary-add-routes'
-import { formatDiaryNumber, formatDiaryShortDate, getMealTypeLabel } from './diary-formatters'
+import { formatDiaryNumber } from './diary-formatters'
 
 interface DiaryAmountNavigationState {
   diaryAddSelectionInHistory?: boolean
@@ -165,31 +165,31 @@ export function FoodAmountPage() {
   return (
     <section className="diary-add-page" aria-labelledby="food-amount-title">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ Выбор еды</button>
-        <span>{formatDiaryShortDate(addContext.date)}</span>
+        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ Продукты</button>
       </header>
       <div className="diary-add-page__scroll diary-amount-page__scroll">
         <div className="diary-add-page__intro">
           <h1 id="food-amount-title">{getSourceName(source)}</h1>
-          <p>Добавить в: <strong>{getMealTypeLabel(addContext.mealType)}</strong></p>
         </div>
-        <div className="diary-entry-form">
-          <div className="form-field">
-            <label htmlFor="diary-add-amount">Количество</label>
-            <input id="diary-add-amount" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
-            {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
-          </div>
-          <div className="form-field">
-            <label htmlFor="diary-add-unit">Единица</label>
-            <select id="diary-add-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
-              {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+        <div className="diary-entry-form diary-amount-page__form">
+          <div className="diary-amount-page__fields">
+            <div className="form-field">
+              <label htmlFor="diary-add-amount">Базовое количество</label>
+              <input id="diary-add-amount" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
+              {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
+            </div>
+            <div className="form-field">
+              <label htmlFor="diary-add-unit">Базовая единица</label>
+              <select id="diary-add-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
+                {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
           </div>
           <NutritionPreview nutrition={preview} />
           {error === undefined ? null : <p className="form-submit-error" role="alert">{error}</p>}
           <div className="diary-add-page__actions">
             <button className="button button--primary" type="button" disabled={preview === undefined || isSaving} onClick={() => void addFood()}>
-              {isSaving ? 'Добавление…' : `Добавить в ${getMealTypeLabel(addContext.mealType).toLocaleLowerCase()}`}
+              {isSaving ? 'Добавление…' : 'Добавить'}
             </button>
           </div>
         </div>

@@ -37,7 +37,7 @@ export function ProductFormPage() {
     ? undefined
     : getDiaryAddSelectionPathFromReturnTo(new URLSearchParams(location.search).get('returnTo'))
   const scannedBarcode = isEditing ? undefined : normalizeBarcode(new URLSearchParams(location.search).get('barcode'))
-  const returnPath = diarySelectionPath ?? (productId === undefined ? '/products' : `/products/${productId}`)
+  const cancelPath = diarySelectionPath ?? (productId === undefined ? '/products' : `/products/${productId}`)
   const [isLoading, setIsLoading] = useState(isEditing)
   const [loadError, setLoadError] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | undefined>()
@@ -49,7 +49,7 @@ export function ProductFormPage() {
     defaultValues: { ...defaultValues, barcode: scannedBarcode ?? '' },
   })
   const { control, formState: { errors }, handleSubmit, register, reset, setValue, watch } = form
-  const { fields, append, remove, replace } = useFieldArray({ control, name: 'servingUnits' })
+  const { fields, replace } = useFieldArray({ control, name: 'servingUnits' })
   const baseUnitType = watch('baseUnitType')
   const servingConversionUnit = getServingConversionUnitForBase(baseUnitType)
 
@@ -121,11 +121,13 @@ export function ProductFormPage() {
     setDuplicateProductId(undefined)
 
     try {
-      const details = productId === undefined
-        ? await applicationServices.products.create(toProductDraft(values))
-        : await applicationServices.products.update(productId, toProductDraft(values))
+      if (productId === undefined) {
+        await applicationServices.products.create(toProductDraft(values))
+      } else {
+        await applicationServices.products.update(productId, toProductDraft(values))
+      }
 
-      navigate(diarySelectionPath ?? `/products/${details.product.id}`, { replace: true })
+      navigate(diarySelectionPath ?? '/products', { replace: true })
     } catch (error) {
       console.error('Failed to save product.', error)
       if (error instanceof DuplicateBarcodeError) {
@@ -150,19 +152,20 @@ export function ProductFormPage() {
       <section className="empty-state" aria-labelledby="product-form-error-title">
         <h1 id="product-form-error-title">Не удалось открыть продукт</h1>
         <p>{loadError}</p>
-        <Link className="button button--secondary" to={returnPath}>Назад</Link>
+        <Link className="button button--secondary" to={cancelPath}>Назад</Link>
       </section>
     )
   }
 
   return (
     <section className="product-form-page" aria-labelledby="product-form-title">
-      <Link className="back-link" to={returnPath}>‹ Назад</Link>
+      <Link className="back-link" to={cancelPath}>‹ Назад</Link>
       <div className="page-heading">
         <div>
           <h1 id="product-form-title">{isEditing ? 'Изменить продукт' : 'Новый продукт'}</h1>
           <p>{isEditing ? 'Изменение КБЖУ или единиц создаст новую версию.' : 'Пищевая ценность сохранится в первой версии продукта.'}</p>
         </div>
+        {isEditing ? <Link className="button button--secondary button--small" to={`/products/${productId}`}>Версии</Link> : null}
       </div>
 
       <form className="product-form" noValidate onSubmit={(event) => void onSubmit(event)}>
@@ -178,16 +181,14 @@ export function ProductFormPage() {
           <FieldError message={errors.barcode?.message} />
         </div>
 
+        <div className="form-field">
+          <label htmlFor="product-base-unit">Базовая единица</label>
+          <select id="product-base-unit" {...register('baseUnitType')}>
+            {baseUnitOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
+
         <fieldset className="form-fieldset">
-          <legend>Базовая единица</legend>
-          <div className="base-unit-options">
-            {baseUnitOptions.map((option) => (
-              <label key={option.value} className={baseUnitType === option.value ? 'base-unit-option base-unit-option--selected' : 'base-unit-option'}>
-                <input type="radio" value={option.value} {...register('baseUnitType')} />
-                {option.label}
-              </label>
-            ))}
-          </div>
           <div className="form-field">
             <label htmlFor="product-base-amount">Базовое количество</label>
             <div className="input-with-unit">
@@ -200,60 +201,12 @@ export function ProductFormPage() {
 
         <fieldset className="form-fieldset">
           <legend>Пищевая ценность</legend>
-          <p className="form-hint">Укажите значения на выбранную базовую единицу.</p>
           <div className="macro-input-grid">
             <NumberField label="Калории" unit="ккал" error={errors.calories?.message} inputProps={register('calories', { valueAsNumber: true })} />
             <NumberField label="Белки" unit="г" error={errors.protein?.message} inputProps={register('protein', { valueAsNumber: true })} />
             <NumberField label="Жиры" unit="г" error={errors.fat?.message} inputProps={register('fat', { valueAsNumber: true })} />
             <NumberField label="Углеводы" unit="г" error={errors.carbs?.message} inputProps={register('carbs', { valueAsNumber: true })} />
           </div>
-        </fieldset>
-
-        <fieldset className="form-fieldset">
-          <div className="fieldset-header">
-            <div>
-              <legend>Дополнительные единицы</legend>
-              <p className="form-hint">Например: 1 кусочек = 32 г.</p>
-            </div>
-            <button
-              className="button button--secondary button--small"
-              type="button"
-              disabled={servingConversionUnit === undefined}
-              onClick={() => {
-                if (servingConversionUnit !== undefined) {
-                  append({ name: '', conversionAmount: 1, conversionUnit: servingConversionUnit })
-                }
-              }}
-            >
-              Добавить
-            </button>
-          </div>
-          {servingConversionUnit === undefined ? <p className="form-empty">Для продукта «на порцию» дополнительная единица требует отдельной связи и пока недоступна.</p> : null}
-          {servingConversionUnit !== undefined && fields.length === 0 ? <p className="form-empty">Нет дополнительных единиц.</p> : null}
-          <div className="serving-unit-fields">
-            {fields.map((field, index) => (
-              <div key={field.id} className="serving-unit-field">
-                <div className="form-field">
-                  <label htmlFor={`serving-name-${field.id}`}>Название</label>
-                  <input id={`serving-name-${field.id}`} placeholder="Кусочек" {...register(`servingUnits.${index}.name`)} />
-                  <FieldError message={errors.servingUnits?.[index]?.name?.message} />
-                </div>
-                <div className="form-field">
-                  <label htmlFor={`serving-amount-${field.id}`}>Равно</label>
-                  <input id={`serving-amount-${field.id}`} type="number" inputMode="decimal" min="0" step="any" {...register(`servingUnits.${index}.conversionAmount`, { valueAsNumber: true })} />
-                  <FieldError message={errors.servingUnits?.[index]?.conversionAmount?.message} />
-                </div>
-                <div className="form-field">
-                  <label htmlFor={`serving-unit-${field.id}`}>Единица</label>
-                  <input id={`serving-unit-${field.id}`} readOnly value={formatBaseUnit(baseUnitType)} />
-                  <input type="hidden" {...register(`servingUnits.${index}.conversionUnit`)} />
-                  <FieldError message={errors.servingUnits?.[index]?.conversionUnit?.message} />
-                </div>
-                <button className="icon-button" type="button" aria-label={`Удалить единицу ${index + 1}`} onClick={() => remove(index)}>×</button>
-              </div>
-            ))}
-          </div>
-          <FieldError message={errors.servingUnits?.message} />
         </fieldset>
 
         {submitError === undefined ? null : (
@@ -263,7 +216,7 @@ export function ProductFormPage() {
           </div>
         )}
         <div className="form-actions">
-          <Link className="button button--secondary" to={returnPath}>Отмена</Link>
+          <Link className="button button--secondary" to={cancelPath}>Отмена</Link>
           <button className="button button--primary" disabled={isSaving} type="submit">{isSaving ? 'Сохранение…' : 'Сохранить'}</button>
         </div>
       </form>

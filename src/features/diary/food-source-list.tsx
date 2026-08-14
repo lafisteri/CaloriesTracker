@@ -5,13 +5,12 @@ import { getRecipePrimaryMacros, getRecipePrimaryNutrition } from '@/features/re
 interface FoodSourceListProps {
   sources: DiaryFoodSource[]
   onSelect: (source: DiaryFoodSource) => void
-  className?: string
 }
 
 /** Shared Diary selection rows for the two snapshot-capable food sources. */
-export function FoodSourceList({ sources, onSelect, className }: FoodSourceListProps) {
+export function FoodSourceList({ sources, onSelect }: FoodSourceListProps) {
   return (
-    <ul className={`product-list food-source-list${className === undefined ? '' : ` ${className}`}`}>
+    <ul className="product-list food-source-list">
       {sources.map((source) => (
         <li key={`${source.sourceType}:${source.sourceType === 'product' ? source.product.id : source.recipe.id}`}>
           <button className="product-list__item product-list__item--selectable" type="button" onClick={() => onSelect(source)}>

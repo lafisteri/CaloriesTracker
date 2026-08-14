@@ -11,7 +11,6 @@ import {
   getDiaryAddSelectionPath,
   getDiaryPath,
 } from './diary-add-routes'
-import { formatDiaryShortDate, getMealTypeLabel } from './diary-formatters'
 import { FoodSourceList } from './food-source-list'
 
 interface DiaryAddNavigationState {
@@ -25,25 +24,10 @@ export function FoodSelectionPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
-  const [recentSources, setRecentSources] = useState<DiaryFoodSource[]>([])
   const [sources, setSources] = useState<DiaryFoodSource[]>([])
-  const [isLoadingRecent, setIsLoadingRecent] = useState(true)
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [error, setError] = useState<string | undefined>()
   const searchRequestId = useRef(0)
-
-  const loadRecent = useCallback(async () => {
-    setIsLoadingRecent(true)
-
-    try {
-      setRecentSources(await applicationServices.diary.getRecentFoodSources(6))
-    } catch (loadError) {
-      console.error('Failed to load recent diary products.', loadError)
-      setError('Не удалось загрузить продукты. Попробуйте ещё раз.')
-    } finally {
-      setIsLoadingRecent(false)
-    }
-  }, [])
 
   const loadProducts = useCallback(async (searchQuery: string) => {
     const requestId = ++searchRequestId.current
@@ -69,10 +53,6 @@ export function FoodSelectionPage() {
   }, [])
 
   useEffect(() => {
-    void loadRecent()
-  }, [loadRecent])
-
-  useEffect(() => {
     void loadProducts(query)
   }, [loadProducts, query])
 
@@ -82,7 +62,7 @@ export function FoodSelectionPage() {
 
   const addContext = context
   const isSearching = query.trim() !== ''
-  const isInitialLoading = !isSearching && (isLoadingRecent || isLoadingProducts)
+  const isInitialLoading = !isSearching && isLoadingProducts
   const isEmptyDatabase = !isSearching && !isLoadingProducts && sources.length === 0
   const selectionPath = getDiaryAddSelectionPath(addContext)
   const createProductPath = `/products/new?returnTo=${encodeURIComponent(selectionPath)}`
@@ -104,7 +84,6 @@ export function FoodSelectionPage() {
 
   function retryLoading(): void {
     setError(undefined)
-    void loadRecent()
     void loadProducts(query)
   }
 
@@ -114,14 +93,16 @@ export function FoodSelectionPage() {
         <button className="back-link diary-add-page__back" type="button" onClick={returnToDiary}>
           ‹ Дневник
         </button>
-        <span>{formatDiaryShortDate(addContext.date)}</span>
       </header>
       <div className="diary-add-page__scroll">
         <div className="diary-add-page__intro">
-          <h1 id="food-selection-title">Выберите еду</h1>
-          <p>Добавление в {getMealTypeLabel(addContext.mealType).toLocaleLowerCase()}.</p>
+          <h1 id="food-selection-title">Продукты</h1>
         </div>
-        <ProductSearchField value={query} onChange={setQuery} placeholder="Поиск еды..." label="Поиск по продуктам и блюдам" />
+        <div className="quick-actions">
+          <Link className="button button--secondary" to={`${selectionPath}/scan`} state={{ scannerInHistory: true }}>Сканировать</Link>
+          <Link className="button button--primary" to={createProductPath}>Добавить</Link>
+        </div>
+        <ProductSearchField value={query} onChange={setQuery} placeholder="Поиск продукта или блюда..." label="Поиск по продуктам и блюдам" />
         {isInitialLoading ? <p className="status-message">Загрузка…</p> : null}
         {error === undefined ? null : (
           <div className="status-message status-message--error" role="alert">
@@ -132,31 +113,15 @@ export function FoodSelectionPage() {
         {error !== undefined || isInitialLoading ? null : isEmptyDatabase ? (
           <section className="empty-state diary-add-page__empty" aria-labelledby="empty-product-database-title">
             <h2 id="empty-product-database-title">В базе пока нет продуктов</h2>
-            <p>Создайте первый продукт, чтобы добавить его в дневник.</p>
-            <Link className="button button--primary" to={createProductPath}>Создать продукт</Link>
+            <p>Создайте первый продукт с помощью кнопки выше, чтобы добавить его в дневник.</p>
           </section>
         ) : (
           <div className="diary-selection-sections">
-            {!isSearching ? (
-              <section aria-labelledby="recent-products-title">
-                <h2 id="recent-products-title">Недавние</h2>
-                {recentSources.length === 0 ? <p className="diary-selection-sections__empty">Недавних продуктов и блюд пока нет</p> : <FoodSourceList className="food-source-list--recent" sources={recentSources} onSelect={selectSource} />}
-              </section>
-            ) : null}
             <section aria-labelledby="database-products-title">
-              <div className="diary-selection-sections__heading">
-                <h2 id="database-products-title">{isSearching ? 'Результаты поиска' : 'Моя база'}</h2>
-                {!isSearching ? (
-                  <span className="diary-selection-sections__actions">
-                    <Link to={`${selectionPath}/scan`} state={{ scannerInHistory: true }}>Сканировать</Link>
-                    <Link to={createProductPath}>+ Создать продукт</Link>
-                  </span>
-                ) : null}
-              </div>
+              <h2 id="database-products-title">{isSearching ? 'Результаты поиска' : 'Моя база'}</h2>
               {sources.length === 0 ? (
                 <div className="form-empty">
-                  <p>Ничего не найдено.</p>
-                  <Link to={createProductPath}>Создать продукт</Link>
+                  <p>Ничего не найдено. Измените запрос или создайте продукт.</p>
                 </div>
               ) : <FoodSourceList sources={sources} onSelect={selectSource} />}
             </section>

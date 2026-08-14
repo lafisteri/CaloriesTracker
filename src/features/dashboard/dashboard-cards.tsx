@@ -1,7 +1,6 @@
-import type { DayStats, WeekStats } from '@/application/statistics/statistics-service'
+import type { WeekStats } from '@/application/statistics/statistics-service'
 
 import {
-  formatCalorieGoalStatus,
   formatDashboardNumber,
   formatMacroDistribution,
   formatWeeklyBalance,
@@ -18,54 +17,6 @@ const macroMetrics: Array<{ key: MacroKey; label: string; className: string }> =
   { key: 'fat', label: 'Жиры', className: 'dashboard-macro__fill--fat' },
   { key: 'carbs', label: 'Углеводы', className: 'dashboard-macro__fill--carbs' },
 ]
-
-export function CaloriesCard({ stats }: { stats: DayStats }) {
-  const target = stats.goal?.calories
-  const hasGoal = target !== undefined && target > 0
-
-  return (
-    <section className="dashboard-card dashboard-calories" aria-labelledby="dashboard-calories-title">
-      <h2 id="dashboard-calories-title">Калории</h2>
-      <p className="dashboard-calories__value">
-        {formatDashboardNumber(stats.calories)}{hasGoal ? ` / ${formatDashboardNumber(target)}` : ''} <span>ккал</span>
-      </p>
-      <p className="dashboard-calories__status">{formatCalorieGoalStatus(stats.calories, target)}</p>
-    </section>
-  )
-}
-
-export function DailyMacroCard({ stats }: { stats: DayStats }) {
-  return (
-    <section className="dashboard-card dashboard-macros" aria-labelledby="dashboard-macros-title">
-      <div className="dashboard-card__heading">
-        <h2 id="dashboard-macros-title">Макронутриенты</h2>
-        <span>за день</span>
-      </div>
-      <dl>
-        {macroMetrics.map((metric) => {
-          const actual = stats[metric.key]
-          const target = stats.goal?.[metric.key]
-          const hasGoal = target !== undefined && target > 0
-          const progress = hasGoal ? Math.min(actual / target * 100, 100) : 0
-
-          return (
-            <div key={metric.key} className="dashboard-macro">
-              <div className="dashboard-macro__values">
-                <dt>{metric.label}</dt>
-                <dd>{formatDashboardNumber(actual)}{hasGoal ? ` / ${formatDashboardNumber(target)}` : ''} г</dd>
-              </div>
-              {hasGoal ? (
-                <div className="dashboard-macro__track" aria-label={`${metric.label}: ${formatDashboardNumber(actual)} из ${formatDashboardNumber(target)} г`}>
-                  <span className={`dashboard-macro__fill ${metric.className}${actual > target ? ' dashboard-macro__fill--over' : ''}`} style={{ width: `${progress}%` }} />
-                </div>
-              ) : <p className="dashboard-macro__no-goal">Цель не задана</p>}
-            </div>
-          )
-        })}
-      </dl>
-    </section>
-  )
-}
 
 export function WeeklyCaloriesCard({ stats }: { stats: WeekStats }) {
   return (

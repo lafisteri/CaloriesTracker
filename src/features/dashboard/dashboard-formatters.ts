@@ -6,18 +6,6 @@ export function formatDashboardNumber(value: number): string {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(value)
 }
 
-export function formatCalorieGoalStatus(actual: number, target: number | undefined): string {
-  if (target === undefined || target === 0) {
-    return 'Цель не задана'
-  }
-
-  const difference = target - actual
-
-  return difference >= 0
-    ? `Осталось ${formatDashboardNumber(difference)} ккал`
-    : `+${formatDashboardNumber(Math.abs(difference))} ккал к цели`
-}
-
 export function formatWeeklyBalance(balance: WeeklyCalorieBalance): string {
   if (balance.difference === 0) {
     return 'В цели за неделю'

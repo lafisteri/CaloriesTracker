@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import type { DayStats, WeekStats } from '@/application/statistics/statistics-service'
+import type { WeekStats } from '@/application/statistics/statistics-service'
 import { applicationServices } from '@/app/providers/application-services'
 import { DiaryDateNavigation } from '@/features/diary/diary-date-navigation'
 import { shiftLocalDateKey, toLocalDateKey } from '@/shared/utils/local-date-key'
 
-import { CaloriesCard, DailyMacroCard, WeeklyCaloriesCard, WeeklyMacroCard } from './dashboard-cards'
+import { WeeklyCaloriesCard, WeeklyMacroCard } from './dashboard-cards'
 
 export function TodayPage() {
   const [date, setDate] = useState(toLocalDateKey)
-  const [dailyStats, setDailyStats] = useState<DayStats | undefined>()
   const [weekStats, setWeekStats] = useState<WeekStats | undefined>()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
@@ -23,10 +22,8 @@ export function TodayPage() {
 
     try {
       const loadedWeekStats = await applicationServices.statistics.getWeekStats(dateKey)
-      const loadedDailyStats = loadedWeekStats.days.find((day) => day.date === dateKey)
 
-      if (requestId === loadRequestId.current && loadedDailyStats !== undefined) {
-        setDailyStats(loadedDailyStats)
+      if (requestId === loadRequestId.current) {
         setWeekStats(loadedWeekStats)
       }
     } catch (loadError) {
@@ -65,10 +62,8 @@ export function TodayPage() {
           <button className="button button--secondary" type="button" onClick={() => void loadDashboard(date)}>Повторить</button>
         </div>
       )}
-      {dailyStats === undefined || weekStats === undefined || isLoading || error !== undefined ? null : (
+      {weekStats === undefined || isLoading || error !== undefined ? null : (
         <>
-          <CaloriesCard stats={dailyStats} />
-          <DailyMacroCard stats={dailyStats} />
           <WeeklyCaloriesCard stats={weekStats} />
           <WeeklyMacroCard stats={weekStats} />
         </>
