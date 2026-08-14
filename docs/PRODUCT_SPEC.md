@@ -1,1414 +1,360 @@
-# Master Prompt для Codex: PWA для учёта КБЖУ
+# PRODUCT_SPEC
 
-Ты работаешь как senior full-stack engineer и архитектор.
+**Status:** Current product specification
+**Last updated:** 2026-08-14
 
-Нужно разработать mobile-first PWA для личного учёта калорий, белков, жиров и углеводов.
+This document describes the current intended behavior of the application. If it conflicts with older phase prompts or historical planning notes, this document is the source of truth for product behavior. The current code remains the source for implementation details.
 
-Приложение предназначено в первую очередь для iPhone и должно устанавливаться на Home Screen как PWA.
+## 1. Product overview
 
-Главные приоритеты:
+КБЖУ — personal, local-first PWA для учёта калорий, белков, жиров и углеводов. Приложение ориентировано прежде всего на iPhone, устанавливается на Home Screen и не требует регистрации.
 
-1. Простота.
-2. Скорость добавления еды.
-3. Local-first архитектура.
-4. Работа offline.
-5. Собственная база продуктов.
-6. Рецепты.
-7. Версионирование продуктов и рецептов.
-8. Корректная история дневника.
-9. Минимум лишних функций.
-10. Код должен быть понятным, модульным и пригодным для дальнейшего развития.
-
----
-
-# 1. Технологический стек
-
-Использовать:
+Основной ежедневный сценарий:
 
 ```text
-React
-TypeScript
-Vite
-React Router
-Tailwind CSS
-
-IndexedDB
-Dexie.js
-
-Zustand
-
-React Hook Form
-Zod
-
-Vitest
-React Testing Library
-Playwright
-
-vite-plugin-pwa
-
-Backend в будущем:
-Supabase / PostgreSQL
+Открыть приложение
+→ Сегодня
+→ добавить еду
+→ выбрать продукт или рецепт
+→ указать количество
+→ сохранить
 ```
 
-Backend НЕ реализовывать на первом этапе.
+Пользователь самостоятельно ведёт базу продуктов. Приложение не использует внешнюю базу питания и не меняет исторические данные задним числом.
 
-Первая версия должна полностью работать локально через IndexedDB.
+## 2. Product principles
 
-Архитектуру подготовить так, чтобы позднее можно было подключить Supabase через repository/sync слой без переписывания UI и domain logic.
+- Mobile-first и iPhone/PWA-first интерфейс.
+- Local-first хранение и работа без аккаунта.
+- Offline-capable после первого успешного запуска.
+- Собственная, управляемая пользователем база продуктов и рецептов.
+- Минимум действий в ежедневном food logging flow.
+- Версионирование nutritional data.
+- Исторические данные не должны незаметно изменяться.
+- Понятный, спокойный интерфейс без геймификации и лишних функций.
 
----
+## 3. Navigation and information architecture
 
-# 2. Основной архитектурный принцип
-
-Использовать слои:
+Постоянная нижняя навигация содержит только часто используемые разделы:
 
 ```text
-UI
-↓
-Application
-↓
-Domain
-↓
-Repositories
-↓
-Local Database
-↓
-Future Sync Layer
-↓
-Supabase
+Сегодня      → /diary
+Статистика   → /dashboard
+Продукты     → /products
 ```
 
-UI не должен напрямую обращаться к Dexie.
+`/` перенаправляет на `/diary`. PWA manifest использует `/` как `start_url`, поэтому запуск с Home Screen также приводит в дневник.
 
-UI не должен самостоятельно выполнять расчёты КБЖУ.
+Маршрут `/today` сохранён как compatibility redirect на `/dashboard`. Неизвестные маршруты перенаправляются на `/diary`.
 
-Вся бизнес-логика должна находиться в domain/application слоях.
+`/goals` остаётся доступным маршрутом, но не занимает постоянное место в bottom navigation. Основной вход в настройки целей — secondary action **«Настроить цели»** на экране «Статистика».
 
----
+Полноэкранные промежуточные сценарии скрывают header и bottom navigation:
 
-# 3. Предлагаемая структура проекта
+- выбор еды;
+- ввод количества;
+- сканер штрихкода;
+- создание и редактирование рецепта.
+
+## 4. Today and diary
+
+В нижней навигации **«Сегодня»** означает дневник, а не статистику.
+
+Обычный переход на `/diary` всегда открывает текущую локальную дату. Diary date deep links поддерживаются через `/diary?date=YYYY-MM-DD`; внутри дневника можно перейти на прошлую или будущую дату и вернуться к сегодняшней.
+
+Дневник содержит:
+
+- навигацию по датам;
+- дневные калории и Б/Ж/У;
+- четыре группы: Завтрак, Обед, Ужин и Перекусы;
+- итоги каждого приёма пищи;
+- записи дневника;
+- действие **«+ Добавить»** для каждого meal type.
+
+Пустые секции приёмов пищи остаются компактными и не должны мешать добавлению. Текст пустого дня:
 
 ```text
-src/
-  app/
-    router/
-    providers/
-    layout/
-
-  features/
-    dashboard/
-    diary/
-    products/
-    recipes/
-    goals/
-    barcode/
-
-  domain/
-    nutrition/
-    units/
-    products/
-    recipes/
-    diary/
-    goals/
-    statistics/
-
-  data/
-    database/
-    repositories/
-    sync/
-
-  shared/
-    ui/
-    hooks/
-    types/
-    utils/
+Сегодня пока ничего не добавлено
 ```
 
-Не создавать огромные универсальные файлы.
-
-Разделять ответственность.
-
----
-
-# 4. Основные разделы приложения
-
-Нижняя навигация:
+или, для другой даты:
 
 ```text
-Сегодня
-Дневник
-Продукты
-Цели
+За этот день ничего не добавлено
 ```
 
-Приложение mobile-first.
+## 5. Food selection and amount flow
 
-Главная ширина и UX ориентированы на iPhone.
-
----
-
-# 5. Dashboard
-
-Главный экран показывает:
-
-## Сегодня
-
-Дата:
+Основной flow добавления еды:
 
 ```text
-‹   Чт, 13 августа   ›
+Diary
+→ + Добавить
+→ Full-screen Food Selection
+→ выбрать Product или Recipe
+→ Full-screen Amount / Unit
+→ Добавить
+→ Diary
 ```
 
-Возможности:
+Контекст даты и приёма пищи передаётся в URL. После успешного добавления пользователь возвращается прямо в соответствующий дневник; completed Amount screen не должен появляться при обычном возврате назад.
 
-- предыдущий день;
-- следующий день;
-- календарь;
-- возврат на сегодня.
+### Food Selection
 
----
+Это один общий полноэкранный экран, а не bottom sheet. В нём есть:
 
-## Calories Card
+1. поиск по продуктам и рецептам;
+2. компактный список недавних источников;
+3. единая локальная база продуктов и блюд;
+4. переход к сканированию и созданию продукта.
 
-Показывать:
+Пользователь не выбирает заранее тип «продукт или рецепт»: оба типа присутствуют в одном поиске и одном списке. Search обновляет результаты без отдельной кнопки. Поле имеет clear action и не открывает клавиатуру автоматически при каждом входе в Food Selection.
+
+Recent хранит логическую пару `sourceType + sourceId`. При повторном добавлении используется актуальная `ProductVersion` или `RecipeVersion`, а не версия старой DiaryEntry.
+
+### Amount and units
+
+Экран Amount общий для продуктов и рецептов. Он показывает название источника, выбранный приём пищи, количество, доступную единицу, live preview КБЖУ и CTA **«Добавить в …»**.
+
+Количество поддерживает целые и десятичные значения с подходящей numeric keyboard. Preview и сохраняемая DiaryEntry используют один расчётный путь.
+
+## 6. Products
+
+Пользователь ведёт собственную базу продуктов. Доступны:
+
+- создание;
+- поиск по названию и штрихкоду;
+- просмотр;
+- редактирование;
+- soft delete;
+- штрихкод;
+- базовая пищевая ценность;
+- дополнительные Serving Units;
+- история версий.
+
+Products и Recipes доступны как отдельные вкладки management catalog на `/products`. Management mode не смешивается с Food Selection mode.
+
+### Product and ProductVersion
+
+`Product` — логическая сущность с именем, optional barcode и ссылкой на актуальную версию. Nutrition и units принадлежат `ProductVersion`.
+
+Изменение базовой единицы, базового количества, калорий, Б/Ж/У или дополнительных единиц создаёт новую `ProductVersion` (`v1`, `v2`, `v3` и далее). `currentVersionId` указывает на актуальную версию. Старые версии не редактируются и доступны в истории.
+
+Новая DiaryEntry использует текущую версию. Историческая DiaryEntry сохраняет ссылку на использованную версию и собственный nutrition snapshot.
+
+### Serving Units
+
+Продукт может иметь пользовательские единицы, например:
 
 ```text
-Калории
-
-1640 / 2200 ккал
-
-Осталось 560 ккал
-```
-
-Если превышено:
-
-```text
-+180 ккал к цели
-```
-
-Не использовать негативные или обвиняющие тексты.
-
----
-
-## Weekly Calories Chart
-
-Показывать:
-
-```text
-Пн Вт Ср Чт Пт Сб Вс
-```
-
-Для каждого дня:
-
-```text
-actual calories / daily goal
-```
-
-Если цель превышена, это должно визуально отображаться.
-
-Под графиком:
-
-```text
-−799 ккал за неделю
-```
-
-или:
-
-```text
-+320 ккал к недельной цели
-```
-
-Цель каждого дня может быть разной.
-
----
-
-## Macro Card
-
-Показывать:
-
-```text
-Белки       128 / 150 г
-Жиры         61 / 70 г
-Углеводы    180 / 230 г
-```
-
-Также отображать недельный stacked bar chart:
-
-```text
-Protein
-Fat
-Carbs
-```
-
-по дням недели.
-
----
-
-# 6. Дневник питания
-
-Для каждого дня существуют группы:
-
-```text
-Завтрак
-Обед
-Ужин
-Перекусы
-```
-
-Каждая группа содержит DiaryEntry.
-
-Пример:
-
-```text
-Пицца домашняя
-180 г
-412 ккал
-```
-
-По нажатию можно показать:
-
-```text
-Белки
-Жиры
-Углеводы
-Версия источника
-```
-
----
-
-# 7. Добавление еды
-
-Основной flow:
-
-```text
-+ Добавить
-↓
-Недавние / Поиск
-↓
-Выбор продукта или рецепта
-↓
-Выбор единицы
-↓
-Количество
-↓
-Предпросмотр КБЖУ
-↓
-Добавить
-```
-
-При добавлении изменения должны мгновенно появляться:
-
-- в дневнике;
-- в дневных итогах;
-- на Dashboard;
-- в недельной статистике.
-
----
-
-# 8. Быстрое добавление
-
-При открытии food picker сначала показывать:
-
-```text
-Недавние
-```
-
-Недавние формировать на основе DiaryEntry.
-
-Не показывать несколько одинаковых записей одного продукта подряд.
-
-После блока Recent:
-
-```text
-Поиск
-```
-
-Поиск выполняется только по собственной базе.
-
----
-
-# 9. Продукты
-
-Пользователь вручную создаёт всю базу продуктов.
-
-На MVP НЕ использовать:
-
-- OpenFoodFacts;
-- внешние API;
-- готовые базы продуктов;
-- AI для определения продуктов.
-
----
-
-# 10. Product
-
-Product является постоянной логической сущностью.
-
-```ts
-interface Product {
-  id: string
-  name: string
-  barcode?: string
-  currentVersionId: string
-  createdAt: string
-  updatedAt: string
-  deletedAt?: string
-}
-```
-
-Использовать UUID.
-
----
-
-# 11. ProductVersion
-
-Пищевая ценность хранится в версиях.
-
-```ts
-interface ProductVersion {
-  id: string
-  productId: string
-  versionNumber: number
-
-  baseUnitType: 'g' | 'ml' | 'piece' | 'serving'
-  baseAmount: number
-
-  calories: number
-  protein: number
-  fat: number
-  carbs: number
-
-  servingUnits: ServingUnit[]
-
-  createdAt: string
-}
-```
-
----
-
-# 12. ServingUnit
-
-Пример:
-
-```text
-Хлеб:
-
-100 г
-250 ккал
-
 1 кусок = 32 г
+1 стакан = 250 мл
 ```
+
+Пищевая ценность рассчитывается от базовой единицы через conversion и nutrition calculation. В UI используются понятные названия единиц, а не внутренние технические поля.
+
+## 7. Recipes
+
+Recipes — реализованная часть продукта, а не future feature.
 
 Модель:
 
-```ts
-interface ServingUnit {
-  id: string
-  name: string
-  conversionAmount: number
-  conversionUnit: 'g' | 'ml' | 'piece'
-}
-```
-
----
-
-# 13. Версионирование продуктов
-
-При изменении:
-
-- calories;
-- protein;
-- fat;
-- carbs;
-- base unit;
-- serving units;
-
-НЕ изменять старую ProductVersion.
-
-Создавать новую:
-
 ```text
-v1
-v2
-v3
-```
-
-Product.currentVersionId переключать на новую версию.
-
-Поиск должен использовать только текущую версию.
-
-Историю версий показывать отдельно.
-
----
-
-# 14. Расчёт продукта
-
-Пример:
-
-```text
-350 ккал / 100 г
-```
-
-Пользователь выбирает:
-
-```text
-45 г
-```
-
-Результат:
-
-```text
-350 × 45 / 100
-```
-
-То же самое для:
-
-```text
-protein
-fat
-carbs
-```
-
-Создать отдельный чистый сервис:
-
-```ts
-NutritionCalculator
-```
-
-Расчёты должны быть unit-tested.
-
----
-
-# 15. UnitConverter
-
-Создать отдельный:
-
-```ts
-UnitConverter
-```
-
-Пример:
-
-```text
-1 кусок = 32 г
-```
-
-```text
-2 кусочка = 64 г
-```
-
-После конвертации NutritionCalculator выполняет расчёт КБЖУ.
-
-Не смешивать unit conversion и nutrition calculation.
-
----
-
-# 16. Создание продукта
-
-Форма:
-
-```text
-Название
-
-Barcode optional
-
-Базовая единица:
-100 г
-100 мл
-1 шт
-1 порция
-
-Калории
-Белки
-Жиры
-Углеводы
-
-Дополнительные единицы
-```
-
-Использовать:
-
-```text
-React Hook Form
-Zod
-```
-
----
-
-# 17. Barcode
-
-На MVP barcode работает только с локальной базой.
-
-Flow:
-
-```text
-Сканировать
-↓
-barcode
-↓
-поиск Product.barcode
-```
-
-Если найден:
-
-```text
-открыть текущий ProductVersion
-```
-
-Если не найден:
-
-```text
-открыть Create Product
-```
-
-Barcode должен быть уже заполнен.
-
-Предусмотреть архитектуру BarcodeService, чтобы позднее можно было добавить внешний lookup.
-
----
-
-# 18. Recipe
-
-Recipe является логической сущностью.
-
-```ts
-interface Recipe {
-  id: string
-  name: string
-  currentVersionId: string
-  createdAt: string
-  updatedAt: string
-  deletedAt?: string
-}
-```
-
----
-
-# 19. RecipeVersion
-
-```ts
-interface RecipeVersion {
-  id: string
-  recipeId: string
-  versionNumber: number
-
-  ingredients: RecipeIngredient[]
-
-  totalCalories: number
-  totalProtein: number
-  totalFat: number
-  totalCarbs: number
-
-  cookedWeight?: number
-  servingsCount?: number
-
-  createdAt: string
-}
-```
-
----
-
-# 20. RecipeIngredient
-
-Каждый ингредиент должен ссылаться именно на конкретную ProductVersion.
-
-```ts
-interface RecipeIngredient {
-  id: string
-
-  productId: string
-  productVersionId: string
-
-  amount: number
-  unit: string
-  normalizedAmount: number
-}
-```
-
----
-
-# 21. Создание рецепта
-
-Flow:
-
-```text
-Новый рецепт
-↓
-Название
-↓
-Добавить продукт
-↓
-Количество
-↓
-Добавить следующий ингредиент
-↓
-...
-↓
-Готовый вес
-и/или
-Количество изделий
-↓
-Предпросмотр КБЖУ
-↓
-Сохранить
-```
-
----
-
-# 22. Пример рецепта
-
-```text
-Пицца
-
-Мука       100 г
-Молоко      50 г
-Сыр        100 г
-Колбаса    100 г
-```
-
-Допустим суммарно:
-
-```text
-900 ккал
-45 Б
-35 Ж
-100 У
-```
-
-После приготовления пользователь указывает:
-
-```text
-Готовый вес = 300 г
-```
-
-Тогда:
-
-```text
-100 г готовой пиццы:
-
-300 ккал
-15 Б
-11.67 Ж
-33.33 У
-```
-
----
-
-# 23. RecipeCalculator
-
-Создать отдельный pure service:
-
-```ts
-RecipeCalculator
-```
-
-На вход:
-
-```text
-ingredients
-productVersions
-amounts
-units
-cookedWeight
-servingsCount
-```
-
-На выход:
-
-```text
-totalNutrition
-nutritionPer100g
-nutritionPerServing
-```
-
-Покрыть unit tests.
-
----
-
-# 24. Рецепт по штукам
-
-Пример:
-
-```text
-Сырники
-
-1200 ккал total
-
-12 шт
-```
-
-Результат:
-
-```text
-1 шт = 100 ккал
-```
-
-Если дополнительно:
-
-```text
-720 г
-12 шт
-```
-
-то:
-
-```text
-1 шт = 60 г
-```
-
-Пользователь может добавлять рецепт:
-
-```text
-по граммам
-```
-
-или:
-
-```text
-по штукам
-```
-
----
-
-# 25. Версионирование рецептов
-
-При редактировании рецепта:
-
-НЕ изменять существующий RecipeVersion.
-
-Создавать:
-
-```text
-Recipe v2
-Recipe v3
-...
-```
-
----
-
-# 26. Обновление ингредиентов рецепта
-
-Если Product внутри рецепта получил новую версию:
-
-НЕ менять рецепт автоматически.
-
-Показывать состояние:
-
-```text
-Есть обновлённые ингредиенты
-```
-
-Кнопка:
-
-```text
-Обновить рецепт
-```
-
-После нажатия:
-
-1. взять актуальные ProductVersion;
-2. пересчитать рецепт;
-3. создать новую RecipeVersion;
-4. сделать её currentVersion.
-
----
-
-# 27. DiaryEntry
-
-```ts
-interface DiaryEntry {
-  id: string
-
-  date: string
-  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
-
-  sourceType: 'product' | 'recipe'
-
-  sourceId: string
-  sourceVersionId: string
-
-  sourceName: string
-
-  amount: number
-  unit: string
-
-  calories: number
-  protein: number
-  fat: number
-  carbs: number
-
-  createdAt: string
-  updatedAt: string
-  deletedAt?: string
-}
-```
-
----
-
-# 28. Snapshot rule
-
-Это критически важное требование.
-
-DiaryEntry хранит рассчитанные:
-
-```text
-calories
-protein
-fat
-carbs
-```
-
-на момент добавления.
-
-НИКОГДА автоматически не пересчитывать старые DiaryEntry.
-
-Пример:
-
-```text
-Пицца v1
-300 ккал / 100 г
-```
-
-была добавлена вчера.
-
-Сегодня появилась:
-
-```text
-Пицца v2
-320 ккал / 100 г
-```
-
-Вчерашняя запись должна оставаться:
-
-```text
-300 ккал
-```
-
----
-
-# 29. Цели
-
-Пользователь сам задаёт цели.
-
-Не рассчитывать их автоматически.
-
-Отдельная вкладка:
-
-```text
-Цели
-```
-
-Для каждого дня недели:
-
-```text
-Понедельник
-Calories
-Protein
-Fat
-Carbs
-
-Вторник
-Calories
-Protein
-Fat
-Carbs
-
-...
-```
-
----
-
-# 30. Apply to all
-
-Добавить возможность:
-
-```text
-Применить ко всем дням
-```
-
-После этого пользователь может отдельно изменить любой день.
-
----
-
-# 31. Goal history
-
-Цели должны иметь историю.
-
-```ts
-interface WeeklyGoal {
-  id: string
-  effectiveFrom: string
-
-  monday: DailyMacroGoal
-  tuesday: DailyMacroGoal
-  wednesday: DailyMacroGoal
-  thursday: DailyMacroGoal
-  friday: DailyMacroGoal
-  saturday: DailyMacroGoal
-  sunday: DailyMacroGoal
-
-  createdAt: string
-}
-```
-
-```ts
-interface DailyMacroGoal {
-  calories: number
-  protein: number
-  fat: number
-  carbs: number
-}
-```
-
-Изменение цели создаёт новую WeeklyGoal.
-
----
-
-# 32. Local Database
-
-Использовать Dexie.
-
-Создать таблицы минимум:
-
-```text
-products
-productVersions
-
-recipes
-recipeVersions
-
-diaryEntries
-
-weeklyGoals
-```
-
-Не хранить данные приложения только в Zustand.
-
-Zustand использовать исключительно для UI state.
-
----
-
-# 33. Offline-first
-
-Без интернета должны работать:
-
-```text
-просмотр
-поиск
-создание продукта
-редактирование продукта
-создание рецепта
-дневник
-цели
-Dashboard
-статистика
-```
-
----
-
-# 34. PWA
-
-Настроить:
-
-```text
-manifest
-service worker
-offline shell
-icons
-standalone
-safe-area
-```
-
-Приложение должно корректно работать при запуске с iPhone Home Screen.
-
-Не забывать:
-
-```css
-env(safe-area-inset-top)
-env(safe-area-inset-bottom)
-```
-
----
-
-# 35. iPhone UX
-
-Особое внимание:
-
-- fixed bottom navigation;
-- safe area;
-- клавиатура;
-- numeric inputs;
-- touch targets;
-- forms;
-- scroll;
-- modals;
-- camera permissions.
-
-Не проектировать интерфейс как уменьшенный desktop.
-
----
-
-# 36. Форматы чисел
-
-Во внутренних расчётах использовать достаточную точность.
-
-Не округлять промежуточные вычисления.
-
-UI:
-
-```text
-Calories:
-1642
-
-Protein:
-127.4 г
-
-Fat:
-63.8 г
-
-Carbs:
-181.2 г
-```
-
----
-
-# 37. Валидация
-
-Не разрешать:
-
-```text
-negative amount
-negative calories
-negative macros
-empty product name
-recipe without ingredients
-cookedWeight <= 0
-servingsCount <= 0
-```
-
-если соответствующее поле используется.
-
----
-
-# 38. Tests
-
-Обязательно покрыть unit tests:
-
-```text
-NutritionCalculator
-UnitConverter
-RecipeCalculator
-Product versioning
-Recipe versioning
-Goal resolution by date
-Daily statistics
-Weekly statistics
-```
-
----
-
-# 39. Critical test 1
-
-Product:
-
-```text
-250 kcal / 100 g
-```
-
-Amount:
-
-```text
-65 g
-```
-
-Expected:
-
-```text
-162.5 kcal
-```
-
----
-
-# 40. Critical test 2
-
-Recipe:
-
-```text
-Total = 900 kcal
-Cooked weight = 300 g
-```
-
-Expected:
-
-```text
-100 g = 300 kcal
-```
-
----
-
-# 41. Critical test 3
-
-Recipe:
-
-```text
-Total = 1200 kcal
-Servings = 12
-```
-
-Expected:
-
-```text
-1 serving = 100 kcal
-```
-
----
-
-# 42. Critical test 4
-
-Version history:
-
-1. Product Cheese v1.
-2. Recipe Pizza v1 uses Cheese v1.
-3. Pizza v1 added to diary.
-4. Create Cheese v2.
-5. Update Pizza → Pizza v2.
-6. Add Pizza v2.
-
-Expected:
-
-```text
-old DiaryEntry keeps Pizza v1 values
-
-new DiaryEntry uses Pizza v2 values
-```
-
----
-
-# 43. UI стиль
-
-Использовать минималистичный карточный интерфейс.
-
-Ориентироваться на общую информационную структуру Lose It:
-
-- cards;
-- weekly bars;
-- macros;
-- clear typography;
-- dense but readable information.
-
-Не копировать интерфейс Lose It pixel-by-pixel.
-
-Не копировать:
-
-- логотип;
-- бренд;
-- иконки;
-- уникальную визуальную идентичность.
-
----
-
-# 44. Не добавлять без запроса
-
-НЕ добавлять самостоятельно:
-
-```text
-weight tracking
-water tracking
-steps
-exercise
-AI food recognition
-photo recognition
-nutrition recommendations
-social features
-gamification
-streaks
-subscriptions
-ads
-authentication
-external food APIs
-```
-
-Если кажется, что нужна новая функция, сначала остановиться и описать предложение.
-
-Не реализовывать её самостоятельно.
-
----
-
-# 45. Правила работы над проектом
-
-Не пытайся реализовать всё приложение одним большим изменением.
-
-Работай по этапам.
-
-Перед каждым этапом:
-
-1. изучи существующий код;
-2. опиши краткий план;
-3. перечисли файлы, которые планируешь изменить;
-4. реализуй только текущий этап;
-5. запусти tests;
-6. запусти TypeScript check;
-7. проверь build;
-8. исправь ошибки;
-9. дай краткий отчёт.
-
-Не переходи к следующему Phase без команды пользователя.
-
----
-
-# 46. Phase 1
-
-Первым этапом реализовать ТОЛЬКО foundation.
-
-Не создавать полностью Products/Diary/Recipes.
-
-Нужно:
-
-```text
-React + TypeScript + Vite project
-
-Tailwind
-
-React Router
-
-PWA setup
-
-Dexie setup
-
-application layout
-
-bottom navigation
-
-placeholder pages:
-
-Сегодня
-Дневник
-Продукты
-Цели
-
-domain types
-
-repository interfaces
-
-basic local database
-
-Vitest
-
-ESLint
-
-TypeScript strict mode
-```
-
----
-
-# 47. Phase 1 UI
-
-Сделать минимальный mobile shell:
-
-```text
-Header
-
-Page content
-
-Bottom nav
-```
-
-Bottom nav:
-
-```text
-Сегодня
-Дневник
-Продукты
-Цели
-```
-
-Учитывать iPhone safe area.
-
-Не заниматься детальным Dashboard.
-
----
-
-# 48. Phase 1 data models
-
-Создать initial domain models:
-
-```text
-Product
-ProductVersion
-ServingUnit
-
 Recipe
-RecipeVersion
-RecipeIngredient
+→ RecipeVersion
+→ RecipeIngredient
+→ ProductVersion
+```
 
-DiaryEntry
+Рецепт содержит название, ингредиенты, количество и единицу каждого ингредиента, optional cooked weight и optional servings count.
 
+Для сохранения рецепта нужны хотя бы один ингредиент и хотя бы один способ выдачи результата: cooked weight или servings count.
+
+### Nutrition
+
+Total nutrition — сумма nutrition всех ингредиентов.
+
+```text
+per 100 g = total / cookedWeight × 100
+per serving = total / servingsCount
+```
+
+Если заданы оба значения, рецепт можно добавлять и по граммам, и по штукам. В списке и preview nutrition отображается в той же единице, к которой относится показатель.
+
+### Recipe versioning and pinned ingredients
+
+Изменение ингредиентов, их количества, единиц, pinned `ProductVersion`, cooked weight или servings count создаёт новую `RecipeVersion`. Старая версия остаётся неизменной.
+
+`RecipeIngredient` хранит конкретный `productVersionId`. Рецепт не переключается автоматически на `Product.currentVersionId`.
+
+Если продукт получает новую версию, Recipe UI может показать **«Есть обновлённые ингредиенты»**. Пользователь может вручную применить актуальные совместимые версии; это создаёт новую `RecipeVersion`.
+
+## 8. Barcode
+
+Barcode реализован как local-only инструмент:
+
+- сканирование камерой через нативный `BarcodeDetector`, когда он поддержан браузером;
+- ручной ввод кода;
+- точный поиск в локальной IndexedDB;
+- использование из Products и из Food Selection.
+
+Штрихкод — строка: leading zeros сохраняются. Он нормализуется для exact lookup и не должен дублироваться в базе, включая soft-deleted записи.
+
+Management flow:
+
+```text
+Products
+→ Scan
+→ known barcode
+→ Product details
+```
+
+Diary flow:
+
+```text
+Diary
+→ Food Selection
+→ Scan
+→ known barcode
+→ Amount
+→ Add
+→ Diary
+```
+
+Для known product используется current `ProductVersion`. Если barcode неизвестен, открывается создание продукта с заполненным кодом. При входе из Diary сохраняется исходный context даты и meal type.
+
+Внешние barcode/product APIs сейчас не используются.
+
+## 9. Goals
+
+Goals задаются пользователем вручную и доступны из **«Статистика → Настроить цели»**, а также по сохранённому маршруту `/goals`.
+
+Модель цели:
+
+```text
 WeeklyGoal
-DailyMacroGoal
+effectiveFrom
+7 × DailyMacroGoal
 ```
 
-Не реализовывать всю бизнес-логику.
+Для каждого дня недели задаются calories, protein, fat и carbs. Можно скопировать значения одного дня во все дни, затем изменить отдельные дни.
 
----
+Изменение создаёт новую immutable `WeeklyGoal`. Для исторической даты Diary и Statistics используют цель, актуальную на эту дату, а не сегодняшнюю цель.
 
-# 49. Phase 1 repository interfaces
+## 10. Statistics
 
-Подготовить:
+Dashboard в пользовательском интерфейсе называется **«Статистика»** и расположен на `/dashboard`. Он является вторичным аналитическим разделом, а не главным стартовым экраном.
+
+Statistics показывает выбранный день и соответствующую неделю:
+
+- калории за день и дневную цель;
+- статус remaining/over goal без обвиняющих формулировок;
+- дневные Б/Ж/У;
+- недельные бары калорий;
+- недельный calorie balance;
+- недельное распределение Б/Ж/У.
+
+Weekly balance не считает будущие дни текущей недели как deficit. Для прошлой недели учитывается вся неделя.
+
+Проценты Б/Ж/У считаются по энергии:
 
 ```text
-ProductRepository
-RecipeRepository
-DiaryRepository
-GoalRepository
+Protein = grams × 4
+Fat = grams × 9
+Carbs = grams × 4
 ```
 
-Создать Dexie implementations.
+Проценты относятся к macro-derived energy. Calories в DiaryEntry остаются отдельным snapshot и могут незначительно отличаться от этой производной величины.
 
-UI пока не должен напрямую использовать Dexie tables.
+## 11. Versioning and historical integrity
 
----
+Historical integrity — обязательное правило продукта.
 
-# 50. Phase 1 completion criteria
+DiaryEntry хранит:
 
-Phase 1 считается завершённым, если:
+- date и mealType;
+- sourceType, sourceId и sourceVersionId;
+- sourceName snapshot;
+- amount и unit;
+- snapshots calories, protein, fat и carbs.
+
+После изменения Product или Recipe прошлые DiaryEntry не пересчитываются автоматически. Например, запись Pizza v1 остаётся с nutrition Pizza v1 после появления Pizza v2.
+
+При редактировании исторической DiaryEntry расчёт выполняется через сохранённый `sourceVersionId`, а не через актуальную версию продукта или рецепта.
+
+## 12. Storage and architecture
+
+Текущий stack:
+
+- React, TypeScript, Vite и React Router;
+- Tailwind CSS;
+- Dexie.js и IndexedDB;
+- React Hook Form и Zod для форм и валидации;
+- Zustand только для transient UI state;
+- vite-plugin-pwa и Workbox.
+
+Пользовательские данные хранятся локально в IndexedDB: products, productVersions, recipes, recipeVersions, diaryEntries и weeklyGoals.
+
+Архитектура разделяет UI, application services, domain rules, repository interfaces и Dexie implementations. UI не обращается к Dexie напрямую и не дублирует расчёты nutrition.
+
+## 13. Offline and PWA
+
+После первого успешного запуска приложение должно работать offline для локальных сценариев:
+
+- Diary и добавление существующей еды;
+- Products и Recipes;
+- Goals;
+- Statistics на локальных данных;
+- local barcode lookup и ручной barcode input.
+
+PWA поддерживает manifest, service worker, app shell cache, standalone mode, Home Screen installation, локальные icons и iPhone safe areas. Обновления service worker используют normal auto-update behavior. User data остаются в IndexedDB, а не в service worker cache.
+
+## 14. UX rules
+
+- Основные flows полноэкранные; primary food selection не является маленьким bottom sheet.
+- Controls должны быть touch-friendly, обычно с target не менее 44 px.
+- Sticky CTA учитывают safe area и не должны перекрывать поля.
+- Numeric fields используют подходящие input modes.
+- Клавиатура не должна мешать редактированию или сохранению.
+- Длинные названия не должны создавать horizontal scroll.
+- Bottom navigation предназначена только для частых разделов.
+- Ошибки формулируются человеческим языком и не показывают технические исключения пользователю.
+
+## 15. Out of scope
+
+В текущий продукт не входят:
+
+- weight tracking;
+- water tracking;
+- exercise, activity или steps;
+- gamification, streaks и social features;
+- subscriptions и ads;
+- medical advice;
+- AI/photo food recognition;
+- external food database lookup;
+- authentication, sharing и recipe photos;
+- complex onboarding.
+
+## 16. Future and deferred
+
+Следующие возможности не реализованы и не считаются принятым планом:
+
+- Export / Import JSON backup;
+- optional Supabase backup/sync;
+- optional external barcode/product lookup.
+
+К ним следует возвращаться только после подтверждённой пользовательской потребности.
+
+## 17. Document precedence
+
+For intended product behavior, precedence is:
 
 ```text
-npm install works
-
-npm run dev works
-
-npm run build works
-
-tests work
-
-PWA manifest exists
-
-IndexedDB initializes
-
-navigation works
-
-all four placeholder pages open
-
-mobile layout works
-
-project structure follows architecture
+Current PRODUCT_SPEC.md
+>
+older phase prompts
+>
+historical planning notes
 ```
 
----
-
-# 51. После завершения Phase 1
-
-ОСТАНОВИСЬ.
-
-Не начинай Products.
-
-В ответе покажи:
-
-1. что было создано;
-2. структуру проекта;
-3. архитектурные решения;
-4. команды запуска;
-5. результаты tests/build;
-6. что будет сделано в Phase 2.
-
-После этого жди следующую команду.
+Документ описывает продукт, а не историю разработки. Новые возможности не следует считать реализованными, пока они не добавлены в этот spec и в код.

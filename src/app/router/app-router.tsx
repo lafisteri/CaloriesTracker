@@ -36,8 +36,9 @@ export function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate replace to="/today" />} />
-          <Route path="today" element={<TodayPage />} />
+          <Route index element={<Navigate replace to="/diary" />} />
+          <Route path="today" element={<Navigate replace to="/dashboard" />} />
+          <Route path="dashboard" element={<TodayPage />} />
           <Route path="diary" element={<DiaryPage />} />
           <Route path="diary/:date/:mealType/add" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodSelectionPage /></Suspense>} />
           <Route path="diary/:date/:mealType/add/scan" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><BarcodeScannerPage /></Suspense>} />
@@ -53,7 +54,7 @@ export function AppRouter() {
           <Route path="recipes/:recipeId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><RecipeDetailsPage /></Suspense>} />
           <Route path="recipes/:recipeId/edit" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><RecipeFormPage /></Suspense>} />
           <Route path="goals" element={<GoalsPage />} />
-          <Route path="*" element={<Navigate replace to="/today" />} />
+          <Route path="*" element={<Navigate replace to="/diary" />} />
         </Route>
       </Routes>
     </BrowserRouter>

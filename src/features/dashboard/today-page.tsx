@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import type { DayStats, WeekStats } from '@/application/statistics/statistics-service'
 import { applicationServices } from '@/app/providers/application-services'
@@ -47,7 +48,10 @@ export function TodayPage() {
 
   return (
     <section className="dashboard-page" aria-labelledby="dashboard-title">
-      <h1 id="dashboard-title" className="sr-only">Сводка питания</h1>
+      <header className="dashboard-page__header">
+        <h1 id="dashboard-title">Статистика</h1>
+        <Link className="dashboard-page__goals-link" to="/goals" state={{ effectiveFrom: date }}>Настроить цели</Link>
+      </header>
       <DiaryDateNavigation
         date={date}
         onChange={setDate}

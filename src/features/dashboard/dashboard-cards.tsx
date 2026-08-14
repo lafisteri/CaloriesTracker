@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom'
-
 import type { DayStats, WeekStats } from '@/application/statistics/statistics-service'
 
 import {
@@ -32,7 +30,6 @@ export function CaloriesCard({ stats }: { stats: DayStats }) {
         {formatDashboardNumber(stats.calories)}{hasGoal ? ` / ${formatDashboardNumber(target)}` : ''} <span>ккал</span>
       </p>
       <p className="dashboard-calories__status">{formatCalorieGoalStatus(stats.calories, target)}</p>
-      {stats.goal === undefined ? <Link className="dashboard-card__link" to="/goals" state={{ effectiveFrom: stats.date }}>Задать цели</Link> : null}
     </section>
   )
 }

@@ -4,8 +4,7 @@ export interface BottomNavigationItem {
 }
 
 export const bottomNavigationItems: readonly BottomNavigationItem[] = [
-  { label: 'Сегодня', to: '/today' },
-  { label: 'Дневник', to: '/diary' },
+  { label: 'Сегодня', to: '/diary' },
+  { label: 'Статистика', to: '/dashboard' },
   { label: 'Продукты', to: '/products' },
-  { label: 'Цели', to: '/goals' },
 ]
