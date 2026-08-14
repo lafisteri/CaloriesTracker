@@ -1,17 +1,30 @@
-import { Link } from 'react-router-dom'
-
 import type { DiaryMeal } from '@/application/diary/diary-service'
 import type { MealType } from '@/domain/diary/diary-entry'
 
 import { formatDiaryNumber, getMealTypeLabel } from './diary-formatters'
+import { SwipeableDiaryEntry } from './swipeable-diary-entry'
 
 interface MealSectionProps {
   mealType: MealType
   meal: DiaryMeal
   onAdd: () => void
+  openEntryId: string | undefined
+  deletingEntryId: string | undefined
+  onOpenEntryChange: (entryId: string | undefined) => void
+  onEntryInteract: (entryId: string) => void
+  onDeleteEntry: (entryId: string) => void
 }
 
-export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
+export function MealSection({
+  mealType,
+  meal,
+  onAdd,
+  openEntryId,
+  deletingEntryId,
+  onOpenEntryChange,
+  onEntryInteract,
+  onDeleteEntry,
+}: MealSectionProps) {
   const isEmpty = meal.entries.length === 0
 
   return (
@@ -27,11 +40,14 @@ export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
         <ul className="diary-entry-list">
           {meal.entries.map((entry) => (
             <li key={entry.entry.id}>
-              <Link className="diary-entry-list__item" to={`/entries/${entry.entry.id}`}>
-                <span className="diary-entry-list__name">{entry.entry.sourceName}</span>
-                <span className="diary-entry-list__amount">{formatDiaryNumber(entry.entry.amount)} {entry.unitLabel}</span>
-                <strong>{formatDiaryNumber(entry.entry.calories)} ккал</strong>
-              </Link>
+              <SwipeableDiaryEntry
+                item={entry}
+                isOpen={openEntryId === entry.entry.id}
+                isDeleting={deletingEntryId === entry.entry.id}
+                onOpenChange={onOpenEntryChange}
+                onInteract={onEntryInteract}
+                onDelete={onDeleteEntry}
+              />
             </li>
           ))}
         </ul>

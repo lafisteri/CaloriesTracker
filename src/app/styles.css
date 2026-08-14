@@ -801,11 +801,12 @@ a {
 .meal-section {
   display: grid;
   gap: 14px;
+  padding: 14px;
 }
 
 .meal-section--empty {
   gap: 0;
-  padding: 13px 16px;
+  padding: 14px;
   border-radius: 16px;
 }
 
@@ -830,14 +831,47 @@ a {
   list-style: none;
 }
 
+.diary-entry-swipe {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.diary-entry-swipe__delete {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 96px;
+  min-height: 44px;
+  color: #fff;
+  background: #b8443b;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.diary-entry-swipe__delete:disabled {
+  cursor: wait;
+  opacity: 0.8;
+}
+
 .diary-entry-list__item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 2px 14px;
   padding: 13px 0;
   color: inherit;
+  background: #fff;
   border-top: 1px solid #edf0ec;
   text-decoration: none;
+  position: relative;
+  z-index: 1;
+  will-change: transform;
+}
+
+.diary-entry-list__item--swipe-ready {
+  transition: transform 180ms ease-out;
 }
 
 .diary-entry-list li:first-child .diary-entry-list__item {

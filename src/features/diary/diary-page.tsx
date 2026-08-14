@@ -20,11 +20,16 @@ export function DiaryPage() {
   const [dailyGoal, setDailyGoal] = useState<DailyMacroGoal | undefined>()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
+  const [deleteError, setDeleteError] = useState<string | undefined>()
+  const [openEntryId, setOpenEntryId] = useState<string | undefined>()
+  const [deletingEntryId, setDeletingEntryId] = useState<string | undefined>()
   const loadRequestId = useRef(0)
 
-  const loadDay = useCallback(async (dateKey: string) => {
+  const loadDay = useCallback(async (dateKey: string, showLoading = true) => {
     const requestId = ++loadRequestId.current
-    setIsLoading(true)
+    if (showLoading) {
+      setIsLoading(true)
+    }
     setError(undefined)
 
     try {
@@ -45,7 +50,9 @@ export function DiaryPage() {
       }
     } finally {
       if (requestId === loadRequestId.current) {
-        setIsLoading(false)
+        if (showLoading) {
+          setIsLoading(false)
+        }
       }
     }
   }, [])
@@ -55,7 +62,34 @@ export function DiaryPage() {
   }, [date, loadDay])
 
   function changeDate(nextDate: string): void {
+    setOpenEntryId(undefined)
     navigate(getDiaryPath(nextDate), { replace: true })
+  }
+
+  function handleEntryInteract(entryId: string): void {
+    if (openEntryId !== undefined && openEntryId !== entryId) {
+      setOpenEntryId(undefined)
+    }
+  }
+
+  async function deleteEntry(entryId: string): Promise<void> {
+    if (deletingEntryId !== undefined) {
+      return
+    }
+
+    setDeletingEntryId(entryId)
+    setDeleteError(undefined)
+    setOpenEntryId(undefined)
+
+    try {
+      await applicationServices.diary.softDeleteEntry(entryId)
+      await loadDay(date, false)
+    } catch (deleteEntryError) {
+      console.error('Failed to delete diary entry.', deleteEntryError)
+      setDeleteError('Не удалось удалить запись. Попробуйте ещё раз.')
+    } finally {
+      setDeletingEntryId(undefined)
+    }
   }
 
   return (
@@ -75,6 +109,7 @@ export function DiaryPage() {
           <button className="button button--secondary" type="button" onClick={() => void loadDay(date)}>Повторить</button>
         </div>
       )}
+      {deleteError === undefined ? null : <p className="form-submit-error" role="alert">{deleteError}</p>}
       {day === undefined || isLoading || error !== undefined ? null : (
         <>
           <DailyGoalSummary date={date} totals={day.totals} goal={dailyGoal} />
@@ -86,6 +121,11 @@ export function DiaryPage() {
                 mealType={mealType}
                 meal={day.meals[mealType]}
                 onAdd={() => navigate(getDiaryAddSelectionPath({ date, mealType }), { state: { diaryAddFromDiary: true } })}
+                openEntryId={openEntryId}
+                deletingEntryId={deletingEntryId}
+                onOpenEntryChange={setOpenEntryId}
+                onEntryInteract={handleEntryInteract}
+                onDeleteEntry={(entryId) => void deleteEntry(entryId)}
               />
             ))}
           </div>
