@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { AppLayout } from '@/app/layout/app-layout'
@@ -9,6 +10,15 @@ import { ProductDetailsPage } from '@/features/products/product-details-page'
 import { ProductFormPage } from '@/features/products/product-form-page'
 import { TodayPage } from '@/features/dashboard/today-page'
 
+const FoodSelectionPage = lazy(async () => {
+  const module = await import('@/features/diary/food-selection-page')
+  return { default: module.FoodSelectionPage }
+})
+const FoodAmountPage = lazy(async () => {
+  const module = await import('@/features/diary/food-amount-page')
+  return { default: module.FoodAmountPage }
+})
+
 export function AppRouter() {
   return (
     <BrowserRouter>
@@ -17,6 +27,8 @@ export function AppRouter() {
           <Route index element={<Navigate replace to="/today" />} />
           <Route path="today" element={<TodayPage />} />
           <Route path="diary" element={<DiaryPage />} />
+          <Route path="diary/:date/:mealType/add" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodSelectionPage /></Suspense>} />
+          <Route path="diary/:date/:mealType/add/:productId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodAmountPage /></Suspense>} />
           <Route path="diary/entries/:entryId" element={<DiaryEntryDetailsPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="products/new" element={<ProductFormPage />} />

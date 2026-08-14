@@ -1,26 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import type { DiaryDay } from '@/application/diary/diary-service'
 import { applicationServices } from '@/app/providers/application-services'
-import type { MealType } from '@/domain/diary/diary-entry'
 import type { DailyMacroGoal } from '@/domain/goals/weekly-goal'
 import { toLocalDateKey, shiftLocalDateKey } from '@/shared/utils/local-date-key'
 
+import { getDiaryAddSelectionPath, getDiaryDateFromSearch, getDiaryPath } from './diary-add-routes'
 import { DiaryDateNavigation } from './diary-date-navigation'
 import { DailyGoalSummary } from './daily-goal-summary'
 import { mealTypes } from './diary-formatters'
-import { FoodPickerSheet } from './food-picker-sheet'
 import { MealSection } from './meal-section'
 
 export function DiaryPage() {
   const location = useLocation()
-  const [date, setDate] = useState(toLocalDateKey)
+  const navigate = useNavigate()
+  const date = getDiaryDateFromSearch(location.search) ?? toLocalDateKey()
   const [day, setDay] = useState<DiaryDay | undefined>()
   const [dailyGoal, setDailyGoal] = useState<DailyMacroGoal | undefined>()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
-  const [pickerMealType, setPickerMealType] = useState<MealType | undefined>()
   const loadRequestId = useRef(0)
 
   const loadDay = useCallback(async (dateKey: string) => {
@@ -55,21 +54,8 @@ export function DiaryPage() {
     void loadDay(date)
   }, [date, loadDay])
 
-  useEffect(() => {
-    const state = location.state as { date?: string } | null
-
-    if (state?.date !== undefined) {
-      setDate(state.date)
-    }
-  }, [location.state])
-
-  function closePicker(): void {
-    setPickerMealType(undefined)
-  }
-
-  function handleAdded(): void {
-    closePicker()
-    void loadDay(date)
+  function changeDate(nextDate: string): void {
+    navigate(getDiaryPath(nextDate), { replace: true })
   }
 
   return (
@@ -77,9 +63,9 @@ export function DiaryPage() {
       <h1 id="diary-title" className="sr-only">Дневник</h1>
       <DiaryDateNavigation
         date={date}
-        onChange={setDate}
-        onPrevious={() => setDate((currentDate) => shiftLocalDateKey(currentDate, -1))}
-        onNext={() => setDate((currentDate) => shiftLocalDateKey(currentDate, 1))}
+        onChange={changeDate}
+        onPrevious={() => changeDate(shiftLocalDateKey(date, -1))}
+        onNext={() => changeDate(shiftLocalDateKey(date, 1))}
       />
 
       {isLoading ? <p className="status-message">Загрузка…</p> : null}
@@ -96,13 +82,16 @@ export function DiaryPage() {
           {day.entries.length === 0 ? <p className="diary-empty">{date === toLocalDateKey() ? 'Сегодня пока ничего не добавлено' : 'На этот день пока ничего не добавлено'}</p> : null}
           <div className="meal-sections">
             {mealTypes.map((mealType) => (
-              <MealSection key={mealType} mealType={mealType} meal={day.meals[mealType]} onAdd={setPickerMealType} />
+              <MealSection
+                key={mealType}
+                mealType={mealType}
+                meal={day.meals[mealType]}
+                onAdd={() => navigate(getDiaryAddSelectionPath({ date, mealType }), { state: { diaryAddFromDiary: true } })}
+              />
             ))}
           </div>
         </>
       )}
-
-      {pickerMealType === undefined ? null : <FoodPickerSheet date={date} mealType={pickerMealType} onClose={closePicker} onAdded={handleAdded} />}
     </section>
   )
 }

@@ -8,7 +8,7 @@ import { formatDiaryNumber, getMealTypeLabel } from './diary-formatters'
 interface MealSectionProps {
   mealType: MealType
   meal: DiaryMeal
-  onAdd: (mealType: MealType) => void
+  onAdd: () => void
 }
 
 export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
@@ -19,7 +19,7 @@ export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
           <h2 id={`meal-${mealType}`}>{getMealTypeLabel(mealType)}</h2>
           <p>{formatDiaryNumber(meal.totals.calories)} ккал</p>
         </div>
-        <button className="button button--secondary button--small" type="button" onClick={() => onAdd(mealType)}>+ Добавить</button>
+        <button className="button button--secondary button--small" type="button" onClick={onAdd}>+ Добавить</button>
       </div>
       {meal.entries.length === 0 ? null : (
         <ul className="diary-entry-list">

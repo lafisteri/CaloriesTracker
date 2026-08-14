@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 
 import type { ProductListItem } from '@/application/products/product-service'
 import { applicationServices } from '@/app/providers/application-services'
-import { formatBaseAmount, formatNutrition } from '@/features/products/product-formatters'
+
+import { ProductList } from './product-list'
+import { ProductSearchField } from './product-search-field'
 
 export function ProductsPage() {
   const [query, setQuery] = useState('')
@@ -85,15 +87,15 @@ export function ProductsPage() {
         </section>
       ) : null}
 
-      {catalogTab === 'products' ? <label id="products-panel" className="search-field" role="tabpanel" aria-labelledby="products-tab">
-        <span className="sr-only">Поиск продуктов</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Поиск по названию или штрихкоду"
-        />
-      </label> : null}
+      {catalogTab === 'products' ? (
+        <div id="products-panel" role="tabpanel" aria-labelledby="products-tab">
+          <ProductSearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Поиск по названию или штрихкоду"
+          />
+        </div>
+      ) : null}
 
       {catalogTab === 'products' && isLoading ? <p className="status-message">Загрузка…</p> : null}
       {catalogTab === 'products' && error !== undefined ? (
@@ -111,21 +113,7 @@ export function ProductsPage() {
         </div>
       ) : null}
 
-      {catalogTab === 'products' && !isLoading && error === undefined && products.length > 0 ? (
-        <ul className="product-list">
-          {products.map(({ product, currentVersion }) => (
-            <li key={product.id}>
-              <Link className="product-list__item" to={`/products/${product.id}`}>
-                <span className="product-list__name">{product.name}</span>
-                <span className="product-list__details">
-                  {formatNutrition(currentVersion)} · на {formatBaseAmount(currentVersion)}
-                </span>
-                {product.barcode === undefined ? null : <span className="product-list__barcode">Штрихкод: {product.barcode}</span>}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {catalogTab === 'products' && !isLoading && error === undefined && products.length > 0 ? <ProductList products={products} /> : null}
     </section>
   )
 }

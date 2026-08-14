@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useState } from 'react'
 import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import type { ProductDetails } from '@/application/products/product-service'
 import { applicationServices } from '@/app/providers/application-services'
 import type { ProductBaseUnit } from '@/domain/products/product-version'
 import { getServingConversionUnitForBase } from '@/domain/products/product-units'
+import { getDiaryAddSelectionPathFromReturnTo } from '@/features/diary/diary-add-routes'
 import {
   baseUnitOptions,
   productFormSchema,
@@ -28,8 +29,13 @@ const defaultValues: ProductFormValues = {
 
 export function ProductFormPage() {
   const { productId } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const isEditing = productId !== undefined
+  const diarySelectionPath = isEditing
+    ? undefined
+    : getDiaryAddSelectionPathFromReturnTo(new URLSearchParams(location.search).get('returnTo'))
+  const returnPath = diarySelectionPath ?? (productId === undefined ? '/products' : `/products/${productId}`)
   const [isLoading, setIsLoading] = useState(isEditing)
   const [loadError, setLoadError] = useState<string | undefined>()
   const [submitError, setSubmitError] = useState<string | undefined>()
@@ -109,7 +115,7 @@ export function ProductFormPage() {
         ? await applicationServices.products.create(toProductDraft(values))
         : await applicationServices.products.update(productId, toProductDraft(values))
 
-      navigate(`/products/${details.product.id}`, { replace: true })
+      navigate(diarySelectionPath ?? `/products/${details.product.id}`, { replace: true })
     } catch (error) {
       console.error('Failed to save product.', error)
       setSubmitError(error instanceof Error && error.name === 'DuplicateBarcodeError'
@@ -129,14 +135,14 @@ export function ProductFormPage() {
       <section className="empty-state" aria-labelledby="product-form-error-title">
         <h1 id="product-form-error-title">Не удалось открыть продукт</h1>
         <p>{loadError}</p>
-        <Link className="button button--secondary" to="/products">К продуктам</Link>
+        <Link className="button button--secondary" to={returnPath}>Назад</Link>
       </section>
     )
   }
 
   return (
     <section className="product-form-page" aria-labelledby="product-form-title">
-      <Link className="back-link" to={productId === undefined ? '/products' : `/products/${productId}`}>‹ Назад</Link>
+      <Link className="back-link" to={returnPath}>‹ Назад</Link>
       <div className="page-heading">
         <div>
           <h1 id="product-form-title">{isEditing ? 'Изменить продукт' : 'Новый продукт'}</h1>
@@ -237,7 +243,7 @@ export function ProductFormPage() {
 
         {submitError === undefined ? null : <p className="form-submit-error" role="alert">{submitError}</p>}
         <div className="form-actions">
-          <Link className="button button--secondary" to={productId === undefined ? '/products' : `/products/${productId}`}>Отмена</Link>
+          <Link className="button button--secondary" to={returnPath}>Отмена</Link>
           <button className="button button--primary" disabled={isSaving} type="submit">{isSaving ? 'Сохранение…' : 'Сохранить'}</button>
         </div>
       </form>

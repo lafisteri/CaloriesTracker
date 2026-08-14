@@ -29,6 +29,13 @@ export function formatDiaryDate(dateKey: string): string {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1)
 }
 
+export function formatDiaryShortDate(dateKey: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  }).format(fromLocalDateKey(dateKey))
+}
+
 export function formatDiaryNutrition(nutrition: Nutrition): string {
   return `${formatDiaryNumber(nutrition.calories)} ккал · Б ${formatDiaryNumber(nutrition.protein)} · Ж ${formatDiaryNumber(nutrition.fat)} · У ${formatDiaryNumber(nutrition.carbs)}`
 }

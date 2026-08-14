@@ -5,6 +5,7 @@ import type { DiaryEntryDetails } from '@/application/diary/diary-service'
 import { applicationServices } from '@/app/providers/application-services'
 import type { MealType } from '@/domain/diary/diary-entry'
 
+import { getDiaryPath } from './diary-add-routes'
 import { formatDiaryNumber, getMealTypeLabel, mealTypes } from './diary-formatters'
 
 export function DiaryEntryDetailsPage() {
@@ -79,7 +80,7 @@ export function DiaryEntryDetailsPage() {
 
     try {
       const entry = await applicationServices.diary.updateEntry(entryId, { mealType, unit, amount: Number(amount) })
-      navigate('/diary', { replace: true, state: { date: entry.date } })
+      navigate(getDiaryPath(entry.date), { replace: true })
     } catch (saveError) {
       console.error('Failed to update diary entry.', saveError)
       setError('Не удалось сохранить запись. Проверьте данные и попробуйте ещё раз.')
@@ -97,7 +98,7 @@ export function DiaryEntryDetailsPage() {
 
     try {
       await applicationServices.diary.softDeleteEntry(entryId)
-      navigate('/diary', { replace: true, state: { date: details.entry.date } })
+      navigate(getDiaryPath(details.entry.date), { replace: true })
     } catch (deleteError) {
       console.error('Failed to delete diary entry.', deleteError)
       setError('Не удалось удалить запись. Попробуйте ещё раз.')
@@ -121,7 +122,7 @@ export function DiaryEntryDetailsPage() {
 
   return (
     <section className="diary-entry-details" aria-labelledby="diary-entry-title">
-      <Link className="back-link" to="/diary">‹ Дневник</Link>
+      <Link className="back-link" to={getDiaryPath(details.entry.date)}>‹ Дневник</Link>
       <div className="page-heading">
         <div>
           <h1 id="diary-entry-title">{details.entry.sourceName}</h1>
