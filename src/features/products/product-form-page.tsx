@@ -182,7 +182,7 @@ export function ProductFormPage() {
         </div>
 
         <div className="form-field">
-          <label htmlFor="product-base-unit">Базовая единица</label>
+          <label htmlFor="product-base-unit">Единица</label>
           <select id="product-base-unit" {...register('baseUnitType')}>
             {baseUnitOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
@@ -190,7 +190,7 @@ export function ProductFormPage() {
 
         <fieldset className="form-fieldset">
           <div className="form-field">
-            <label htmlFor="product-base-amount">Базовое количество</label>
+            <label htmlFor="product-base-amount">Количество</label>
             <div className="input-with-unit">
               <input id="product-base-amount" type="number" inputMode="decimal" min="0" step="any" {...register('baseAmount', { valueAsNumber: true })} />
               <span>{formatBaseUnit(baseUnitType)}</span>

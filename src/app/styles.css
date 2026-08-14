@@ -648,7 +648,8 @@ a {
   position: relative;
 }
 
-.input-with-unit input {
+.input-with-unit input,
+#diary-add-amount {
   padding-right: 48px;
 }
 
@@ -816,15 +817,6 @@ a {
   font-size: 14px;
   font-weight: 720;
   text-decoration: none;
-}
-
-.diary-empty {
-  padding: 14px 18px;
-  margin: 0;
-  color: #64716a;
-  background: #edf3ec;
-  border-radius: 16px;
-  text-align: center;
 }
 
 .meal-sections {
@@ -1049,6 +1041,7 @@ a {
 }
 
 .diary-amount-page__form {
+  align-content: start;
   gap: 12px;
   padding: 16px;
 }

@@ -174,12 +174,12 @@ export function FoodAmountPage() {
         <div className="diary-entry-form diary-amount-page__form">
           <div className="diary-amount-page__fields">
             <div className="form-field">
-              <label htmlFor="diary-add-amount">Базовое количество</label>
+              <label htmlFor="diary-add-amount">Количество</label>
               <input id="diary-add-amount" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
               {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
             </div>
             <div className="form-field">
-              <label htmlFor="diary-add-unit">Базовая единица</label>
+              <label htmlFor="diary-add-unit">Единица</label>
               <select id="diary-add-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
                 {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
