@@ -73,9 +73,23 @@ export class DiaryService {
 
   /** Returns persisted diary snapshot totals without resolving products or versions. */
   async getTotalsForDate(date: string): Promise<Nutrition> {
-    assertDateKey(date)
+    return (await this.getTotalsForDates([date]))[date]
+  }
 
-    return sumNutrition(await this.diaryRepository.getEntriesByDate(date))
+  /** Gets persisted snapshot totals for several dates in one repository query. */
+  async getTotalsForDates(dates: string[]): Promise<Record<string, Nutrition>> {
+    dates.forEach(assertDateKey)
+    const totalsByDate = dates.reduce<Record<string, Nutrition>>((totals, date) => {
+      totals[date] = createEmptyNutrition()
+      return totals
+    }, {})
+    const entries = await this.diaryRepository.getEntriesByDates(dates)
+
+    entries.forEach((entry) => {
+      totalsByDate[entry.date] = addNutrition(totalsByDate[entry.date], entry)
+    })
+
+    return totalsByDate
   }
 
   async getEntryDetails(id: string): Promise<DiaryEntryDetails | undefined> {
@@ -255,12 +269,16 @@ function calculateSnapshot(version: ProductVersion, amount: number, unit: string
 }
 
 function sumNutrition(entries: DiaryEntry[]): Nutrition {
-  return entries.reduce<Nutrition>((total, entry) => ({
-    calories: total.calories + entry.calories,
-    protein: total.protein + entry.protein,
-    fat: total.fat + entry.fat,
-    carbs: total.carbs + entry.carbs,
-  }), createEmptyNutrition())
+  return entries.reduce<Nutrition>(addNutrition, createEmptyNutrition())
+}
+
+function addNutrition(total: Nutrition, nutrition: Nutrition): Nutrition {
+  return {
+    calories: total.calories + nutrition.calories,
+    protein: total.protein + nutrition.protein,
+    fat: total.fat + nutrition.fat,
+    carbs: total.carbs + nutrition.carbs,
+  }
 }
 
 function getEntryNutritionSnapshot(entry: DiaryEntry): Nutrition {

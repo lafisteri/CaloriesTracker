@@ -7,4 +7,5 @@ export interface GoalRepository {
   getAll(): Promise<WeeklyGoal[]>
   getLatest(): Promise<WeeklyGoal | undefined>
   getEffectiveOn(date: string): Promise<WeeklyGoal | undefined>
+  getEffectiveOnDates(dates: string[]): Promise<Record<string, WeeklyGoal | undefined>>
 }

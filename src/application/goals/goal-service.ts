@@ -26,6 +26,17 @@ export class GoalService {
     return this.goalRepository.getEffectiveOn(date)
   }
 
+  async getGoalsForDates(dates: string[]): Promise<Record<string, DailyMacroGoal | undefined>> {
+    dates.forEach(assertDateKey)
+    const weeklyGoals = await this.goalRepository.getEffectiveOnDates(dates)
+
+    return dates.reduce<Record<string, DailyMacroGoal | undefined>>((goals, date) => {
+      const weeklyGoal = weeklyGoals[date]
+      goals[date] = weeklyGoal === undefined ? undefined : cloneDailyGoal(weeklyGoal[getWeeklyGoalDayForDate(date)])
+      return goals
+    }, {})
+  }
+
   getLatestWeeklyGoal(): Promise<WeeklyGoal | undefined> {
     return this.goalRepository.getLatest()
   }

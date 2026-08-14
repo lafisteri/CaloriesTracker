@@ -50,7 +50,17 @@ export class StatisticsService {
 
   async getWeekStats(date: string): Promise<WeekStats> {
     assertDateKey(date)
-    const days = await Promise.all(getWeekRange(date).map((day) => this.getDailyStats(day)))
+    const dates = getWeekRange(date)
+    const [totalsByDate, goalsByDate] = await Promise.all([
+      this.diaryService.getTotalsForDates(dates),
+      this.goalService.getGoalsForDates(dates),
+    ])
+    const days = dates.map((day) => ({
+      date: day,
+      ...totalsByDate[day],
+      goal: goalsByDate[day],
+      macroDistribution: calculateMacroDistribution(totalsByDate[day]),
+    }))
 
     return {
       days,

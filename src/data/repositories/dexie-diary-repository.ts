@@ -25,6 +25,18 @@ export class DexieDiaryRepository implements DiaryRepository {
       .sortBy('createdAt')
   }
 
+  async getEntriesByDates(dates: string[]): Promise<DiaryEntry[]> {
+    if (dates.length === 0) {
+      return []
+    }
+
+    return this.database.diaryEntries
+      .where('date')
+      .anyOf(dates)
+      .and((entry) => entry.deletedAt === undefined)
+      .toArray()
+  }
+
   async getRecentProductEntries(): Promise<DiaryEntry[]> {
     return this.database.diaryEntries
       .orderBy('createdAt')

@@ -28,9 +28,21 @@ export class DexieGoalRepository implements GoalRepository {
   }
 
   async getEffectiveOn(date: string): Promise<WeeklyGoal | undefined> {
-    const goals = await this.database.weeklyGoals.where('effectiveFrom').belowOrEqual(date).toArray()
+    return (await this.getEffectiveOnDates([date]))[date]
+  }
 
-    return getMostRecentGoal(goals)
+  async getEffectiveOnDates(dates: string[]): Promise<Record<string, WeeklyGoal | undefined>> {
+    if (dates.length === 0) {
+      return {}
+    }
+
+    const latestDate = dates.reduce((latest, date) => date > latest ? date : latest)
+    const goals = await this.database.weeklyGoals.where('effectiveFrom').belowOrEqual(latestDate).toArray()
+
+    return dates.reduce<Record<string, WeeklyGoal | undefined>>((goalsByDate, date) => {
+      goalsByDate[date] = getMostRecentGoal(goals.filter((goal) => goal.effectiveFrom <= date))
+      return goalsByDate
+    }, {})
   }
 
   async getLatest(): Promise<WeeklyGoal | undefined> {
