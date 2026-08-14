@@ -839,21 +839,10 @@ a {
 
 .diary-entry-swipe__delete {
   position: absolute;
-  inset: 0 0 0 auto;
-  width: 96px;
-  min-height: 44px;
-  color: #fff;
-  background: #b8443b;
-  border: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.diary-entry-swipe__delete:disabled {
-  cursor: wait;
-  opacity: 0.8;
+  top: 50%;
+  right: 8px;
+  z-index: 0;
+  transform: translateY(-50%);
 }
 
 .diary-entry-list__item {

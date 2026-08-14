@@ -147,7 +147,7 @@ export function SwipeableDiaryEntry({
       onClickCapture={handleClickCapture}
     >
       <button
-        className="diary-entry-swipe__delete"
+        className="button button--danger button--small diary-entry-swipe__delete"
         type="button"
         tabIndex={isOpen ? 0 : -1}
         disabled={isDeleting}

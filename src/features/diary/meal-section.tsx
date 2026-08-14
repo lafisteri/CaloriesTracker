@@ -34,7 +34,7 @@ export function MealSection({
           <h2 id={`meal-${mealType}`}>{getMealTypeLabel(mealType)}</h2>
           <p>{formatDiaryNumber(meal.totals.calories)} ккал</p>
         </div>
-        <button className="button button--secondary button--small" type="button" onClick={onAdd}>+ Добавить</button>
+        <button className="button button--secondary button--small" type="button" onClick={onAdd}>Добавить</button>
       </div>
       {isEmpty ? null : (
         <ul className="diary-entry-list">
