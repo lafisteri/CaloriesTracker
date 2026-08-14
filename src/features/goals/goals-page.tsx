@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { DuplicateGoalEffectiveFromError } from '@/application/goals/goal-service'
@@ -39,6 +39,7 @@ export function GoalsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [success, setSuccess] = useState<string | undefined>()
+  const isSubmittingRef = useRef(false)
 
   useEffect(() => {
     let isMounted = true
@@ -95,6 +96,11 @@ export function GoalsPage() {
 
   async function saveGoals(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
+
+    if (isSubmittingRef.current) {
+      return
+    }
+
     setError(undefined)
     setSuccess(undefined)
 
@@ -107,6 +113,7 @@ export function GoalsPage() {
       return
     }
 
+    isSubmittingRef.current = true
     setIsSaving(true)
 
     try {
@@ -119,6 +126,7 @@ export function GoalsPage() {
         ? 'Для этой даты цели уже существуют. Выберите другую дату начала действия.'
         : 'Не удалось сохранить цели. Проверьте дату и значения.')
     } finally {
+      isSubmittingRef.current = false
       setIsSaving(false)
     }
   }

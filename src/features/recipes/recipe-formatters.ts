@@ -7,25 +7,25 @@ export function formatRecipeNumber(value: number): string {
 }
 
 export function formatRecipeNutrition(nutrition: Nutrition): string {
-  return `${formatRecipeNumber(nutrition.calories)} ккал · Б ${formatRecipeNumber(nutrition.protein)} · Ж ${formatRecipeNumber(nutrition.fat)} · У ${formatRecipeNumber(nutrition.carbs)}`
+  return `${formatRecipeNumber(nutrition.calories)} ккал · ${formatRecipeMacros(nutrition)}`
+}
+
+export function formatRecipeMacros(nutrition: Pick<Nutrition, 'protein' | 'fat' | 'carbs'>): string {
+  return `Б ${formatRecipeNumber(nutrition.protein)} · Ж ${formatRecipeNumber(nutrition.fat)} · У ${formatRecipeNumber(nutrition.carbs)}`
 }
 
 export function getRecipePrimaryNutrition(version: RecipeVersion): string {
-  const total = toNutrition(version)
+  const primaryNutrition = getRecipePrimaryNutritionValues(version)
 
-  try {
-    if (version.cookedWeight !== undefined) {
-      return `${formatRecipeNumber(recipeCalculator.calculatePer100g(total, version.cookedWeight).calories)} ккал / 100 г`
-    }
+  return primaryNutrition === undefined
+    ? 'КБЖУ недоступно'
+    : `${formatRecipeNumber(primaryNutrition.nutrition.calories)} ккал / ${primaryNutrition.unitLabel}`
+}
 
-    if (version.servingsCount !== undefined) {
-      return `${formatRecipeNumber(recipeCalculator.calculatePerServing(total, version.servingsCount).calories)} ккал / 1 шт`
-    }
-  } catch {
-    return 'КБЖУ недоступно'
-  }
+export function getRecipePrimaryMacros(version: RecipeVersion): string {
+  const primaryNutrition = getRecipePrimaryNutritionValues(version)
 
-  return 'КБЖУ недоступно'
+  return primaryNutrition === undefined ? 'КБЖУ недоступно' : formatRecipeMacros(primaryNutrition.nutrition)
 }
 
 export function toNutrition(version: RecipeVersion): Nutrition {
@@ -35,4 +35,22 @@ export function toNutrition(version: RecipeVersion): Nutrition {
     fat: version.totalFat,
     carbs: version.totalCarbs,
   }
+}
+
+function getRecipePrimaryNutritionValues(version: RecipeVersion): { nutrition: Nutrition; unitLabel: string } | undefined {
+  const total = toNutrition(version)
+
+  try {
+    if (version.cookedWeight !== undefined) {
+      return { nutrition: recipeCalculator.calculatePer100g(total, version.cookedWeight), unitLabel: '100 г' }
+    }
+
+    if (version.servingsCount !== undefined) {
+      return { nutrition: recipeCalculator.calculatePerServing(total, version.servingsCount), unitLabel: '1 шт' }
+    }
+  } catch {
+    return undefined
+  }
+
+  return undefined
 }

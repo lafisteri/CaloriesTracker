@@ -189,15 +189,11 @@ export function BarcodeScannerPage() {
             return
           }
 
-          try {
-            const [result] = await detector.detect(video)
+          const [result] = await detector.detect(video).catch((): BarcodeDetection[] => [])
 
-            if (result?.rawValue !== undefined) {
-              resolveBarcodeRef.current(result.rawValue)
-              return
-            }
-          } catch (error) {
-            console.error('Barcode frame decoding failed.', error)
+          if (result?.rawValue !== undefined) {
+            resolveBarcodeRef.current(result.rawValue)
+            return
           }
 
           if (isMounted && !scanLockedRef.current) {
@@ -307,7 +303,7 @@ function createBarcodeDetector(BarcodeDetectorConstructor: NativeBarcodeDetector
 
 function getCameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError')) {
-    return 'Доступ к камере не разрешён. Введите штрихкод вручную.'
+    return 'Нет доступа к камере. Разрешите доступ к камере или введите код вручную.'
   }
 
   return 'Камера недоступна. Введите штрихкод вручную.'

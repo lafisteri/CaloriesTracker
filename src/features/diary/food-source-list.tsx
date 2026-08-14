@@ -1,16 +1,17 @@
 import type { DiaryFoodSource } from '@/application/diary/diary-service'
 import { ProductListRow } from '@/features/products/product-list'
-import { formatRecipeNutrition, getRecipePrimaryNutrition, toNutrition } from '@/features/recipes/recipe-formatters'
+import { getRecipePrimaryMacros, getRecipePrimaryNutrition } from '@/features/recipes/recipe-formatters'
 
 interface FoodSourceListProps {
   sources: DiaryFoodSource[]
   onSelect: (source: DiaryFoodSource) => void
+  className?: string
 }
 
 /** Shared Diary selection rows for the two snapshot-capable food sources. */
-export function FoodSourceList({ sources, onSelect }: FoodSourceListProps) {
+export function FoodSourceList({ sources, onSelect, className }: FoodSourceListProps) {
   return (
-    <ul className="product-list food-source-list">
+    <ul className={`product-list food-source-list${className === undefined ? '' : ` ${className}`}`}>
       {sources.map((source) => (
         <li key={`${source.sourceType}:${source.sourceType === 'product' ? source.product.id : source.recipe.id}`}>
           <button className="product-list__item product-list__item--selectable" type="button" onClick={() => onSelect(source)}>
@@ -22,7 +23,8 @@ export function FoodSourceList({ sources, onSelect }: FoodSourceListProps) {
             ) : (
               <>
                 <span className="product-list__name">{source.recipe.name}</span>
-                <span className="product-list__details">{getRecipePrimaryNutrition(source.currentVersion)} · {formatRecipeNutrition(toNutrition(source.currentVersion))}</span>
+                <span className="product-list__details">{getRecipePrimaryNutrition(source.currentVersion)}</span>
+                <span className="product-list__macros">{getRecipePrimaryMacros(source.currentVersion)}</span>
                 <span className="food-source-list__type">Блюдо · v{source.currentVersion.versionNumber}</span>
               </>
             )}

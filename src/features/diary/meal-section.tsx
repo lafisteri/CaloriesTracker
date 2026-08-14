@@ -12,8 +12,10 @@ interface MealSectionProps {
 }
 
 export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
+  const isEmpty = meal.entries.length === 0
+
   return (
-    <section className="meal-section" aria-labelledby={`meal-${mealType}`}>
+    <section className={isEmpty ? 'meal-section meal-section--empty' : 'meal-section'} aria-labelledby={`meal-${mealType}`}>
       <div className="meal-section__header">
         <div>
           <h2 id={`meal-${mealType}`}>{getMealTypeLabel(mealType)}</h2>
@@ -21,7 +23,7 @@ export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
         </div>
         <button className="button button--secondary button--small" type="button" onClick={onAdd}>+ Добавить</button>
       </div>
-      {meal.entries.length === 0 ? null : (
+      {isEmpty ? null : (
         <ul className="diary-entry-list">
           {meal.entries.map((entry) => (
             <li key={entry.entry.id}>

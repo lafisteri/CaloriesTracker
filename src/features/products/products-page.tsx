@@ -15,13 +15,13 @@ export function ProductsPage() {
   const [catalogTab, setCatalogTab] = useState<'products' | 'recipes'>(() => new URLSearchParams(location.search).get('tab') === 'recipes' ? 'recipes' : 'products')
   const [products, setProducts] = useState<ProductListItem[]>([])
   const [recipes, setRecipes] = useState<RecipeListItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [hasLoadedProducts, setHasLoadedProducts] = useState(false)
+  const [hasLoadedRecipes, setHasLoadedRecipes] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const searchRequestId = useRef(0)
 
   const loadProducts = useCallback(async (searchQuery: string) => {
     const requestId = ++searchRequestId.current
-    setIsLoading(true)
     setError(undefined)
 
     try {
@@ -38,14 +38,13 @@ export function ProductsPage() {
       }
     } finally {
       if (requestId === searchRequestId.current) {
-        setIsLoading(false)
+        setHasLoadedProducts(true)
       }
     }
   }, [])
 
   const loadRecipes = useCallback(async (searchQuery: string) => {
     const requestId = ++searchRequestId.current
-    setIsLoading(true)
     setError(undefined)
 
     try {
@@ -62,7 +61,7 @@ export function ProductsPage() {
       }
     } finally {
       if (requestId === searchRequestId.current) {
-        setIsLoading(false)
+        setHasLoadedRecipes(true)
       }
     }
   }, [])
@@ -70,6 +69,8 @@ export function ProductsPage() {
   useEffect(() => {
     void (catalogTab === 'products' ? loadProducts(query) : loadRecipes(query))
   }, [catalogTab, loadProducts, loadRecipes, query])
+
+  const isInitialLoading = catalogTab === 'products' ? !hasLoadedProducts : !hasLoadedRecipes
 
   return (
     <section className="products-page" aria-labelledby="products-title">
@@ -120,7 +121,7 @@ export function ProductsPage() {
           />
       </div>
 
-      {isLoading ? <p className="status-message">Загрузка…</p> : null}
+      {isInitialLoading ? <p className="status-message">Загрузка…</p> : null}
       {error !== undefined ? (
         <div className="status-message status-message--error" role="alert">
           <p>{error}</p>
@@ -128,7 +129,7 @@ export function ProductsPage() {
         </div>
       ) : null}
 
-      {catalogTab === 'products' && !isLoading && error === undefined && products.length === 0 ? (
+      {catalogTab === 'products' && !isInitialLoading && error === undefined && products.length === 0 ? (
         <div className="empty-state">
           <h2>{query.trim() === '' ? 'Продуктов пока нет' : 'Ничего не найдено'}</h2>
           <p>{query.trim() === '' ? 'Добавьте первый продукт — всё будет сохранено на этом устройстве.' : 'Измените запрос или добавьте новый продукт.'}</p>
@@ -136,15 +137,15 @@ export function ProductsPage() {
         </div>
       ) : null}
 
-      {catalogTab === 'products' && !isLoading && error === undefined && products.length > 0 ? <ProductList products={products} /> : null}
-      {catalogTab === 'recipes' && !isLoading && error === undefined && recipes.length === 0 ? (
+      {catalogTab === 'products' && !isInitialLoading && error === undefined && products.length > 0 ? <ProductList products={products} /> : null}
+      {catalogTab === 'recipes' && !isInitialLoading && error === undefined && recipes.length === 0 ? (
         <div className="empty-state">
           <h2>{query.trim() === '' ? 'У вас пока нет рецептов' : 'Ничего не найдено'}</h2>
           <p>{query.trim() === '' ? 'Создайте блюдо из продуктов своей базы.' : 'Измените запрос или создайте новый рецепт.'}</p>
           {query.trim() === '' ? <Link className="button button--primary" to="/recipes/new">Создать рецепт</Link> : null}
         </div>
       ) : null}
-      {catalogTab === 'recipes' && !isLoading && error === undefined && recipes.length > 0 ? <RecipeList recipes={recipes} /> : null}
+      {catalogTab === 'recipes' && !isInitialLoading && error === undefined && recipes.length > 0 ? <RecipeList recipes={recipes} /> : null}
     </section>
   )
 }

@@ -15,15 +15,22 @@ export function ProductSearchField({
   label = 'Поиск продуктов',
 }: ProductSearchFieldProps) {
   return (
-    <label className="search-field">
-      <span className="sr-only">{label}</span>
-      <input
-        autoFocus={autoFocus}
-        type="search"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
+    <div className="search-field">
+      <label>
+        <span className="sr-only">{label}</span>
+        <input
+          autoFocus={autoFocus}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+        />
+      </label>
+      {value === '' ? null : (
+        <button className="search-field__clear" type="button" onClick={() => onChange('')} aria-label="Очистить поиск">
+          ×
+        </button>
+      )}
+    </div>
   )
 }

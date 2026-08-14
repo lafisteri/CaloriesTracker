@@ -165,7 +165,7 @@ export function FoodAmountPage() {
   return (
     <section className="diary-add-page" aria-labelledby="food-amount-title">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ {getSourceName(source)}</button>
+        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ Выбор еды</button>
         <span>{formatDiaryShortDate(addContext.date)}</span>
       </header>
       <div className="diary-add-page__scroll diary-amount-page__scroll">

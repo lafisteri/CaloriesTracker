@@ -18,7 +18,11 @@ export function formatBaseAmount(version: Pick<ProductVersion, 'baseUnitType' | 
 }
 
 export function formatNutrition(nutrition: Nutrition): string {
-  return `${formatNumber(nutrition.calories)} ккал · Б ${formatNumber(nutrition.protein)} · Ж ${formatNumber(nutrition.fat)} · У ${formatNumber(nutrition.carbs)}`
+  return `${formatNumber(nutrition.calories)} ккал · ${formatMacros(nutrition)}`
+}
+
+export function formatMacros(nutrition: Pick<Nutrition, 'protein' | 'fat' | 'carbs'>): string {
+  return `Б ${formatNumber(nutrition.protein)} · Ж ${formatNumber(nutrition.fat)} · У ${formatNumber(nutrition.carbs)}`
 }
 
 export function formatConversionUnit(unit: ServingConversionUnit): string {

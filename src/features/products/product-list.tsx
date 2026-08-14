@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 import type { ProductListItem } from '@/application/products/product-service'
 
-import { formatBaseAmount, formatNutrition } from './product-formatters'
+import { formatBaseAmount, formatMacros, formatNumber } from './product-formatters'
 
 interface ProductListProps {
   products: ProductListItem[]
@@ -37,8 +37,9 @@ export function ProductListRow({ item }: { item: ProductListItem }) {
     <>
       <span className="product-list__name">{product.name}</span>
       <span className="product-list__details">
-        {formatNutrition(currentVersion)} · на {formatBaseAmount(currentVersion)}
+        {formatNumber(currentVersion.calories)} ккал / {formatBaseAmount(currentVersion)}
       </span>
+      <span className="product-list__macros">{formatMacros(currentVersion)}</span>
       {product.barcode === undefined ? null : <span className="product-list__barcode">Штрихкод: {product.barcode}</span>}
     </>
   )

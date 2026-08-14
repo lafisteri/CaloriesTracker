@@ -30,6 +30,11 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+:focus-visible {
+  outline: 3px solid rgb(58 117 96 / 62%);
+  outline-offset: 2px;
+}
+
 .app-shell {
   width: min(100%, 480px);
   min-height: 100dvh;
@@ -78,34 +83,6 @@ a {
   height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   min-height: 0;
   padding: 0;
-}
-
-.placeholder-page {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  min-height: 220px;
-  padding: 24px;
-  background: #fff;
-  border: 1px solid #e6e8e3;
-  border-radius: 24px;
-  box-shadow: 0 1px 2px rgb(31 41 35 / 4%);
-}
-
-.placeholder-page h1 {
-  margin: 0;
-  color: #193e32;
-  font-size: 28px;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-}
-
-.placeholder-page p {
-  max-width: 30ch;
-  margin: 0;
-  color: #64716a;
-  font-size: 16px;
-  line-height: 1.45;
 }
 
 .bottom-navigation {
@@ -174,6 +151,11 @@ a {
   justify-content: space-between;
 }
 
+.page-heading > :first-child,
+.section-heading > :first-child {
+  min-width: 0;
+}
+
 .page-heading h1,
 .product-details h1,
 .product-form-page h1 {
@@ -237,6 +219,15 @@ a {
   font-size: 13px;
 }
 
+.search-field,
+.search-field label {
+  display: block;
+}
+
+.search-field {
+  position: relative;
+}
+
 .search-field input,
 .form-field input,
 .form-field select {
@@ -251,7 +242,25 @@ a {
 }
 
 .search-field input {
-  padding: 0 16px;
+  padding: 0 52px 0 16px;
+}
+
+.search-field__clear {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: #607066;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .form-field input,
@@ -360,6 +369,7 @@ a {
 .product-list__item {
   display: grid;
   gap: 4px;
+  min-width: 0;
   width: 100%;
   padding: 17px;
   color: inherit;
@@ -381,16 +391,24 @@ a {
 }
 
 .product-list__name {
+  min-width: 0;
   color: #193e32;
   font-size: 17px;
   font-weight: 720;
+  overflow-wrap: anywhere;
 }
 
 .product-list__details,
+.product-list__macros,
 .product-list__barcode {
+  min-width: 0;
   color: #64716a;
   font-size: 13px;
   line-height: 1.4;
+}
+
+.product-list__macros {
+  color: #536159;
 }
 
 .product-list__barcode {
@@ -398,7 +416,10 @@ a {
 }
 
 .back-link {
+  display: inline-flex;
   width: fit-content;
+  min-height: 44px;
+  align-items: center;
   color: #356450;
   font-size: 14px;
   font-weight: 700;
@@ -520,6 +541,7 @@ a {
   display: grid;
   gap: 5px;
   width: 100%;
+  min-height: 44px;
   padding: 0;
   color: inherit;
   background: transparent;
@@ -653,7 +675,7 @@ a {
 
 .serving-unit-field {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(76px, 0.8fr) minmax(64px, 0.65fr) 34px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(76px, 0.8fr) minmax(64px, 0.65fr) 44px;
   gap: 8px;
   align-items: end;
   padding: 14px;
@@ -662,7 +684,7 @@ a {
 }
 
 .icon-button {
-  width: 34px;
+  width: 44px;
   height: 48px;
   color: #8d4d43;
   background: transparent;
@@ -827,6 +849,12 @@ a {
 .meal-section {
   display: grid;
   gap: 14px;
+}
+
+.meal-section--empty {
+  gap: 0;
+  padding: 13px 16px;
+  border-radius: 16px;
 }
 
 .meal-section__header {
@@ -1058,6 +1086,26 @@ a {
   color: #718077;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.food-source-list--recent {
+  gap: 6px;
+}
+
+.food-source-list--recent .product-list__item {
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.food-source-list--recent .product-list__name {
+  font-size: 15px;
+}
+
+.food-source-list--recent .product-list__details,
+.food-source-list--recent .product-list__macros,
+.food-source-list--recent .food-source-list__type {
+  font-size: 12px;
 }
 
 .diary-selection-sections__actions {
@@ -1381,6 +1429,32 @@ a {
 
   .recipe-update-notice {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .page-heading,
+  .section-heading,
+  .diary-selection-sections__heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .product-details__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .diary-selection-sections__actions {
+    justify-content: flex-start;
+  }
+
+  .barcode-scanner__manual > div {
+    display: grid;
+  }
+
+  .barcode-scanner__manual .button {
+    width: 100%;
   }
 }
 

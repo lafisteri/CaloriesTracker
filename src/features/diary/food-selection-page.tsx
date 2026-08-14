@@ -36,7 +36,7 @@ export function FoodSelectionPage() {
     setIsLoadingRecent(true)
 
     try {
-      setRecentSources(await applicationServices.diary.getRecentFoodSources())
+      setRecentSources(await applicationServices.diary.getRecentFoodSources(6))
     } catch (loadError) {
       console.error('Failed to load recent diary products.', loadError)
       setError('Не удалось загрузить продукты. Попробуйте ещё раз.')
@@ -82,7 +82,7 @@ export function FoodSelectionPage() {
 
   const addContext = context
   const isSearching = query.trim() !== ''
-  const isLoading = isLoadingRecent || isLoadingProducts
+  const isInitialLoading = !isSearching && (isLoadingRecent || isLoadingProducts)
   const isEmptyDatabase = !isSearching && !isLoadingProducts && sources.length === 0
   const selectionPath = getDiaryAddSelectionPath(addContext)
   const createProductPath = `/products/new?returnTo=${encodeURIComponent(selectionPath)}`
@@ -112,7 +112,7 @@ export function FoodSelectionPage() {
     <section className="diary-add-page" aria-labelledby="food-selection-title">
       <header className="diary-add-page__header">
         <button className="back-link diary-add-page__back" type="button" onClick={returnToDiary}>
-          ‹ Добавить в {getMealTypeLabel(addContext.mealType).toLocaleLowerCase()}
+          ‹ Дневник
         </button>
         <span>{formatDiaryShortDate(addContext.date)}</span>
       </header>
@@ -121,15 +121,15 @@ export function FoodSelectionPage() {
           <h1 id="food-selection-title">Выберите еду</h1>
           <p>Добавление в {getMealTypeLabel(addContext.mealType).toLocaleLowerCase()}.</p>
         </div>
-        <ProductSearchField value={query} onChange={setQuery} placeholder="Поиск продукта..." autoFocus />
-        {isLoading ? <p className="status-message">Загрузка…</p> : null}
+        <ProductSearchField value={query} onChange={setQuery} placeholder="Поиск еды..." label="Поиск по продуктам и блюдам" />
+        {isInitialLoading ? <p className="status-message">Загрузка…</p> : null}
         {error === undefined ? null : (
           <div className="status-message status-message--error" role="alert">
             <p>{error}</p>
             <button className="button button--secondary" type="button" onClick={retryLoading}>Повторить</button>
           </div>
         )}
-        {error !== undefined || isLoading ? null : isEmptyDatabase ? (
+        {error !== undefined || isInitialLoading ? null : isEmptyDatabase ? (
           <section className="empty-state diary-add-page__empty" aria-labelledby="empty-product-database-title">
             <h2 id="empty-product-database-title">В базе пока нет продуктов</h2>
             <p>Создайте первый продукт, чтобы добавить его в дневник.</p>
@@ -140,7 +140,7 @@ export function FoodSelectionPage() {
             {!isSearching ? (
               <section aria-labelledby="recent-products-title">
                 <h2 id="recent-products-title">Недавние</h2>
-                {recentSources.length === 0 ? <p className="diary-selection-sections__empty">Недавних продуктов и блюд пока нет</p> : <FoodSourceList sources={recentSources} onSelect={selectSource} />}
+                {recentSources.length === 0 ? <p className="diary-selection-sections__empty">Недавних продуктов и блюд пока нет</p> : <FoodSourceList className="food-source-list--recent" sources={recentSources} onSelect={selectSource} />}
               </section>
             ) : null}
             <section aria-labelledby="database-products-title">

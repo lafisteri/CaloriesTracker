@@ -79,7 +79,7 @@ export function DiaryPage() {
         <>
           <DailyGoalSummary date={date} totals={day.totals} goal={dailyGoal} />
 
-          {day.entries.length === 0 ? <p className="diary-empty">{date === toLocalDateKey() ? 'Сегодня пока ничего не добавлено' : 'На этот день пока ничего не добавлено'}</p> : null}
+          {day.entries.length === 0 ? <p className="diary-empty">{date === toLocalDateKey() ? 'Сегодня пока ничего не добавлено' : 'За этот день ничего не добавлено'}</p> : null}
           <div className="meal-sections">
             {mealTypes.map((mealType) => (
               <MealSection

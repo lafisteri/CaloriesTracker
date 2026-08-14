@@ -274,13 +274,12 @@ function RecipeIngredientPicker({ onClose, onAdd }: { onClose: () => void; onAdd
   const [selectedProduct, setSelectedProduct] = useState<ProductListItem | undefined>()
   const [amount, setAmount] = useState('')
   const [unit, setUnit] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [hasLoadedProducts, setHasLoadedProducts] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const requestId = useRef(0)
 
   const loadProducts = useCallback(async (searchQuery: string) => {
     const id = ++requestId.current
-    setIsLoading(true)
 
     try {
       const found = await applicationServices.products.search(searchQuery)
@@ -296,7 +295,7 @@ function RecipeIngredientPicker({ onClose, onAdd }: { onClose: () => void; onAdd
       }
     } finally {
       if (id === requestId.current) {
-        setIsLoading(false)
+        setHasLoadedProducts(true)
       }
     }
   }, [])
@@ -304,6 +303,8 @@ function RecipeIngredientPicker({ onClose, onAdd }: { onClose: () => void; onAdd
   useEffect(() => {
     void loadProducts(query)
   }, [loadProducts, query])
+
+  const isInitialLoading = !hasLoadedProducts
 
   const preview = useMemo(() => {
     if (selectedProduct === undefined || !isPositiveFinite(Number(amount)) || unit === '') {
@@ -334,10 +335,10 @@ function RecipeIngredientPicker({ onClose, onAdd }: { onClose: () => void; onAdd
           <>
             <div className="diary-add-page__intro"><h1 id="ingredient-picker-title">Выбрать ингредиент</h1><p>Используется текущая версия продукта.</p></div>
             <ProductSearchField value={query} onChange={setQuery} placeholder="Поиск продукта..." autoFocus />
-            {isLoading ? <p className="status-message">Загрузка…</p> : null}
+            {isInitialLoading ? <p className="status-message">Загрузка…</p> : null}
             {error === undefined ? null : <p className="form-submit-error" role="alert">{error}</p>}
-            {!isLoading && error === undefined && products.length === 0 ? <p className="form-empty">Продукты не найдены.</p> : null}
-            {!isLoading && error === undefined && products.length > 0 ? <ProductList products={products} onSelect={selectProduct} /> : null}
+            {!isInitialLoading && error === undefined && products.length === 0 ? <p className="form-empty">Продукты не найдены.</p> : null}
+            {!isInitialLoading && error === undefined && products.length > 0 ? <ProductList products={products} onSelect={selectProduct} /> : null}
           </>
         ) : (
           <>

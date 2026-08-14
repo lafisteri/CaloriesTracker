@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
@@ -43,6 +43,7 @@ export function ProductFormPage() {
   const [submitError, setSubmitError] = useState<string | undefined>()
   const [duplicateProductId, setDuplicateProductId] = useState<string | undefined>()
   const [isSaving, setIsSaving] = useState(false)
+  const isSubmittingRef = useRef(false)
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: { ...defaultValues, barcode: scannedBarcode ?? '' },
@@ -110,6 +111,11 @@ export function ProductFormPage() {
   }, [productId, reset])
 
   const onSubmit = handleSubmit(async (values) => {
+    if (isSubmittingRef.current) {
+      return
+    }
+
+    isSubmittingRef.current = true
     setIsSaving(true)
     setSubmitError(undefined)
     setDuplicateProductId(undefined)
@@ -130,7 +136,7 @@ export function ProductFormPage() {
       } else {
         setSubmitError('Не удалось сохранить продукт. Проверьте данные и попробуйте ещё раз.')
       }
-    } finally {
+      isSubmittingRef.current = false
       setIsSaving(false)
     }
   })

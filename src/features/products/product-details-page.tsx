@@ -77,7 +77,7 @@ export function ProductDetailsPage() {
   const product = details.product
 
   async function deleteProduct(): Promise<void> {
-    if (!window.confirm(`Удалить продукт «${product.name}»? Его история версий сохранится.`)) {
+    if (!window.confirm(`Удалить продукт «${product.name}»? Старые записи дневника и история версий сохранятся.`)) {
       return
     }
 
