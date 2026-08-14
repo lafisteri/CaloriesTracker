@@ -71,6 +71,13 @@ export class DiaryService {
     }
   }
 
+  /** Returns persisted diary snapshot totals without resolving products or versions. */
+  async getTotalsForDate(date: string): Promise<Nutrition> {
+    assertDateKey(date)
+
+    return sumNutrition(await this.diaryRepository.getEntriesByDate(date))
+  }
+
   async getEntryDetails(id: string): Promise<DiaryEntryDetails | undefined> {
     const entry = await this.diaryRepository.getEntryById(id)
 

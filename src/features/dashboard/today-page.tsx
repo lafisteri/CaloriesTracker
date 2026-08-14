@@ -1,5 +1,74 @@
-import { PlaceholderPage } from '@/shared/ui/placeholder-page'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import type { DayStats, WeekStats } from '@/application/statistics/statistics-service'
+import { applicationServices } from '@/app/providers/application-services'
+import { DiaryDateNavigation } from '@/features/diary/diary-date-navigation'
+import { shiftLocalDateKey, toLocalDateKey } from '@/shared/utils/local-date-key'
+
+import { CaloriesCard, DailyMacroCard, WeeklyCaloriesCard, WeeklyMacroCard } from './dashboard-cards'
 
 export function TodayPage() {
-  return <PlaceholderPage title="Сегодня" description="Здесь появится сводка по вашему рациону за день." />
+  const [date, setDate] = useState(toLocalDateKey)
+  const [dailyStats, setDailyStats] = useState<DayStats | undefined>()
+  const [weekStats, setWeekStats] = useState<WeekStats | undefined>()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | undefined>()
+  const loadRequestId = useRef(0)
+
+  const loadDashboard = useCallback(async (dateKey: string) => {
+    const requestId = ++loadRequestId.current
+    setIsLoading(true)
+    setError(undefined)
+
+    try {
+      const loadedWeekStats = await applicationServices.statistics.getWeekStats(dateKey)
+      const loadedDailyStats = loadedWeekStats.days.find((day) => day.date === dateKey)
+
+      if (requestId === loadRequestId.current && loadedDailyStats !== undefined) {
+        setDailyStats(loadedDailyStats)
+        setWeekStats(loadedWeekStats)
+      }
+    } catch (loadError) {
+      console.error('Failed to load dashboard statistics.', loadError)
+
+      if (requestId === loadRequestId.current) {
+        setError('Не удалось загрузить сводку. Попробуйте ещё раз.')
+      }
+    } finally {
+      if (requestId === loadRequestId.current) {
+        setIsLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadDashboard(date)
+  }, [date, loadDashboard])
+
+  return (
+    <section className="dashboard-page" aria-labelledby="dashboard-title">
+      <h1 id="dashboard-title" className="sr-only">Сводка питания</h1>
+      <DiaryDateNavigation
+        date={date}
+        onChange={setDate}
+        onPrevious={() => setDate((currentDate) => shiftLocalDateKey(currentDate, -1))}
+        onNext={() => setDate((currentDate) => shiftLocalDateKey(currentDate, 1))}
+      />
+      {isLoading ? <p className="status-message">Загрузка…</p> : null}
+      {error === undefined ? null : (
+        <div className="status-message status-message--error" role="alert">
+          <p>{error}</p>
+          <button className="button button--secondary" type="button" onClick={() => void loadDashboard(date)}>Повторить</button>
+        </div>
+      )}
+      {dailyStats === undefined || weekStats === undefined || isLoading || error !== undefined ? null : (
+        <>
+          <CaloriesCard stats={dailyStats} />
+          <DailyMacroCard stats={dailyStats} />
+          <WeeklyCaloriesCard stats={weekStats} />
+          <WeeklyMacroCard stats={weekStats} />
+        </>
+      )}
+    </section>
+  )
 }

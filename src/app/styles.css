@@ -152,7 +152,8 @@ a {
 .product-form-page,
 .diary-page,
 .diary-entry-details,
-.goals-page {
+.goals-page,
+.dashboard-page {
   display: grid;
   gap: 20px;
 }
@@ -1116,6 +1117,272 @@ a {
 
 .goals-form__actions .button {
   width: 100%;
+}
+
+.dashboard-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e6e8e3;
+  border-radius: 22px;
+  box-shadow: 0 1px 2px rgb(31 41 35 / 4%);
+}
+
+.dashboard-card h2 {
+  margin: 0;
+  color: #193e32;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-card__heading {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.dashboard-card__heading span {
+  color: #718077;
+  font-size: 12px;
+}
+
+.dashboard-calories {
+  gap: 8px;
+  background: linear-gradient(135deg, #f2f8f1, #fff 68%);
+}
+
+.dashboard-calories__value {
+  margin: 4px 0 0;
+  color: #193e32;
+  font-size: clamp(32px, 9vw, 42px);
+  font-weight: 770;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.dashboard-calories__value span {
+  color: #64716a;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.dashboard-calories__status {
+  margin: 0;
+  color: #356450;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dashboard-card__link {
+  width: fit-content;
+  margin-top: 2px;
+  color: #285342;
+  font-size: 14px;
+  font-weight: 720;
+  text-decoration: none;
+}
+
+.dashboard-macros dl {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+}
+
+.dashboard-macro {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-macro__values {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-macro dt {
+  color: #33433a;
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.dashboard-macro dd {
+  margin: 0;
+  color: #244f42;
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.dashboard-macro__track {
+  height: 8px;
+  overflow: hidden;
+  background: #edf1ed;
+  border-radius: 999px;
+}
+
+.dashboard-macro__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.dashboard-macro__fill--protein {
+  background: #587fc2;
+}
+
+.dashboard-macro__fill--fat {
+  background: #cc9251;
+}
+
+.dashboard-macro__fill--carbs {
+  background: #5e9a72;
+}
+
+.dashboard-macro__fill--over {
+  filter: saturate(1.3) brightness(0.9);
+}
+
+.dashboard-macro__no-goal {
+  margin: -3px 0 0;
+  color: #718077;
+  font-size: 12px;
+}
+
+.weekly-calories__chart,
+.weekly-macros__chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+  align-items: end;
+}
+
+.weekly-calories__day,
+.weekly-macros__day {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  justify-items: center;
+  color: #66746b;
+  font-size: 11px;
+  text-align: center;
+}
+
+.weekly-calories__track,
+.weekly-macros__bar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 126px;
+  overflow: hidden;
+  align-items: end;
+  background: #f0f3ef;
+  border: 1px solid #e3e9e3;
+  border-radius: 10px 10px 5px 5px;
+}
+
+.weekly-calories__goal-line {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: 66.667%;
+  left: 0;
+  border-top: 1px dashed #5f7064;
+}
+
+.weekly-calories__bar {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  min-height: 0;
+  border-radius: 7px 7px 3px 3px;
+}
+
+.weekly-calories__bar--below {
+  background: #75a984;
+}
+
+.weekly-calories__bar--near-goal {
+  background: #37755c;
+}
+
+.weekly-calories__bar--over {
+  background: #c68b4b;
+}
+
+.weekly-calories__bar--empty,
+.weekly-calories__bar--no-goal {
+  background: transparent;
+}
+
+.weekly-calories__day strong {
+  color: #3d4d43;
+  font-size: 12px;
+}
+
+.weekly-calories__day > span {
+  min-height: 26px;
+  color: #718077;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.weekly-calories__balance,
+.weekly-macros__average,
+.weekly-macros__empty {
+  padding: 11px 12px;
+  margin: 0;
+  color: #356450;
+  background: #eff6ee;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.weekly-macros {
+  gap: 14px;
+}
+
+.macro-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 13px;
+  color: #64716a;
+  font-size: 12px;
+}
+
+.macro-legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.macro-legend i {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.weekly-macros__bar {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.weekly-macros__segment {
+  display: block;
+  width: 100%;
+}
+
+.weekly-macros__empty {
+  color: #718077;
+  background: #f0f3ef;
+  font-weight: 600;
 }
 
 .form-actions .button {
