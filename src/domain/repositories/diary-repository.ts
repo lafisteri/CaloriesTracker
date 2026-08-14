@@ -6,6 +6,6 @@ export interface DiaryRepository {
   getEntryById(id: string): Promise<DiaryEntry | undefined>
   getEntriesByDate(date: string): Promise<DiaryEntry[]>
   getEntriesByDates(dates: string[]): Promise<DiaryEntry[]>
-  getRecentProductEntries(): Promise<DiaryEntry[]>
+  getRecentEntries(): Promise<DiaryEntry[]>
   softDeleteEntry(id: string, deletedAt: string): Promise<void>
 }

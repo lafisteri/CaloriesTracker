@@ -8,6 +8,14 @@ export interface CreateProductDiaryEntryDraft {
   unit: string
 }
 
+export interface CreateRecipeDiaryEntryDraft {
+  date: string
+  mealType: MealType
+  recipeId: string
+  amount: number
+  unit: string
+}
+
 export interface UpdateDiaryEntryDraft {
   mealType: MealType
   amount: number

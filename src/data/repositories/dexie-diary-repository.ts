@@ -37,11 +37,11 @@ export class DexieDiaryRepository implements DiaryRepository {
       .toArray()
   }
 
-  async getRecentProductEntries(): Promise<DiaryEntry[]> {
+  async getRecentEntries(): Promise<DiaryEntry[]> {
     return this.database.diaryEntries
       .orderBy('createdAt')
       .reverse()
-      .filter((entry) => entry.sourceType === 'product' && entry.deletedAt === undefined)
+      .filter((entry) => entry.deletedAt === undefined)
       .toArray()
   }
 

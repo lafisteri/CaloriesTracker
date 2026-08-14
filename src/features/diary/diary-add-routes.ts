@@ -1,4 +1,5 @@
 import type { MealType } from '@/domain/diary/diary-entry'
+import type { DiarySourceType } from '@/domain/diary/diary-entry'
 import { isLocalDateKey } from '@/shared/utils/local-date-key'
 
 const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -6,6 +7,10 @@ const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 export interface DiaryAddContext {
   date: string
   mealType: MealType
+}
+
+export function getDiaryFoodSourceType(sourceType: string | undefined): DiarySourceType | undefined {
+  return sourceType === 'product' || sourceType === 'recipe' ? sourceType : undefined
 }
 
 export function getDiaryAddContext(date: string | undefined, mealType: string | undefined): DiaryAddContext | undefined {
@@ -30,8 +35,8 @@ export function getDiaryAddSelectionPath(context: DiaryAddContext): string {
   return `/diary/${context.date}/${context.mealType}/add`
 }
 
-export function getDiaryAddAmountPath(context: DiaryAddContext, productId: string): string {
-  return `${getDiaryAddSelectionPath(context)}/${encodeURIComponent(productId)}`
+export function getDiaryAddAmountPath(context: DiaryAddContext, sourceType: DiarySourceType, sourceId: string): string {
+  return `${getDiaryAddSelectionPath(context)}/${sourceType}/${encodeURIComponent(sourceId)}`
 }
 
 export function getDiaryAddSelectionPathFromReturnTo(returnTo: string | null): string | undefined {

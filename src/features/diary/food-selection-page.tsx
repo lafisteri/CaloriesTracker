@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
-import type { DiaryProduct } from '@/application/diary/diary-service'
+import type { DiaryFoodSource } from '@/application/diary/diary-service'
 import { applicationServices } from '@/app/providers/application-services'
-import { ProductList } from '@/features/products/product-list'
 import { ProductSearchField } from '@/features/products/product-search-field'
 
 import {
@@ -13,6 +12,7 @@ import {
   getDiaryPath,
 } from './diary-add-routes'
 import { formatDiaryShortDate, getMealTypeLabel } from './diary-formatters'
+import { FoodSourceList } from './food-source-list'
 
 interface DiaryAddNavigationState {
   diaryAddFromDiary?: boolean
@@ -25,8 +25,8 @@ export function FoodSelectionPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
-  const [recentProducts, setRecentProducts] = useState<DiaryProduct[]>([])
-  const [products, setProducts] = useState<DiaryProduct[]>([])
+  const [recentSources, setRecentSources] = useState<DiaryFoodSource[]>([])
+  const [sources, setSources] = useState<DiaryFoodSource[]>([])
   const [isLoadingRecent, setIsLoadingRecent] = useState(true)
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [error, setError] = useState<string | undefined>()
@@ -36,7 +36,7 @@ export function FoodSelectionPage() {
     setIsLoadingRecent(true)
 
     try {
-      setRecentProducts(await applicationServices.diary.getRecentProducts())
+      setRecentSources(await applicationServices.diary.getRecentFoodSources())
     } catch (loadError) {
       console.error('Failed to load recent diary products.', loadError)
       setError('Не удалось загрузить продукты. Попробуйте ещё раз.')
@@ -50,10 +50,10 @@ export function FoodSelectionPage() {
     setIsLoadingProducts(true)
 
     try {
-      const foundProducts = await applicationServices.diary.searchProducts(searchQuery)
+      const foundSources = await applicationServices.diary.searchFoodSources(searchQuery)
 
       if (requestId === searchRequestId.current) {
-        setProducts(foundProducts)
+        setSources(foundSources)
       }
     } catch (loadError) {
       console.error('Failed to search products for diary.', loadError)
@@ -83,7 +83,7 @@ export function FoodSelectionPage() {
   const addContext = context
   const isSearching = query.trim() !== ''
   const isLoading = isLoadingRecent || isLoadingProducts
-  const isEmptyDatabase = !isSearching && !isLoadingProducts && products.length === 0
+  const isEmptyDatabase = !isSearching && !isLoadingProducts && sources.length === 0
   const selectionPath = getDiaryAddSelectionPath(addContext)
   const createProductPath = `/products/new?returnTo=${encodeURIComponent(selectionPath)}`
   const state = location.state as DiaryAddNavigationState | null
@@ -97,8 +97,9 @@ export function FoodSelectionPage() {
     navigate(getDiaryPath(addContext.date), { replace: true })
   }
 
-  function selectProduct(product: DiaryProduct): void {
-    navigate(getDiaryAddAmountPath(addContext, product.product.id), { state: { diaryAddSelectionInHistory: true } })
+  function selectSource(source: DiaryFoodSource): void {
+    const sourceId = source.sourceType === 'product' ? source.product.id : source.recipe.id
+    navigate(getDiaryAddAmountPath(addContext, source.sourceType, sourceId), { state: { diaryAddSelectionInHistory: true } })
   }
 
   function retryLoading(): void {
@@ -117,7 +118,7 @@ export function FoodSelectionPage() {
       </header>
       <div className="diary-add-page__scroll">
         <div className="diary-add-page__intro">
-          <h1 id="food-selection-title">Выберите продукт</h1>
+          <h1 id="food-selection-title">Выберите еду</h1>
           <p>Добавление в {getMealTypeLabel(addContext.mealType).toLocaleLowerCase()}.</p>
         </div>
         <ProductSearchField value={query} onChange={setQuery} placeholder="Поиск продукта..." autoFocus />
@@ -139,7 +140,7 @@ export function FoodSelectionPage() {
             {!isSearching ? (
               <section aria-labelledby="recent-products-title">
                 <h2 id="recent-products-title">Недавние</h2>
-                {recentProducts.length === 0 ? <p className="diary-selection-sections__empty">Недавних продуктов пока нет</p> : <ProductList products={recentProducts} onSelect={selectProduct} />}
+                {recentSources.length === 0 ? <p className="diary-selection-sections__empty">Недавних продуктов и блюд пока нет</p> : <FoodSourceList sources={recentSources} onSelect={selectSource} />}
               </section>
             ) : null}
             <section aria-labelledby="database-products-title">
@@ -147,12 +148,12 @@ export function FoodSelectionPage() {
                 <h2 id="database-products-title">{isSearching ? 'Результаты поиска' : 'Моя база'}</h2>
                 {!isSearching ? <Link to={createProductPath}>+ Создать продукт</Link> : null}
               </div>
-              {products.length === 0 ? (
+              {sources.length === 0 ? (
                 <div className="form-empty">
                   <p>Ничего не найдено.</p>
                   <Link to={createProductPath}>Создать продукт</Link>
                 </div>
-              ) : <ProductList products={products} onSelect={selectProduct} />}
+              ) : <FoodSourceList sources={sources} onSelect={selectSource} />}
             </section>
           </div>
         )}

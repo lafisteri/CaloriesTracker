@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
-import type { DiaryProduct } from '@/application/diary/diary-service'
+import type { DiaryFoodSource } from '@/application/diary/diary-service'
 import { applicationServices } from '@/app/providers/application-services'
-import { getDiaryUnitOptions } from '@/domain/diary/diary-unit'
 
 import {
   getDiaryAddContext,
   getDiaryAddSelectionPath,
+  getDiaryFoodSourceType,
   getDiaryPath,
 } from './diary-add-routes'
 import { formatDiaryNumber, formatDiaryShortDate, getMealTypeLabel } from './diary-formatters'
@@ -18,11 +18,15 @@ interface DiaryAmountNavigationState {
 
 /** Full-screen amount and unit form that creates one immutable Diary snapshot. */
 export function FoodAmountPage() {
-  const { date, mealType, productId } = useParams()
+  const { date, mealType, sourceType, sourceId } = useParams()
   const context = getDiaryAddContext(date, mealType)
+  // Keep old product-only links working, but never reinterpret an invalid typed URL as a product.
+  const resolvedSourceType = sourceType === undefined
+    ? (sourceId === undefined ? undefined : 'product')
+    : getDiaryFoodSourceType(sourceType)
   const navigate = useNavigate()
   const location = useLocation()
-  const [product, setProduct] = useState<DiaryProduct | undefined>()
+  const [source, setSource] = useState<DiaryFoodSource | undefined>()
   const [unit, setUnit] = useState('')
   const [amount, setAmount] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -33,33 +37,32 @@ export function FoodAmountPage() {
   useEffect(() => {
     let isMounted = true
 
-    async function loadProduct(): Promise<void> {
+    async function loadSource(): Promise<void> {
       setIsLoading(true)
       setError(undefined)
-      setProduct(undefined)
+      setSource(undefined)
       setUnit('')
       setAmount('')
 
-      if (productId === undefined) {
+      if (resolvedSourceType === undefined || sourceId === undefined) {
         setIsLoading(false)
         return
       }
 
       try {
-        const details = await applicationServices.products.getById(productId)
+        const foodSource = await applicationServices.diary.getFoodSource(resolvedSourceType, sourceId)
 
-        if (isMounted && details !== undefined) {
-          const diaryProduct = { product: details.product, currentVersion: details.currentVersion }
-          const [defaultUnit] = getDiaryUnitOptions(diaryProduct.currentVersion)
-          setProduct(diaryProduct)
+        if (isMounted && foodSource !== undefined) {
+          const [defaultUnit] = applicationServices.diary.getFoodUnitOptions(foodSource)
+          setSource(foodSource)
           setUnit(defaultUnit.value)
-          setAmount(String(diaryProduct.currentVersion.baseAmount))
+          setAmount(String(getDefaultAmount(foodSource)))
         }
       } catch (loadError) {
-        console.error('Failed to load product for diary.', loadError)
+        console.error('Failed to load food source for diary.', loadError)
 
         if (isMounted) {
-          setError('Не удалось загрузить продукт. Попробуйте ещё раз.')
+          setError('Не удалось загрузить еду. Попробуйте ещё раз.')
         }
       } finally {
         if (isMounted) {
@@ -68,24 +71,24 @@ export function FoodAmountPage() {
       }
     }
 
-    void loadProduct()
+    void loadSource()
 
     return () => {
       isMounted = false
     }
-  }, [productId])
+  }, [resolvedSourceType, sourceId])
 
   const preview = useMemo(() => {
-    if (product === undefined || unit === '' || !isPositiveDecimal(amount)) {
+    if (source === undefined || unit === '' || !isPositiveDecimal(amount)) {
       return undefined
     }
 
     try {
-      return applicationServices.diary.previewProduct(product, Number(amount), unit)
+      return applicationServices.diary.previewFoodSource(source, Number(amount), unit)
     } catch {
       return undefined
     }
-  }, [amount, product, unit])
+  }, [amount, source, unit])
 
   if (context === undefined) {
     return <InvalidDiaryAddContext />
@@ -104,8 +107,8 @@ export function FoodAmountPage() {
     navigate(selectionPath, { replace: true })
   }
 
-  async function addProduct(): Promise<void> {
-    if (isSubmittingRef.current || product === undefined || preview === undefined) {
+  async function addFood(): Promise<void> {
+    if (isSubmittingRef.current || source === undefined || preview === undefined) {
       return
     }
 
@@ -114,13 +117,23 @@ export function FoodAmountPage() {
     setError(undefined)
 
     try {
-      await applicationServices.diary.addProduct({
-        date: addContext.date,
-        mealType: addContext.mealType,
-        productId: product.product.id,
-        amount: Number(amount),
-        unit,
-      })
+      if (source.sourceType === 'product') {
+        await applicationServices.diary.addProduct({
+          date: addContext.date,
+          mealType: addContext.mealType,
+          productId: source.product.id,
+          amount: Number(amount),
+          unit,
+        })
+      } else {
+        await applicationServices.diary.addRecipe({
+          date: addContext.date,
+          mealType: addContext.mealType,
+          recipeId: source.recipe.id,
+          amount: Number(amount),
+          unit,
+        })
+      }
 
       if (state?.diaryAddSelectionInHistory === true) {
         navigate(-2)
@@ -128,8 +141,8 @@ export function FoodAmountPage() {
         navigate(getDiaryPath(addContext.date), { replace: true })
       }
     } catch (addError) {
-      console.error('Failed to add diary product.', addError)
-      setError('Не удалось добавить продукт. Проверьте количество и попробуйте ещё раз.')
+      console.error('Failed to add food to diary.', addError)
+      setError('Не удалось добавить еду. Проверьте количество и попробуйте ещё раз.')
       isSubmittingRef.current = false
       setIsSaving(false)
     }
@@ -139,11 +152,11 @@ export function FoodAmountPage() {
     return <p className="status-message">Загрузка…</p>
   }
 
-  if (product === undefined) {
+  if (source === undefined) {
     return (
       <section className="empty-state" aria-labelledby="diary-product-missing-title">
-        <h1 id="diary-product-missing-title">Продукт не найден</h1>
-        <p>{error ?? 'Возможно, продукт был удалён.'}</p>
+        <h1 id="diary-product-missing-title">Еда не найдена</h1>
+        <p>{error ?? 'Возможно, продукт или блюдо было удалено.'}</p>
         <Link className="button button--secondary" to={selectionPath}>К выбору продуктов</Link>
       </section>
     )
@@ -152,12 +165,12 @@ export function FoodAmountPage() {
   return (
     <section className="diary-add-page" aria-labelledby="food-amount-title">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ {product.product.name}</button>
+        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ {getSourceName(source)}</button>
         <span>{formatDiaryShortDate(addContext.date)}</span>
       </header>
       <div className="diary-add-page__scroll diary-amount-page__scroll">
         <div className="diary-add-page__intro">
-          <h1 id="food-amount-title">{product.product.name}</h1>
+          <h1 id="food-amount-title">{getSourceName(source)}</h1>
           <p>Добавить в: <strong>{getMealTypeLabel(addContext.mealType)}</strong></p>
         </div>
         <div className="diary-entry-form">
@@ -169,13 +182,13 @@ export function FoodAmountPage() {
           <div className="form-field">
             <label htmlFor="diary-add-unit">Единица</label>
             <select id="diary-add-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
-              {getDiaryUnitOptions(product.currentVersion).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </div>
           <NutritionPreview nutrition={preview} />
           {error === undefined ? null : <p className="form-submit-error" role="alert">{error}</p>}
           <div className="diary-add-page__actions">
-            <button className="button button--primary" type="button" disabled={preview === undefined || isSaving} onClick={() => void addProduct()}>
+            <button className="button button--primary" type="button" disabled={preview === undefined || isSaving} onClick={() => void addFood()}>
               {isSaving ? 'Добавление…' : `Добавить в ${getMealTypeLabel(addContext.mealType).toLocaleLowerCase()}`}
             </button>
           </div>
@@ -214,4 +227,16 @@ function isPositiveDecimal(value: string): boolean {
   const numericAmount = Number(value)
 
   return Number.isFinite(numericAmount) && numericAmount > 0
+}
+
+function getSourceName(source: DiaryFoodSource): string {
+  return source.sourceType === 'product' ? source.product.name : source.recipe.name
+}
+
+function getDefaultAmount(source: DiaryFoodSource): number {
+  if (source.sourceType === 'product') {
+    return source.currentVersion.baseAmount
+  }
+
+  return source.currentVersion.cookedWeight === undefined ? 1 : 100
 }

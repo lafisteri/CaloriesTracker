@@ -30,7 +30,7 @@ export function ProductList({ products, onSelect }: ProductListProps) {
   )
 }
 
-function ProductListRow({ item }: { item: ProductListItem }) {
+export function ProductListRow({ item }: { item: ProductListItem }) {
   const { product, currentVersion } = item
 
   return (

@@ -1,5 +1,5 @@
-import type { DiaryEntry, MealType } from '@/domain/diary/diary-entry'
-import type { CreateProductDiaryEntryDraft, UpdateDiaryEntryDraft } from '@/domain/diary/diary-entry-draft'
+import type { DiaryEntry, DiarySourceType, MealType } from '@/domain/diary/diary-entry'
+import type { CreateProductDiaryEntryDraft, CreateRecipeDiaryEntryDraft, UpdateDiaryEntryDraft } from '@/domain/diary/diary-entry-draft'
 import { getDiaryUnitOptions, resolveDiaryUnit, type DiaryUnitOption } from '@/domain/diary/diary-unit'
 import { nutritionCalculator } from '@/domain/nutrition/nutrition-calculator'
 import type { Nutrition } from '@/domain/nutrition/nutrition'
@@ -7,6 +7,10 @@ import type { Product } from '@/domain/products/product'
 import type { ProductVersion } from '@/domain/products/product-version'
 import type { DiaryRepository } from '@/domain/repositories/diary-repository'
 import type { ProductRepository } from '@/domain/repositories/product-repository'
+import type { Recipe } from '@/domain/recipes/recipe'
+import type { RecipeVersion } from '@/domain/recipes/recipe-version'
+import type { RecipeRepository } from '@/domain/repositories/recipe-repository'
+import { recipeCalculator } from '@/domain/recipes/recipe-calculator'
 import { unitConverter } from '@/domain/units/unit-converter'
 import { createUuid } from '@/shared/utils/create-uuid'
 import { isLocalDateKey } from '@/shared/utils/local-date-key'
@@ -18,9 +22,24 @@ export interface DiaryProduct {
   currentVersion: ProductVersion
 }
 
-export interface DiaryEntryDetails {
-  entry: DiaryEntry
+export interface DiaryRecipe {
+  recipe: Recipe
+  currentVersion: RecipeVersion
+}
+
+export type DiaryFoodSource = ({ sourceType: 'product' } & DiaryProduct) | ({ sourceType: 'recipe' } & DiaryRecipe)
+
+export type DiaryEntryDetails = ProductDiaryEntryDetails | RecipeDiaryEntryDetails
+
+interface ProductDiaryEntryDetails {
+  entry: DiaryEntry & { sourceType: 'product' }
   sourceVersion: ProductVersion
+  unitOptions: DiaryUnitOption[]
+}
+
+interface RecipeDiaryEntryDetails {
+  entry: DiaryEntry & { sourceType: 'recipe' }
+  sourceVersion: RecipeVersion
   unitOptions: DiaryUnitOption[]
 }
 
@@ -46,6 +65,7 @@ export class DiaryService {
   constructor(
     private readonly diaryRepository: DiaryRepository,
     private readonly productRepository: ProductRepository,
+    private readonly recipeRepository: RecipeRepository,
   ) {}
 
   async getDay(date: string): Promise<DiaryDay> {
@@ -95,8 +115,18 @@ export class DiaryService {
   async getEntryDetails(id: string): Promise<DiaryEntryDetails | undefined> {
     const entry = await this.diaryRepository.getEntryById(id)
 
-    if (entry === undefined || entry.deletedAt !== undefined || entry.sourceType !== 'product') {
+    if (entry === undefined || entry.deletedAt !== undefined) {
       return undefined
+    }
+
+    if (entry.sourceType === 'recipe') {
+      const sourceVersion = await this.recipeRepository.getVersionById(entry.sourceVersionId)
+
+      if (sourceVersion === undefined) {
+        throw new DiaryEntrySourceNotFoundError()
+      }
+
+      return { entry: entry as RecipeDiaryEntryDetails['entry'], sourceVersion, unitOptions: getRecipeUnitOptions(sourceVersion) }
     }
 
     const sourceVersion = await this.productRepository.getVersionById(entry.sourceVersionId)
@@ -105,7 +135,7 @@ export class DiaryService {
       throw new DiaryEntrySourceNotFoundError()
     }
 
-    return { entry, sourceVersion, unitOptions: getDiaryUnitOptions(sourceVersion) }
+    return { entry: entry as ProductDiaryEntryDetails['entry'], sourceVersion, unitOptions: getDiaryUnitOptions(sourceVersion) }
   }
 
   async searchProducts(query = ''): Promise<DiaryProduct[]> {
@@ -118,12 +148,83 @@ export class DiaryService {
     return this.resolveCurrentProducts(matches)
   }
 
+  async searchFoodSources(query = ''): Promise<DiaryFoodSource[]> {
+    const [products, recipes] = await Promise.all([
+      this.searchProducts(query),
+      this.searchRecipes(query),
+    ])
+
+    return [
+      ...products.map((product): DiaryFoodSource => ({ sourceType: 'product', ...product })),
+      ...recipes.map((recipe): DiaryFoodSource => ({ sourceType: 'recipe', ...recipe })),
+    ]
+  }
+
   async getRecentProducts(limit = 10): Promise<DiaryProduct[]> {
-    const entries = await this.diaryRepository.getRecentProductEntries()
+    const entries = (await this.diaryRepository.getRecentEntries()).filter((entry) => entry.sourceType === 'product')
     const sourceIds = [...new Set(entries.map((entry) => entry.sourceId))].slice(0, limit)
     const products = await Promise.all(sourceIds.map((id) => this.productRepository.getById(id)))
 
     return this.resolveCurrentProducts(products.filter((product): product is Product => product !== undefined && product.deletedAt === undefined))
+  }
+
+  async getRecentFoodSources(limit = 10): Promise<DiaryFoodSource[]> {
+    const entries = await this.diaryRepository.getRecentEntries()
+    const seenSourceKeys = new Set<string>()
+    const sources: DiaryFoodSource[] = []
+
+    for (const entry of entries) {
+      const sourceKey = `${entry.sourceType}:${entry.sourceId}`
+
+      if (seenSourceKeys.has(sourceKey)) {
+        continue
+      }
+
+      seenSourceKeys.add(sourceKey)
+      const source = await this.getFoodSource(entry.sourceType, entry.sourceId)
+
+      if (source !== undefined) {
+        sources.push(source)
+      }
+
+      if (sources.length === limit) {
+        break
+      }
+    }
+
+    return sources
+  }
+
+  async getFoodSource(sourceType: DiarySourceType, sourceId: string): Promise<DiaryFoodSource | undefined> {
+    if (sourceType === 'product') {
+      const product = await this.productRepository.getById(sourceId)
+
+      if (product === undefined || product.deletedAt !== undefined) {
+        return undefined
+      }
+
+      const currentVersion = await this.productRepository.getVersionById(product.currentVersionId)
+      return currentVersion === undefined ? undefined : { sourceType, product, currentVersion }
+    }
+
+    const recipe = await this.recipeRepository.getById(sourceId)
+
+    if (recipe === undefined || recipe.deletedAt !== undefined) {
+      return undefined
+    }
+
+    const currentVersion = await this.recipeRepository.getVersionById(recipe.currentVersionId)
+    return currentVersion === undefined ? undefined : { sourceType, recipe, currentVersion }
+  }
+
+  getFoodUnitOptions(source: DiaryFoodSource): DiaryUnitOption[] {
+    return source.sourceType === 'product' ? getDiaryUnitOptions(source.currentVersion) : getRecipeUnitOptions(source.currentVersion)
+  }
+
+  previewFoodSource(source: DiaryFoodSource, amount: number, unit: string): Nutrition {
+    return source.sourceType === 'product'
+      ? this.previewProduct(source, amount, unit)
+      : calculateRecipeSnapshot(source.currentVersion, amount, unit)
   }
 
   previewProduct(product: DiaryProduct, amount: number, unit: string): Nutrition {
@@ -131,7 +232,9 @@ export class DiaryService {
   }
 
   previewEntry(details: DiaryEntryDetails, amount: number, unit: string): Nutrition {
-    return calculateSnapshot(details.sourceVersion, amount, unit)
+    return isProductEntryDetails(details)
+      ? calculateSnapshot(details.sourceVersion, amount, unit)
+      : calculateRecipeSnapshot(details.sourceVersion, amount, unit)
   }
 
   async addProduct(draft: CreateProductDiaryEntryDraft): Promise<DiaryEntry> {
@@ -161,6 +264,44 @@ export class DiaryService {
       sourceId: product.id,
       sourceVersionId: sourceVersion.id,
       sourceName: product.name,
+      amount: draft.amount,
+      unit: draft.unit,
+      ...nutrition,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    await this.diaryRepository.createEntry(entry)
+
+    return entry
+  }
+
+  async addRecipe(draft: CreateRecipeDiaryEntryDraft): Promise<DiaryEntry> {
+    assertDateKey(draft.date)
+    assertMealType(draft.mealType)
+    assertPositiveAmount(draft.amount)
+    const recipe = await this.recipeRepository.getById(draft.recipeId)
+
+    if (recipe === undefined || recipe.deletedAt !== undefined) {
+      throw new DiaryRecipeNotFoundError()
+    }
+
+    const sourceVersion = await this.recipeRepository.getVersionById(recipe.currentVersionId)
+
+    if (sourceVersion === undefined) {
+      throw new DiaryEntrySourceNotFoundError()
+    }
+
+    const nutrition = calculateRecipeSnapshot(sourceVersion, draft.amount, draft.unit)
+    const now = new Date().toISOString()
+    const entry: DiaryEntry = {
+      id: createUuid(),
+      date: draft.date,
+      mealType: draft.mealType,
+      sourceType: 'recipe',
+      sourceId: recipe.id,
+      sourceVersionId: sourceVersion.id,
+      sourceName: recipe.name,
       amount: draft.amount,
       unit: draft.unit,
       ...nutrition,
@@ -218,9 +359,21 @@ export class DiaryService {
     return productResults.filter((result): result is DiaryProduct => result !== undefined)
   }
 
+  private async searchRecipes(query: string): Promise<DiaryRecipe[]> {
+    const normalizedQuery = query.trim().toLocaleLowerCase()
+    const recipes = await this.recipeRepository.getActive()
+    const matches = recipes.filter((recipe) => normalizedQuery.length === 0 || recipe.name.toLocaleLowerCase().includes(normalizedQuery))
+    const results = await Promise.all(matches.map(async (recipe) => {
+      const currentVersion = await this.recipeRepository.getVersionById(recipe.currentVersionId)
+      return currentVersion === undefined ? undefined : { recipe, currentVersion }
+    }))
+
+    return results.filter((result): result is DiaryRecipe => result !== undefined)
+  }
+
   private async getEntryUnitLabel(entry: DiaryEntry): Promise<string> {
-    if (entry.sourceType !== 'product') {
-      return entry.unit
+    if (entry.sourceType === 'recipe') {
+      return getRecipeUnitLabel(entry.unit)
     }
 
     const sourceVersion = await this.productRepository.getVersionById(entry.sourceVersionId)
@@ -258,6 +411,13 @@ export class DiaryProductNotFoundError extends Error {
   }
 }
 
+export class DiaryRecipeNotFoundError extends Error {
+  constructor() {
+    super('Recipe not found.')
+    this.name = 'DiaryRecipeNotFoundError'
+  }
+}
+
 function calculateSnapshot(version: ProductVersion, amount: number, unit: string): Nutrition {
   assertPositiveAmount(amount)
   const resolvedUnit = resolveDiaryUnit(version, unit)
@@ -266,6 +426,48 @@ function calculateSnapshot(version: ProductVersion, amount: number, unit: string
     : unitConverter.toBaseAmount(version, amount, resolvedUnit.servingUnit!)
 
   return nutritionCalculator.calculateForProduct(version, normalizedAmount)
+}
+
+function getRecipeUnitOptions(version: RecipeVersion): DiaryUnitOption[] {
+  const options: DiaryUnitOption[] = []
+
+  if (version.cookedWeight !== undefined) {
+    options.push({ value: 'g', label: 'г' })
+  }
+
+  if (version.servingsCount !== undefined) {
+    options.push({ value: 'piece', label: 'шт' })
+  }
+
+  return options
+}
+
+function getRecipeUnitLabel(unit: string): string {
+  return unit === 'piece' ? 'шт' : unit === 'g' ? 'г' : unit
+}
+
+function isProductEntryDetails(details: DiaryEntryDetails): details is ProductDiaryEntryDetails {
+  return details.entry.sourceType === 'product'
+}
+
+function calculateRecipeSnapshot(version: RecipeVersion, amount: number, unit: string): Nutrition {
+  assertPositiveAmount(amount)
+  const total = {
+    calories: version.totalCalories,
+    protein: version.totalProtein,
+    fat: version.totalFat,
+    carbs: version.totalCarbs,
+  }
+
+  if (unit === 'g' && version.cookedWeight !== undefined) {
+    return recipeCalculator.scale(total, amount / version.cookedWeight)
+  }
+
+  if (unit === 'piece' && version.servingsCount !== undefined) {
+    return recipeCalculator.scale(total, amount / version.servingsCount)
+  }
+
+  throw new Error('Diary unit is not available for this recipe version.')
 }
 
 function sumNutrition(entries: DiaryEntry[]): Nutrition {

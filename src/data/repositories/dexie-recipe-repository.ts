@@ -6,6 +6,13 @@ import type { RecipeRepository } from '@/domain/repositories/recipe-repository'
 export class DexieRecipeRepository implements RecipeRepository {
   constructor(private readonly database: CalorieDatabase = appDatabase) {}
 
+  async create(recipe: Recipe, initialVersion: RecipeVersion): Promise<void> {
+    await this.database.transaction('rw', this.database.recipes, this.database.recipeVersions, async () => {
+      await this.database.recipeVersions.add(initialVersion)
+      await this.database.recipes.add(recipe)
+    })
+  }
+
   async save(recipe: Recipe): Promise<void> {
     await this.database.recipes.put(recipe)
   }
@@ -18,8 +25,11 @@ export class DexieRecipeRepository implements RecipeRepository {
     return this.database.recipes.filter((recipe) => recipe.deletedAt === undefined).sortBy('name')
   }
 
-  async saveVersion(version: RecipeVersion): Promise<void> {
-    await this.database.recipeVersions.put(version)
+  async saveVersionAndUpdateRecipe(recipe: Recipe, version: RecipeVersion): Promise<void> {
+    await this.database.transaction('rw', this.database.recipes, this.database.recipeVersions, async () => {
+      await this.database.recipeVersions.add(version)
+      await this.database.recipes.put(recipe)
+    })
   }
 
   getVersions(recipeId: string): Promise<RecipeVersion[]> {
@@ -28,5 +38,9 @@ export class DexieRecipeRepository implements RecipeRepository {
 
   getVersionById(id: string): Promise<RecipeVersion | undefined> {
     return this.database.recipeVersions.get(id)
+  }
+
+  async softDelete(id: string, deletedAt: string): Promise<void> {
+    await this.database.recipes.update(id, { deletedAt, updatedAt: deletedAt })
   }
 }

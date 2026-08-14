@@ -18,6 +18,14 @@ const FoodAmountPage = lazy(async () => {
   const module = await import('@/features/diary/food-amount-page')
   return { default: module.FoodAmountPage }
 })
+const RecipeDetailsPage = lazy(async () => {
+  const module = await import('@/features/recipes/recipe-details-page')
+  return { default: module.RecipeDetailsPage }
+})
+const RecipeFormPage = lazy(async () => {
+  const module = await import('@/features/recipes/recipe-form-page')
+  return { default: module.RecipeFormPage }
+})
 
 export function AppRouter() {
   return (
@@ -28,12 +36,16 @@ export function AppRouter() {
           <Route path="today" element={<TodayPage />} />
           <Route path="diary" element={<DiaryPage />} />
           <Route path="diary/:date/:mealType/add" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodSelectionPage /></Suspense>} />
-          <Route path="diary/:date/:mealType/add/:productId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodAmountPage /></Suspense>} />
+          <Route path="diary/:date/:mealType/add/:sourceType/:sourceId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodAmountPage /></Suspense>} />
+          <Route path="diary/:date/:mealType/add/:sourceId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><FoodAmountPage /></Suspense>} />
           <Route path="diary/entries/:entryId" element={<DiaryEntryDetailsPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="products/new" element={<ProductFormPage />} />
           <Route path="products/:productId" element={<ProductDetailsPage />} />
           <Route path="products/:productId/edit" element={<ProductFormPage />} />
+          <Route path="recipes/new" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><RecipeFormPage /></Suspense>} />
+          <Route path="recipes/:recipeId" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><RecipeDetailsPage /></Suspense>} />
+          <Route path="recipes/:recipeId/edit" element={<Suspense fallback={<p className="status-message">Загрузка…</p>}><RecipeFormPage /></Suspense>} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="*" element={<Navigate replace to="/today" />} />
         </Route>

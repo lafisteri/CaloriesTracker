@@ -126,7 +126,7 @@ export function DiaryEntryDetailsPage() {
       <div className="page-heading">
         <div>
           <h1 id="diary-entry-title">{details.entry.sourceName}</h1>
-          <p>Версия продукта v{details.sourceVersion.versionNumber}</p>
+          <p>Версия {details.entry.sourceType === 'recipe' ? 'рецепта' : 'продукта'} v{details.sourceVersion.versionNumber}</p>
         </div>
       </div>
       <div className="diary-entry-form">
