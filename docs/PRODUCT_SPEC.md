@@ -319,6 +319,7 @@ PWA поддерживает manifest, service worker, app shell cache, standalo
 - Длинные названия не должны создавать horizontal scroll.
 - Bottom navigation предназначена только для частых разделов.
 - Ошибки формулируются человеческим языком и не показывают технические исключения пользователю.
+- Do not use native browser alert/confirm/prompt dialogs in product UX.
 
 ## 15. Out of scope
 

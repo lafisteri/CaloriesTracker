@@ -134,8 +134,7 @@ export function ProductsPage() {
       {catalogTab === 'products' && !isInitialLoading && error === undefined && products.length === 0 ? (
         <div className="empty-state">
           <h2>{query.trim() === '' ? 'Продуктов пока нет' : 'Ничего не найдено'}</h2>
-          <p>{query.trim() === '' ? 'Добавьте первый продукт — всё будет сохранено на этом устройстве.' : 'Измените запрос или добавьте новый продукт.'}</p>
-          {query.trim() === '' ? <Link className="button button--primary" to="/products/new">Создать продукт</Link> : null}
+          <p>{query.trim() === '' ? 'Добавьте первый продукт с помощью кнопки выше.' : 'Измените запрос или добавьте новый продукт.'}</p>
         </div>
       ) : null}
 
@@ -143,8 +142,7 @@ export function ProductsPage() {
       {catalogTab === 'recipes' && !isInitialLoading && error === undefined && recipes.length === 0 ? (
         <div className="empty-state">
           <h2>{query.trim() === '' ? 'У вас пока нет рецептов' : 'Ничего не найдено'}</h2>
-          <p>{query.trim() === '' ? 'Создайте блюдо из продуктов своей базы.' : 'Измените запрос или создайте новый рецепт.'}</p>
-          {query.trim() === '' ? <Link className="button button--primary" to="/recipes/new">Создать рецепт</Link> : null}
+          <p>{query.trim() === '' ? 'Создайте первый рецепт с помощью кнопки выше.' : 'Измените запрос или создайте новый рецепт.'}</p>
         </div>
       ) : null}
       {catalogTab === 'recipes' && !isInitialLoading && error === undefined && recipes.length > 0 ? <RecipeList recipes={recipes} /> : null}

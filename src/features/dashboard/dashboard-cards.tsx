@@ -72,7 +72,7 @@ export function WeeklyMacroCard({ stats }: { stats: WeekStats }) {
           </div>
         ))}
       </div>
-      {stats.macroDistribution.totalEnergy === 0 ? <p className="weekly-macros__empty">За эту неделю пока нет БЖУ для распределения.</p> : <p className="weekly-macros__average">Среднее: {formatMacroDistribution(stats.macroDistribution)}</p>}
+      {stats.macroDistribution.totalEnergy === 0 ? null : <p className="weekly-macros__average">Среднее: {formatMacroDistribution(stats.macroDistribution)}</p>}
     </section>
   )
 }

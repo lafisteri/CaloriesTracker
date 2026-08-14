@@ -72,7 +72,7 @@ export function RecipeDetailsPage() {
   }
 
   async function updateIngredients(): Promise<void> {
-    if (details === undefined || !window.confirm('Создать новую версию рецепта с актуальными версиями ингредиентов?')) {
+    if (details === undefined) {
       return
     }
 
@@ -93,7 +93,7 @@ export function RecipeDetailsPage() {
   }
 
   async function deleteRecipe(): Promise<void> {
-    if (details === undefined || !window.confirm(`Удалить рецепт «${details.recipe.name}»? История и записи дневника сохранятся.`)) {
+    if (details === undefined) {
       return
     }
 

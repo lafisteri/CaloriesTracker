@@ -44,38 +44,8 @@ a {
   background: #f7f8f5;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  height: 64px;
-  padding: 0 20px;
-}
-
-.app-header__brand {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: #244f42;
-  font-size: 18px;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-}
-
-.app-header__mark {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  color: #f7f8f5;
-  background: #2e5e4e;
-  border-radius: 9px;
-  font-size: 21px;
-  font-weight: 500;
-  line-height: 1;
-}
-
 .app-content {
-  min-height: calc(100dvh - 64px - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   padding: 20px 20px 96px;
 }
 
@@ -83,6 +53,10 @@ a {
   height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   min-height: 0;
   padding: 0;
+}
+
+.app-content--flow.app-content--with-bottom-navigation {
+  height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 .bottom-navigation {
@@ -983,6 +957,10 @@ a {
   overscroll-behavior-y: contain;
 }
 
+.diary-add-page--with-bottom-navigation .diary-add-page__scroll {
+  padding-bottom: 28px;
+}
+
 .diary-add-page__intro h1 {
   margin: 0;
   color: #193e32;
@@ -1650,8 +1628,7 @@ a {
 }
 
 .weekly-calories__balance,
-.weekly-macros__average,
-.weekly-macros__empty {
+.weekly-macros__average {
   padding: 11px 12px;
   margin: 0;
   color: #356450;
@@ -1696,12 +1673,6 @@ a {
 .weekly-macros__segment {
   display: block;
   width: 100%;
-}
-
-.weekly-macros__empty {
-  color: #718077;
-  background: #f0f3ef;
-  font-weight: 600;
 }
 
 .form-actions .button {

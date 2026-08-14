@@ -163,7 +163,7 @@ export function FoodAmountPage() {
   }
 
   return (
-    <section className="diary-add-page" aria-labelledby="food-amount-title">
+    <section className="diary-add-page diary-add-page--with-bottom-navigation" aria-labelledby="food-amount-title">
       <header className="diary-add-page__header">
         <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ Продукты</button>
       </header>

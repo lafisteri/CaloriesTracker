@@ -89,7 +89,7 @@ export function DiaryEntryDetailsPage() {
   }
 
   async function deleteEntry(): Promise<void> {
-    if (entryId === undefined || details === undefined || !window.confirm(`Удалить «${details.entry.sourceName}» из дневника?`)) {
+    if (entryId === undefined || details === undefined) {
       return
     }
 
