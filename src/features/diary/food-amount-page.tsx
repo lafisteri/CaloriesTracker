@@ -20,10 +20,7 @@ interface DiaryAmountNavigationState {
 export function FoodAmountPage() {
   const { date, mealType, sourceType, sourceId } = useParams()
   const context = getDiaryAddContext(date, mealType)
-  // Keep old product-only links working, but never reinterpret an invalid typed URL as a product.
-  const resolvedSourceType = sourceType === undefined
-    ? (sourceId === undefined ? undefined : 'product')
-    : getDiaryFoodSourceType(sourceType)
+  const resolvedSourceType = getDiaryFoodSourceType(sourceType)
   const navigate = useNavigate()
   const location = useLocation()
   const [source, setSource] = useState<DiaryFoodSource | undefined>()
@@ -135,11 +132,7 @@ export function FoodAmountPage() {
         })
       }
 
-      if (state?.diaryAddSelectionInHistory === true) {
-        navigate(-2)
-      } else {
-        navigate(getDiaryPath(addContext.date), { replace: true })
-      }
+      navigate(getDiaryPath(addContext.date), { replace: true })
     } catch (addError) {
       console.error('Failed to add food to diary.', addError)
       setError('Не удалось добавить еду. Проверьте количество и попробуйте ещё раз.')
@@ -218,7 +211,7 @@ function InvalidDiaryAddContext() {
     <section className="empty-state" aria-labelledby="diary-add-context-error-title">
       <h1 id="diary-add-context-error-title">Не удалось открыть добавление еды</h1>
       <p>Дата или приём пищи в ссылке некорректны.</p>
-      <Link className="button button--secondary" to="/diary">К дневнику</Link>
+      <Link className="button button--secondary" to="/">К дневнику</Link>
     </section>
   )
 }

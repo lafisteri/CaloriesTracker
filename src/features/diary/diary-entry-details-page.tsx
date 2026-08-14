@@ -115,7 +115,7 @@ export function DiaryEntryDetailsPage() {
       <section className="empty-state" aria-labelledby="diary-entry-not-found-title">
         <h1 id="diary-entry-not-found-title">Запись не найдена</h1>
         <p>{error ?? 'Возможно, она была удалена.'}</p>
-        <Link className="button button--secondary" to="/diary">К дневнику</Link>
+        <Link className="button button--secondary" to="/">К дневнику</Link>
       </section>
     )
   }

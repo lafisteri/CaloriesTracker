@@ -22,7 +22,7 @@ export function getDiaryAddContext(date: string | undefined, mealType: string | 
 }
 
 export function getDiaryPath(date: string): string {
-  return `/diary?date=${encodeURIComponent(date)}`
+  return `/?date=${encodeURIComponent(date)}`
 }
 
 export function getDiaryDateFromSearch(search: string): string | undefined {
@@ -32,7 +32,7 @@ export function getDiaryDateFromSearch(search: string): string | undefined {
 }
 
 export function getDiaryAddSelectionPath(context: DiaryAddContext): string {
-  return `/diary/${context.date}/${context.mealType}/add`
+  return `/add/${context.date}/${context.mealType}`
 }
 
 export function getDiaryAddAmountPath(context: DiaryAddContext, sourceType: DiarySourceType, sourceId: string): string {
@@ -44,7 +44,7 @@ export function getDiaryAddSelectionPathFromReturnTo(returnTo: string | null): s
     return undefined
   }
 
-  const match = /^\/diary\/(\d{4}-\d{2}-\d{2})\/(breakfast|lunch|dinner|snack)\/add$/.exec(returnTo)
+  const match = /^\/add\/(\d{4}-\d{2}-\d{2})\/(breakfast|lunch|dinner|snack)$/.exec(returnTo)
   const context = match === null ? undefined : getDiaryAddContext(match[1], match[2])
 
   return context === undefined ? undefined : getDiaryAddSelectionPath(context)

@@ -27,7 +27,7 @@ export function MealSection({ mealType, meal, onAdd }: MealSectionProps) {
         <ul className="diary-entry-list">
           {meal.entries.map((entry) => (
             <li key={entry.entry.id}>
-              <Link className="diary-entry-list__item" to={`/diary/entries/${entry.entry.id}`}>
+              <Link className="diary-entry-list__item" to={`/entries/${entry.entry.id}`}>
                 <span className="diary-entry-list__name">{entry.entry.sourceName}</span>
                 <span className="diary-entry-list__amount">{formatDiaryNumber(entry.entry.amount)} {entry.unitLabel}</span>
                 <strong>{formatDiaryNumber(entry.entry.calories)} ккал</strong>

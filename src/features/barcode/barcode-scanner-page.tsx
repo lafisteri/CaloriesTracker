@@ -242,7 +242,7 @@ export function BarcodeScannerPage() {
       <section className="empty-state" aria-labelledby="barcode-scanner-context-title">
         <h1 id="barcode-scanner-context-title">Не удалось открыть сканер</h1>
         <p>Дата или приём пищи в ссылке некорректны.</p>
-        <Link className="button button--secondary" to="/diary">К дневнику</Link>
+        <Link className="button button--secondary" to="/">К дневнику</Link>
       </section>
     )
   }

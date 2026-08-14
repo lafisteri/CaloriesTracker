@@ -137,7 +137,7 @@ function InvalidDiaryAddContext() {
     <section className="empty-state" aria-labelledby="diary-add-context-error-title">
       <h1 id="diary-add-context-error-title">Не удалось открыть добавление еды</h1>
       <p>Дата или приём пищи в ссылке некорректны.</p>
-      <Link className="button button--secondary" to="/diary">К дневнику</Link>
+      <Link className="button button--secondary" to="/">К дневнику</Link>
     </section>
   )
 }
