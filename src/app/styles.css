@@ -46,7 +46,7 @@ a {
 
 .app-content {
   min-height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  padding: 20px 20px 96px;
+  padding: 10px 20px 96px;
 }
 
 .app-content--flow {
@@ -92,27 +92,12 @@ a {
   background: #e7f0e9;
 }
 
-.dashboard-page__header {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dashboard-page__header h1 {
-  margin: 0;
-  color: #193e32;
-  font-size: 28px;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-}
-
-.dashboard-page__goals-link {
+.dashboard-card__goals-link {
   display: inline-flex;
-  min-height: 44px;
+  min-height: 38px;
   align-items: center;
   color: #285342;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 720;
   text-align: right;
   text-decoration: none;
@@ -852,7 +837,6 @@ a {
   padding: 13px 0;
   color: inherit;
   background: #fff;
-  border-top: 1px solid #edf0ec;
   text-decoration: none;
   position: relative;
   z-index: 1;
@@ -865,7 +849,6 @@ a {
 
 .diary-entry-list li:first-child .diary-entry-list__item {
   padding-top: 0;
-  border-top: 0;
 }
 
 .diary-entry-list__name {
@@ -1404,11 +1387,6 @@ a {
 }
 
 @media (max-width: 390px) {
-  .dashboard-page__header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
   .page-heading,
   .section-heading,
   .diary-selection-sections__heading {
@@ -1555,9 +1533,8 @@ a {
   justify-content: space-between;
 }
 
-.dashboard-card__heading span {
-  color: #718077;
-  font-size: 12px;
+.weekly-calories .dashboard-card__heading {
+  align-items: center;
 }
 
 .dashboard-macro__fill--protein {

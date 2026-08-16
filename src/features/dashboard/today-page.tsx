@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-
 import type { WeekStats } from '@/application/statistics/statistics-service'
 import { applicationServices } from '@/app/providers/application-services'
 import { DiaryDateNavigation } from '@/features/diary/diary-date-navigation'
@@ -44,11 +42,7 @@ export function TodayPage() {
   }, [date, loadDashboard])
 
   return (
-    <section className="dashboard-page" aria-labelledby="dashboard-title">
-      <header className="dashboard-page__header">
-        <h1 id="dashboard-title">Статистика</h1>
-        <Link className="dashboard-page__goals-link" to="/goals" state={{ effectiveFrom: date }}>Настроить цели</Link>
-      </header>
+    <section className="dashboard-page" aria-label="Статистика">
       <DiaryDateNavigation
         date={date}
         onChange={setDate}
@@ -64,7 +58,7 @@ export function TodayPage() {
       )}
       {weekStats === undefined || isLoading || error !== undefined ? null : (
         <>
-          <WeeklyCaloriesCard stats={weekStats} />
+          <WeeklyCaloriesCard stats={weekStats} date={date} />
           <WeeklyMacroCard stats={weekStats} />
         </>
       )}

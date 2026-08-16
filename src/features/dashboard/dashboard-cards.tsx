@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import type { WeekStats } from '@/application/statistics/statistics-service'
 
 import {
@@ -18,12 +20,17 @@ const macroMetrics: Array<{ key: MacroKey; label: string; className: string }> =
   { key: 'carbs', label: 'Углеводы', className: 'dashboard-macro__fill--carbs' },
 ]
 
-export function WeeklyCaloriesCard({ stats }: { stats: WeekStats }) {
+interface WeeklyCaloriesCardProps {
+  stats: WeekStats
+  date: string
+}
+
+export function WeeklyCaloriesCard({ stats, date }: WeeklyCaloriesCardProps) {
   return (
     <section className="dashboard-card weekly-calories" aria-labelledby="weekly-calories-title">
       <div className="dashboard-card__heading">
         <h2 id="weekly-calories-title">Калории за неделю</h2>
-        <span>100% = цель дня</span>
+        <Link className="dashboard-card__goals-link" to="/goals" state={{ effectiveFrom: date }}>Настроить цели</Link>
       </div>
       <div className="weekly-calories__chart" role="list" aria-label="Калории по дням недели">
         {stats.days.map((day, index) => {
@@ -55,7 +62,6 @@ export function WeeklyMacroCard({ stats }: { stats: WeekStats }) {
     <section className="dashboard-card weekly-macros" aria-labelledby="weekly-macros-title">
       <div className="dashboard-card__heading">
         <h2 id="weekly-macros-title">БЖУ за неделю</h2>
-        <span>доля энергии</span>
       </div>
       <div className="macro-legend" aria-label="Обозначения графика">
         {macroMetrics.map((metric) => <span key={metric.key}><i className={metric.className} />{metric.label}</span>)}
