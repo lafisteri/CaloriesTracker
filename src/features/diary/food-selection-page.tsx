@@ -88,16 +88,13 @@ export function FoodSelectionPage() {
   }
 
   return (
-    <section className="diary-add-page diary-add-page--with-bottom-navigation" aria-labelledby="food-selection-title">
+    <section className="diary-add-page diary-add-page--with-bottom-navigation" aria-label="Выбор еды">
       <header className="diary-add-page__header">
         <button className="back-link diary-add-page__back" type="button" onClick={returnToDiary}>
           ‹ Дневник
         </button>
       </header>
       <div className="diary-add-page__scroll">
-        <div className="diary-add-page__intro">
-          <h1 id="food-selection-title">Продукты</h1>
-        </div>
         <div className="quick-actions">
           <Link className="button button--secondary" to={`${selectionPath}/scan`} state={{ scannerInHistory: true }}>Сканировать</Link>
           <Link className="button button--primary" to={createProductPath}>Добавить</Link>

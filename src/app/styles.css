@@ -607,8 +607,7 @@ a {
   position: relative;
 }
 
-.input-with-unit input,
-#diary-add-amount {
+.input-with-unit input {
   padding-right: 48px;
 }
 
@@ -1032,7 +1031,30 @@ a {
 
 .diary-amount-page__fields {
   display: grid;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, 0.75fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.diary-amount-page__fields .form-field {
+  min-width: 0;
+  gap: 5px;
+}
+
+.diary-amount-page__fields .form-field > label {
+  font-size: 12px;
+}
+
+.diary-amount-page__fields input,
+.diary-amount-page__fields select,
+.diary-amount-page__submit {
+  min-height: 44px;
+}
+
+.diary-amount-page__submit {
+  padding: 10px 12px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .diary-add-page__actions {

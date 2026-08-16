@@ -73,13 +73,7 @@ export function ProductsPage() {
   const isInitialLoading = catalogTab === 'products' ? !hasLoadedProducts : !hasLoadedRecipes
 
   return (
-    <section className="products-page" aria-labelledby="products-title">
-      <div className="page-heading">
-        <div>
-          <h1 id="products-title">Продукты</h1>
-        </div>
-      </div>
-
+    <section className="products-page" aria-label="Каталог продуктов и рецептов">
       <div className="catalog-tabs" role="tablist" aria-label="Каталог">
         <button
           className={catalogTab === 'products' ? 'catalog-tabs__tab catalog-tabs__tab--active' : 'catalog-tabs__tab'}

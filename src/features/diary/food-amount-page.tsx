@@ -30,11 +30,14 @@ export function FoodAmountPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const isSubmittingRef = useRef(false)
+  const amountInputRef = useRef<HTMLInputElement>(null)
+  const hasSelectedInitialAmountRef = useRef(false)
 
   useEffect(() => {
     let isMounted = true
 
     async function loadSource(): Promise<void> {
+      hasSelectedInitialAmountRef.current = false
       setIsLoading(true)
       setError(undefined)
       setSource(undefined)
@@ -74,6 +77,22 @@ export function FoodAmountPage() {
       isMounted = false
     }
   }, [resolvedSourceType, sourceId])
+
+  useEffect(() => {
+    if (source === undefined || amount === '' || hasSelectedInitialAmountRef.current) {
+      return
+    }
+
+    const amountInput = amountInputRef.current
+
+    if (amountInput === null) {
+      return
+    }
+
+    amountInput.focus()
+    amountInput.select()
+    hasSelectedInitialAmountRef.current = true
+  }, [amount, source])
 
   const preview = useMemo(() => {
     if (source === undefined || unit === '' || !isPositiveDecimal(amount)) {
@@ -165,26 +184,24 @@ export function FoodAmountPage() {
           <h1 id="food-amount-title">{getSourceName(source)}</h1>
         </div>
         <div className="diary-entry-form diary-amount-page__form">
+          <NutritionPreview nutrition={preview} />
           <div className="diary-amount-page__fields">
             <div className="form-field">
               <label htmlFor="diary-add-amount">Количество</label>
-              <input id="diary-add-amount" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
+              <input ref={amountInputRef} id="diary-add-amount" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
               {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
             </div>
-            <div className="form-field">
+            <div className="form-field diary-amount-page__unit">
               <label htmlFor="diary-add-unit">Единица</label>
               <select id="diary-add-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
                 {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
-          </div>
-          <NutritionPreview nutrition={preview} />
-          {error === undefined ? null : <p className="form-submit-error" role="alert">{error}</p>}
-          <div className="diary-add-page__actions">
-            <button className="button button--primary" type="button" disabled={preview === undefined || isSaving} onClick={() => void addFood()}>
+            <button className="button button--primary diary-amount-page__submit" type="button" disabled={preview === undefined || isSaving} onClick={() => void addFood()}>
               {isSaving ? 'Добавление…' : 'Добавить'}
             </button>
           </div>
+          {error === undefined ? null : <p className="form-submit-error" role="alert">{error}</p>}
         </div>
       </div>
     </section>
