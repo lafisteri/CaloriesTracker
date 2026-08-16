@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
+import { BackButton } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 import { normalizeBarcode } from '@/domain/products/barcode'
 import type { DiaryAddContext } from '@/features/diary/diary-add-routes'
@@ -250,7 +251,7 @@ export function BarcodeScannerPage() {
   return (
     <section className="barcode-scanner" aria-labelledby="barcode-scanner-title">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={returnToPreviousPage}>‹ {context.kind === 'diary' ? 'Выбор еды' : 'Продукты'}</button>
+        <BackButton className="diary-add-page__back" onClick={returnToPreviousPage} />
       </header>
       <div className="barcode-scanner__scroll">
         <div className="diary-add-page__intro">
@@ -281,7 +282,7 @@ export function BarcodeScannerPage() {
             <h2 id="unknown-barcode-title">Продукт не найден</h2>
             <p>Штрихкод <strong>{unknownBarcode}</strong> отсутствует в локальной базе.</p>
             <Link className="button button--primary" to={createProductPath(unknownBarcode)}>Создать продукт</Link>
-            <button className="button button--secondary" type="button" onClick={returnToPreviousPage}>Назад</button>
+            <BackButton onClick={returnToPreviousPage} />
           </section>
         )}
       </div>

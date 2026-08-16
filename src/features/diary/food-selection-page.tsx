@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import type { DiaryFoodSource } from '@/application/diary/diary-service'
+import { BackButton } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 import { ProductSearchField } from '@/features/products/product-search-field'
 
@@ -90,9 +91,7 @@ export function FoodSelectionPage() {
   return (
     <section className="diary-add-page diary-add-page--with-bottom-navigation" aria-label="Выбор еды">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={returnToDiary}>
-          ‹ Дневник
-        </button>
+        <BackButton className="diary-add-page__back" onClick={returnToDiary} />
       </header>
       <div className="diary-add-page__scroll">
         <div className="quick-actions">

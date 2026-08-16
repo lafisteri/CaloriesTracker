@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import type { ProductDetails } from '@/application/products/product-service'
+import { BackLink } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 import { formatBaseAmount, formatConversionUnit, formatNutrition, formatNumber } from '@/features/products/product-formatters'
 
@@ -92,7 +93,7 @@ export function ProductDetailsPage() {
 
   return (
     <section className="product-details" aria-labelledby="product-title">
-      <Link className="back-link" to="/products">‹ Все продукты</Link>
+      <BackLink to="/products" />
       <div className="page-heading">
         <div>
           <h1 id="product-title">{details.product.name}</h1>

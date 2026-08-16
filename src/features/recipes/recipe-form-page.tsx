@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import type { RecipeIngredientDraft, RecipePreview } from '@/application/recipes/recipe-service'
 import type { ProductListItem } from '@/application/products/product-service'
+import { BackButton, BackLink } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 import { getDiaryUnitOptions, type DiaryUnitOption } from '@/domain/diary/diary-unit'
 import { formatDiaryNumber } from '@/features/diary/diary-formatters'
@@ -181,7 +182,7 @@ export function RecipeFormPage() {
   return (
     <section className="recipe-editor" aria-labelledby="recipe-editor-title">
       <header className="diary-add-page__header">
-        <Link className="back-link diary-add-page__back" to={isEditing && recipeId !== undefined ? `/recipes/${recipeId}` : '/products?tab=recipes'}>‹ {isEditing ? 'Изменить рецепт' : 'Новый рецепт'}</Link>
+        <BackLink className="diary-add-page__back" to={isEditing && recipeId !== undefined ? `/recipes/${recipeId}` : '/products?tab=recipes'} />
       </header>
       <div className="recipe-editor__scroll">
         <div className="diary-add-page__intro">
@@ -328,7 +329,7 @@ function RecipeIngredientPicker({ onClose, onAdd }: { onClose: () => void; onAdd
   return (
     <section className="recipe-ingredient-picker" aria-labelledby="ingredient-picker-title">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={selectedProduct === undefined ? onClose : () => setSelectedProduct(undefined)}>‹ {selectedProduct === undefined ? 'Выбрать ингредиент' : selectedProduct.product.name}</button>
+        <BackButton className="diary-add-page__back" onClick={selectedProduct === undefined ? onClose : () => setSelectedProduct(undefined)} />
       </header>
       <div className="diary-add-page__scroll">
         {selectedProduct === undefined ? (

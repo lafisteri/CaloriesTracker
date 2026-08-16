@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import type { RecipeDetails, RecipeVersionDetails } from '@/application/recipes/recipe-service'
+import { BackLink } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 import { getDiaryUnitOptions } from '@/domain/diary/diary-unit'
 import { formatDiaryNumber } from '@/features/diary/diary-formatters'
@@ -131,7 +132,7 @@ export function RecipeDetailsPage() {
 
   return (
     <section className="recipe-details" aria-labelledby="recipe-title">
-      <Link className="back-link" to="/products?tab=recipes">‹ Все рецепты</Link>
+      <BackLink to="/products?tab=recipes" />
       <div className="page-heading">
         <div>
           <h1 id="recipe-title">{details.recipe.name}</h1>

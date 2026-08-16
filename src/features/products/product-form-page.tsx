@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
+import { BackLink } from '@/app/layout/back-link'
 import { DuplicateBarcodeError, type ProductDetails } from '@/application/products/product-service'
 import { applicationServices } from '@/app/providers/application-services'
 import { normalizeBarcode } from '@/domain/products/barcode'
@@ -152,14 +153,14 @@ export function ProductFormPage() {
       <section className="empty-state" aria-labelledby="product-form-error-title">
         <h1 id="product-form-error-title">Не удалось открыть продукт</h1>
         <p>{loadError}</p>
-        <Link className="button button--secondary" to={cancelPath}>Назад</Link>
+        <BackLink to={cancelPath} />
       </section>
     )
   }
 
   return (
     <section className="product-form-page" aria-labelledby="product-form-title">
-      <Link className="back-link" to={cancelPath}>‹ Назад</Link>
+      <BackLink to={cancelPath} />
       <div className="page-heading">
         <div>
           <h1 id="product-form-title">{isEditing ? 'Изменить продукт' : 'Новый продукт'}</h1>

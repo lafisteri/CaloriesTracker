@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import type { DiaryEntryDetails } from '@/application/diary/diary-service'
+import { BackLink } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 import type { MealType } from '@/domain/diary/diary-entry'
 
@@ -122,7 +123,7 @@ export function DiaryEntryDetailsPage() {
 
   return (
     <section className="diary-entry-details" aria-labelledby="diary-entry-title">
-      <Link className="back-link" to={getDiaryPath(details.entry.date)}>‹ Дневник</Link>
+      <BackLink to={getDiaryPath(details.entry.date)} />
       <div className="page-heading">
         <div>
           <h1 id="diary-entry-title">{details.entry.sourceName}</h1>

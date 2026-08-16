@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import type { DiaryFoodSource } from '@/application/diary/diary-service'
+import { BackButton } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 
 import {
@@ -30,14 +31,11 @@ export function FoodAmountPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const isSubmittingRef = useRef(false)
-  const amountInputRef = useRef<HTMLInputElement>(null)
-  const hasSelectedInitialAmountRef = useRef(false)
 
   useEffect(() => {
     let isMounted = true
 
     async function loadSource(): Promise<void> {
-      hasSelectedInitialAmountRef.current = false
       setIsLoading(true)
       setError(undefined)
       setSource(undefined)
@@ -77,22 +75,6 @@ export function FoodAmountPage() {
       isMounted = false
     }
   }, [resolvedSourceType, sourceId])
-
-  useEffect(() => {
-    if (source === undefined || amount === '' || hasSelectedInitialAmountRef.current) {
-      return
-    }
-
-    const amountInput = amountInputRef.current
-
-    if (amountInput === null) {
-      return
-    }
-
-    amountInput.focus()
-    amountInput.select()
-    hasSelectedInitialAmountRef.current = true
-  }, [amount, source])
 
   const preview = useMemo(() => {
     if (source === undefined || unit === '' || !isPositiveDecimal(amount)) {
@@ -177,7 +159,7 @@ export function FoodAmountPage() {
   return (
     <section className="diary-add-page diary-add-page--with-bottom-navigation" aria-labelledby="food-amount-title">
       <header className="diary-add-page__header">
-        <button className="back-link diary-add-page__back" type="button" onClick={returnToSelection}>‹ Продукты</button>
+        <BackButton className="diary-add-page__back" onClick={returnToSelection} />
       </header>
       <div className="diary-add-page__scroll diary-amount-page__scroll">
         <div className="diary-add-page__intro">
@@ -187,7 +169,7 @@ export function FoodAmountPage() {
           <NutritionPreview nutrition={preview} />
           <div className="diary-amount-page__fields">
             <div className="form-field">
-              <input ref={amountInputRef} id="diary-add-amount" aria-label="Количество" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
+              <input id="diary-add-amount" aria-label="Количество" type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
               {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
             </div>
             <div className="form-field diary-amount-page__unit">
