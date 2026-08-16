@@ -187,13 +187,11 @@ export function FoodAmountPage() {
           <NutritionPreview nutrition={preview} />
           <div className="diary-amount-page__fields">
             <div className="form-field">
-              <label htmlFor="diary-add-amount">Количество</label>
-              <input ref={amountInputRef} id="diary-add-amount" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
+              <input ref={amountInputRef} id="diary-add-amount" aria-label="Количество" autoFocus type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
               {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
             </div>
             <div className="form-field diary-amount-page__unit">
-              <label htmlFor="diary-add-unit">Единица</label>
-              <select id="diary-add-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
+              <select id="diary-add-unit" aria-label="Единица" value={unit} onChange={(event) => setUnit(event.target.value)}>
                 {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
