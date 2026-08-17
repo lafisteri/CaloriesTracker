@@ -1,7 +1,7 @@
 # PRODUCT_SPEC
 
 **Status:** Current product specification
-**Last updated:** 2026-08-14
+**Last updated:** 2026-08-17
 
 This document describes the current intended behavior of the application. If it conflicts with older phase prompts or historical planning notes, this document is the source of truth for product behavior. The current code remains the source for implementation details.
 
@@ -38,14 +38,14 @@ This document describes the current intended behavior of the application. If it 
 Постоянная нижняя навигация содержит только часто используемые разделы:
 
 ```text
-Сегодня      → /diary
 Статистика   → /dashboard
+Сегодня      → /
 Продукты     → /products
 ```
 
-`/` перенаправляет на `/diary`. PWA manifest использует `/` как `start_url`, поэтому запуск с Home Screen также приводит в дневник.
+`/` открывает Diary для текущей локальной даты. `/?date=YYYY-MM-DD` открывает Diary выбранной даты. PWA manifest использует `/` как `start_url`, поэтому запуск с Home Screen сразу открывает дневник.
 
-Маршрут `/today` сохранён как compatibility redirect на `/dashboard`. Неизвестные маршруты перенаправляются на `/diary`.
+Маршрут `/today` сохранён как compatibility redirect на `/dashboard`. Неизвестные маршруты перенаправляются на `/`.
 
 `/goals` остаётся доступным маршрутом, но не занимает постоянное место в bottom navigation. Основной вход в настройки целей — secondary action **«Настроить цели»** на экране «Статистика».
 
@@ -54,19 +54,20 @@ This document describes the current intended behavior of the application. If it 
 Bottom navigation сохраняется в Diary add flow:
 
 ```text
-/diary
-/diary/:date/:meal/add
-/diary/:date/:meal/add/product/:productId
-/diary/:date/:meal/add/recipe/:recipeId
+/
+/?date=YYYY-MM-DD
+/add/:date/:meal
+/add/:date/:meal/product/:productId
+/add/:date/:meal/recipe/:recipeId
 ```
 
-На этих маршрутах активен пункт **«Сегодня»**. Scanner штрихкода, а также создание и редактирование рецепта остаются focused full-screen сценариями без bottom navigation.
+На Diary, Diary add flow и edit DiaryEntry активен пункт **«Сегодня»**. Scanner штрихкода, а также создание и редактирование рецепта остаются focused full-screen сценариями без bottom navigation.
 
 ## 4. Today and diary
 
 В нижней навигации **«Сегодня»** означает дневник, а не статистику.
 
-Обычный переход на `/diary` всегда открывает текущую локальную дату. Diary date deep links поддерживаются через `/diary?date=YYYY-MM-DD`; внутри дневника можно перейти на прошлую или будущую дату и вернуться к сегодняшней.
+Обычный переход на `/` открывает текущую локальную дату. Diary date deep links поддерживаются через `/?date=YYYY-MM-DD`; внутри дневника можно перейти на прошлую или будущую дату и вернуться к сегодняшней.
 
 Дневник содержит:
 
@@ -75,9 +76,27 @@ Bottom navigation сохраняется в Diary add flow:
 - четыре группы: Завтрак, Обед, Ужин и Перекусы;
 - итоги каждого приёма пищи;
 - записи дневника;
-- действие **«+ Добавить»** для каждого meal type.
+- действие **«Добавить»** для каждого meal type.
 
-Сводка не является большой hero-card. Пустые секции приёмов пищи остаются компактными и содержат действие добавления; отдельной глобальной empty-state плашки для пустого дня нет.
+Сводка не является большой hero-card. Meal cards используют одинаковый compact padding со всех четырёх сторон, а между соседними DiaryEntry нет divider. Пустые секции приёмов пищи остаются компактными и содержат действие добавления; отдельной глобальной empty-state плашки для пустого дня нет.
+
+Короткий tap по DiaryEntry открывает её редактирование. Запись можно удалить или изменить её организацию прямо в Diary:
+
+```text
+swipe справа налево → открыть «Удалить» → tap «Удалить»
+long press → перетащить → изменить порядок или meal
+```
+
+Swipe сам по себе не удаляет запись и не показывает browser confirmation. Удаляется только конкретная DiaryEntry; Product, Recipe и их versions сохраняются. Meal и day totals обновляются, а удаление сохраняется локально.
+
+Long press позволяет менять порядок entries внутри meal или переносить запись в другой meal того же дня, включая пустой meal. Пользовательский порядок хранится в `DiaryEntry.sortOrder` и сохраняется после reload. При переносе меняются только `mealType` и `sortOrder`: `date`, source/version reference, amount, unit и nutrition snapshots не изменяются. Внутри Diary жесты различаются так:
+
+```text
+tap             → edit DiaryEntry
+swipe left      → открыть Delete
+vertical swipe  → scroll
+long press      → reorder
+```
 
 ## 5. Food selection and amount flow
 
@@ -85,7 +104,7 @@ Bottom navigation сохраняется в Diary add flow:
 
 ```text
 Diary
-→ + Добавить
+→ Добавить
 → Products selection
 → выбрать Product или Recipe
 → Amount / Unit
@@ -97,12 +116,12 @@ Diary
 
 ### Food Selection
 
-Это единый экран выбора продуктов и рецептов с title **«Продукты»**. Header не показывает отдельную дату или текст о выбранном meal type: они остаются routing/data context.
+Это единый экран выбора продуктов и рецептов без page title **«Продукты»**. Header содержит только back navigation; дата и выбранный meal type остаются routing/data context.
 
 Верхняя последовательность экрана:
 
 ```text
-Продукты
+< < <
 [ Сканировать ] [ Добавить ]
 Поиск продукта или блюда...
 ```
@@ -120,9 +139,20 @@ Diary
 
 ### Amount and units
 
-Экран Amount общий для продуктов и рецептов. В верхнем navigation context используется **«Продукты»**; экран показывает название источника, **«Количество»**, **«Единица»**, live preview КБЖУ и универсальную CTA **«Добавить»**. Отдельный subtitle о meal type не показывается.
+Экран Amount для продуктов и рецептов показывает back navigation, название источника, live preview КБЖУ и CTA **«Добавить»**. Отдельный subtitle о meal type не показывается.
 
-Input и select используют тот же компактный visual style, что и Product form: одинаковые height, padding, border radius, font size, focus state и label spacing. Количество поддерживает целые и десятичные значения с подходящей numeric keyboard. Preview и сохраняемая DiaryEntry используют один расчётный путь.
+Последовательность экрана:
+
+```text
+< < <
+source/product info
+nutrition preview
+[ amount ] [ unit ] [ Добавить ]
+```
+
+Amount, unit и CTA находятся в одной compact horizontal row; visible labels для amount и unit не показываются. Input и select используют согласованный compact visual style. Количество поддерживает целые и десятичные значения с подходящей numeric keyboard. При открытии Amount screen input не получает focus и его значение не выделяется автоматически: keyboard открывается после user tap. Preview и сохраняемая DiaryEntry используют один расчётный путь.
+
+Create и edit DiaryEntry используют общий Amount UI concept. Create завершает действие CTA **«Добавить»**, edit — **«Сохранить»**. На `/entries/:entryId` пользователь может изменить только amount и unit: meal type и date сохраняются, а отдельного delete action нет. Удаление остаётся действием Diary swipe-to-delete.
 
 ## 6. Products
 
@@ -142,13 +172,13 @@ Products и Recipes доступны как отдельные вкладки ma
 На вкладке Products порядок действий:
 
 ```text
-Продукты
 [ Сканировать ] [ Добавить ]
+[ Продукты ] [ Рецепты ]
 Search
 Content
 ```
 
-На вкладке Recipes action **«Создать рецепт»** занимает тот же quick-action area над Search.
+Верхнего page header **«Продукты»** нет. На вкладке Recipes action **«Создать рецепт»** занимает тот же quick-action area; tabs и Search остаются доступны ниже.
 
 Если Products отсутствуют, empty state показывает:
 
@@ -176,7 +206,7 @@ Content
 
 ### Product form and save flow
 
-Product create/edit form содержит Name, Barcode, **«Единица»**, **«Количество»**, calories, protein, fat и carbs. Поле единицы — select; по умолчанию выбраны граммы, а список ограничен units, поддерживаемыми data model. **«Пищевая ценность»** следует сразу за заголовком без дополнительного explanatory text.
+Product create/edit form содержит Name, Barcode, **«Единица»**, **«Количество»**, calories, protein, fat и carbs. Поле единицы — select; по умолчанию выбраны граммы, а список ограничен units, поддерживаемыми data model. В create flow поля количества и nutrition изначально визуально пустые и пустое значение не трактуется как `0`; в edit flow реальный сохранённый `0` отображается как `0`. **«Пищевая ценность»** следует сразу за заголовком без дополнительного explanatory text.
 
 Обычное создание и редактирование завершаются переходом на `/products`. При создании через `/products/new?returnTo=...` сохраняется исходный Diary return flow и его date/mealType context. На edit screen secondary action **«Версии»** открывает существующую ProductVersion history; history не открывается автоматически после Save.
 
@@ -283,7 +313,7 @@ effectiveFrom
 
 ## 10. Statistics
 
-Dashboard в пользовательском интерфейсе называется **«Статистика»** и расположен на `/dashboard`. Он является вторичным аналитическим разделом, а не главным стартовым экраном.
+Dashboard в пользовательском интерфейсе называется **«Статистика»** и расположен на `/dashboard`. Он является вторичным аналитическим разделом, а не главным стартовым экраном. Отдельного верхнего page header **«Статистика»** нет.
 
 Statistics показывает выбранный день и соответствующую неделю:
 
@@ -291,7 +321,7 @@ Statistics показывает выбранный день и соответс�
 - недельный calorie balance;
 - недельное распределение Б/Ж/У.
 
-Отдельные верхние summary cards **«Калории»** и **«Макронутриенты»** не используются. Goals доступны через secondary action **«Настроить цели»**.
+Отдельные верхние summary cards **«Калории»** и **«Макронутриенты»** не используются. Goals доступны через compact secondary action **«Настроить цели»**. Explanatory texts **«100% = цель дня»** и **«Доля энергии»** не отображаются.
 
 Weekly balance не считает будущие дни текущей недели как deficit. Для прошлой недели учитывается вся неделя.
 
@@ -311,7 +341,7 @@ Historical integrity — обязательное правило продукт�
 
 DiaryEntry хранит:
 
-- date и mealType;
+- date, mealType и sortOrder;
 - sourceType, sourceId и sourceVersionId;
 - sourceName snapshot;
 - amount и unit;
@@ -319,7 +349,7 @@ DiaryEntry хранит:
 
 После изменения Product или Recipe прошлые DiaryEntry не пересчитываются автоматически. Например, запись Pizza v1 остаётся с nutrition Pizza v1 после появления Pizza v2.
 
-При редактировании исторической DiaryEntry расчёт выполняется через сохранённый `sourceVersionId`, а не через актуальную версию продукта или рецепта.
+При редактировании исторической DiaryEntry расчёт выполняется через сохранённый `sourceVersionId`, а не через актуальную версию продукта или рецепта. Edit изменяет только amount и unit; существующие meal type и date сохраняются.
 
 ## 12. Storage and architecture
 
@@ -332,7 +362,7 @@ DiaryEntry хранит:
 - Zustand только для transient UI state;
 - vite-plugin-pwa и Workbox.
 
-Пользовательские данные хранятся локально в IndexedDB: products, productVersions, recipes, recipeVersions, diaryEntries и weeklyGoals.
+Пользовательские данные хранятся локально в IndexedDB: products, productVersions, recipes, recipeVersions, diaryEntries и weeklyGoals. Diary ordering также хранится локально через `sortOrder`; обновление схемы назначает существующим entries стабильный начальный порядок без изменения historical nutrition data.
 
 Архитектура разделяет UI, application services, domain rules, repository interfaces и Dexie implementations. UI не обращается к Dexie напрямую и не дублирует расчёты nutrition.
 
@@ -359,10 +389,12 @@ Intended deployment model — static Vite PWA, размещённое по HTTPS
 - Клавиатура не должна мешать редактированию или сохранению.
 - Длинные названия не должны создавать horizontal scroll.
 - Bottom navigation предназначена только для частых разделов.
+- Основные tab screens используют compact top spacing с сохранением iPhone safe area.
+- Visible back navigation в focused flows унифицирована как **`< < <`** без contextual labels и отдельного divider; destination сохраняет текущий context.
 - Ошибки формулируются человеческим языком и не показывают технические исключения пользователю.
 - Do not use native browser alert/confirm/prompt dialogs in product UX.
 - Если primary creation action уже находится в quick-action area, empty state содержит только title и короткое объяснение без повторной CTA.
-- Для management и selection screens используется порядок: title → quick actions → search → content.
+- Food Selection начинается с back navigation и quick actions; Products management начинается с quick actions, затем tabs, Search и content.
 - Daily workflow остаётся компактным: без oversized inputs, redundant subtitles, repeated CTA и unnecessary empty-state cards.
 
 ## 15. Out of scope
