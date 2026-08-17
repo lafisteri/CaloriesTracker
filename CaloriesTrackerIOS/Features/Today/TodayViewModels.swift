@@ -75,17 +75,45 @@ final class TodayViewModel {
         }
     }
 
-    func move(entryID: UUID, to meal: MealType) async {
+    func move(
+        entryID: UUID,
+        to meal: MealType,
+        displayedTargetIndex: Int,
+    ) async {
         errorMessage = nil
 
         do {
+            let targetIndex = targetIndex(
+                for: entryID,
+                movingTo: meal,
+                displayedTargetIndex: displayedTargetIndex,
+            )
             try await diaryService.move(
-                MoveDiaryEntryCommand(entryID: entryID, targetMeal: meal, targetIndex: Int.max),
+                MoveDiaryEntryCommand(entryID: entryID, targetMeal: meal, targetIndex: targetIndex),
             )
             await load()
         } catch {
             errorMessage = diaryErrorMessage(error, fallback: "Не удалось переместить запись.")
         }
+    }
+
+    private func targetIndex(
+        for entryID: UUID,
+        movingTo targetMeal: MealType,
+        displayedTargetIndex: Int,
+    ) -> Int {
+        guard displayedTargetIndex >= 0,
+              let day,
+              let sourceMeal = day.meals.first(where: { meal in
+                  meal.entries.contains(where: { $0.id == entryID })
+              }),
+              sourceMeal.mealType == targetMeal,
+              let sourceIndex = sourceMeal.entries.firstIndex(where: { $0.id == entryID })
+        else {
+            return displayedTargetIndex
+        }
+
+        return sourceIndex < displayedTargetIndex ? displayedTargetIndex - 1 : displayedTargetIndex
     }
 }
 

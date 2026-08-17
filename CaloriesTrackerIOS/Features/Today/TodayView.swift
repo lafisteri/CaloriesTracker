@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TodayRootView: View {
     let router: AppRouter
@@ -30,46 +31,47 @@ struct TodayRootView: View {
                 ForEach(day.meals) { meal in
                     Section {
                         ForEach(meal.entries) { entry in
-                            NavigationLink(value: TodayRoute.entryEditor(entry.id)) {
-                                DiaryEntryRow(entry: entry)
-                            }
-                            .listRowSeparator(.hidden)
-                            .swipeActions {
-                                Button(role: .destructive) {
+                            DiaryDraggableEntryRow(
+                                entry: entry,
+                                onDrop: { draggedEntryID, insertion in
+                                    guard let targetIndex = meal.entries.firstIndex(where: { $0.id == entry.id }) else {
+                                        return
+                                    }
+
+                                    let displayedTargetIndex = targetIndex + (insertion == .after ? 1 : 0)
+                                    Task {
+                                        await model.move(
+                                            entryID: draggedEntryID,
+                                            to: meal.mealType,
+                                            displayedTargetIndex: displayedTargetIndex,
+                                        )
+                                    }
+                                },
+                                onDelete: {
                                     Task {
                                         await model.delete(entryID: entry.id)
                                     }
-                                } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                Menu("Переместить в") {
-                                    ForEach(MealType.allCases.filter { $0 != meal.mealType }, id: \.self) { targetMeal in
-                                        Button(targetMeal.russianLabel) {
-                                            Task {
-                                                await model.move(entryID: entry.id, to: targetMeal)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .onMove { offsets, newOffset in
-                            var orderedEntryIDs = meal.entries.map(\.id)
-                            orderedEntryIDs.move(fromOffsets: offsets, toOffset: newOffset)
-                            Task {
-                                await model.reorder(meal: meal.mealType, orderedEntryIDs: orderedEntryIDs)
-                            }
+                                },
+                            )
+                            .listRowSeparator(.hidden)
                         }
 
-                        Button {
-                            router.todayPath.append(
-                                .foodSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
-                            )
-                        } label: {
-                            Label("Добавить", systemImage: "plus")
-                        }
+                        DiaryMealDropButton(
+                            onAdd: {
+                                router.todayPath.append(
+                                    .foodSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
+                                )
+                            },
+                            onDrop: { draggedEntryID in
+                                Task {
+                                    await model.move(
+                                        entryID: draggedEntryID,
+                                        to: meal.mealType,
+                                        displayedTargetIndex: meal.entries.count,
+                                    )
+                                }
+                            },
+                        )
                     } header: {
                         HStack {
                             Text(meal.mealType.russianLabel)
@@ -88,13 +90,6 @@ struct TodayRootView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Сегодня")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-            }
-        }
         .task {
             await model.load()
         }
@@ -169,6 +164,212 @@ struct TodayRootView: View {
             }
         }
         .buttonStyle(.borderless)
+    }
+}
+
+private enum DiaryDropInsertion {
+    case before
+    case after
+}
+
+private enum DiaryEntryDragPayload {
+    static let contentType = UTType(exportedAs: "com.caloriestracker.diary-entry-id")
+
+    static func makeItemProvider(for entryID: UUID) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(
+            forTypeIdentifier: contentType.identifier,
+            visibility: .all,
+        ) { completion in
+            completion(Data(entryID.uuidString.utf8), nil)
+            return nil
+        }
+        return provider
+    }
+
+    @discardableResult
+    static func loadEntryID(
+        from info: DropInfo,
+        completion: @escaping @MainActor (UUID) -> Void,
+    ) -> Bool {
+        guard let provider = info.itemProviders(for: [contentType]).first else {
+            return false
+        }
+
+        provider.loadDataRepresentation(forTypeIdentifier: contentType.identifier) { data, _ in
+            guard let data,
+                  let rawValue = String(data: data, encoding: .utf8),
+                  let entryID = UUID(uuidString: rawValue)
+            else {
+                return
+            }
+
+            Task { @MainActor in
+                completion(entryID)
+            }
+        }
+        return true
+    }
+}
+
+private struct DiaryDraggableEntryRow: View {
+    let entry: DiaryEntry
+    let onDrop: @MainActor (UUID, DiaryDropInsertion) -> Void
+    let onDelete: @MainActor () -> Void
+
+    @State private var rowHeight: CGFloat = 1
+    @State private var isDropTarget = false
+    @State private var insertion: DiaryDropInsertion?
+
+    var body: some View {
+        NavigationLink(value: TodayRoute.entryEditor(entry.id)) {
+            DiaryEntryRow(entry: entry)
+        }
+        .swipeActions {
+            Button(role: .destructive, action: onDelete) {
+                Label("Удалить", systemImage: "trash")
+            }
+        }
+        .onDrag {
+            DiaryEntryDragPayload.makeItemProvider(for: entry.id)
+        } preview: {
+            DiaryEntryRow(entry: entry)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
+        }
+        .onDrop(
+            of: [DiaryEntryDragPayload.contentType],
+            delegate: DiaryEntryDropDelegate(
+                targetHeight: rowHeight,
+                onTargetChange: { isTargeted, insertion in
+                    isDropTarget = isTargeted
+                    self.insertion = insertion
+                },
+                onDrop: { draggedEntryID, insertion in
+                    guard draggedEntryID != entry.id else {
+                        return
+                    }
+                    onDrop(draggedEntryID, insertion)
+                },
+            ),
+        )
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        rowHeight = proxy.size.height
+                    }
+                    .onChange(of: proxy.size.height) { _, height in
+                        rowHeight = height
+                    }
+            }
+        }
+        .overlay(alignment: insertion == .before ? .top : .bottom) {
+            if isDropTarget, insertion != nil {
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(height: 3)
+                    .padding(.horizontal, 8)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+private struct DiaryMealDropButton: View {
+    let onAdd: @MainActor () -> Void
+    let onDrop: @MainActor (UUID) -> Void
+
+    @State private var isDropTarget = false
+
+    var body: some View {
+        Button(action: onAdd) {
+            Label(
+                isDropTarget ? "Переместить сюда" : "Добавить",
+                systemImage: isDropTarget ? "arrow.down.to.line" : "plus",
+            )
+        }
+        .onDrop(
+            of: [DiaryEntryDragPayload.contentType],
+            delegate: DiaryMealDropDelegate(
+                onTargetChange: { isDropTarget = $0 },
+                onDrop: onDrop,
+            ),
+        )
+        .background {
+            if isDropTarget {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.12))
+            }
+        }
+    }
+}
+
+private struct DiaryEntryDropDelegate: DropDelegate {
+    let targetHeight: CGFloat
+    let onTargetChange: @MainActor (Bool, DiaryDropInsertion?) -> Void
+    let onDrop: @MainActor (UUID, DiaryDropInsertion) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        !info.itemProviders(for: [DiaryEntryDragPayload.contentType]).isEmpty
+    }
+
+    func dropEntered(info: DropInfo) {
+        updateTarget(for: info)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        updateTarget(for: info)
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        onTargetChange(false, nil)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let insertion = insertion(for: info)
+        onTargetChange(false, nil)
+        return DiaryEntryDragPayload.loadEntryID(from: info) { entryID in
+            onDrop(entryID, insertion)
+        }
+    }
+
+    private func updateTarget(for info: DropInfo) {
+        onTargetChange(true, insertion(for: info))
+    }
+
+    private func insertion(for info: DropInfo) -> DiaryDropInsertion {
+        info.location.y < max(targetHeight, 1) / 2 ? .before : .after
+    }
+}
+
+private struct DiaryMealDropDelegate: DropDelegate {
+    let onTargetChange: @MainActor (Bool) -> Void
+    let onDrop: @MainActor (UUID) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        !info.itemProviders(for: [DiaryEntryDragPayload.contentType]).isEmpty
+    }
+
+    func dropEntered(info: DropInfo) {
+        onTargetChange(true)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        onTargetChange(true)
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        onTargetChange(false)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        onTargetChange(false)
+        return DiaryEntryDragPayload.loadEntryID(from: info, completion: onDrop)
     }
 }
 
