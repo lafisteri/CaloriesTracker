@@ -266,9 +266,186 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         modelContext = ModelContext(modelContainer)
     }
 
-    func entry(id: UUID) async throws -> DiaryEntry? {
+    func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry? {
         let descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.id == id })
-        return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
+        guard let entry = try modelContext.fetch(descriptor).first.map({ try $0.toDomain() }) else {
+            return nil
+        }
+
+        return includingDeleted || entry.deletedAt == nil ? entry : nil
+    }
+
+    func entries(on day: LocalDay) async throws -> [DiaryEntry] {
+        let dayKey = day.rawValue
+        let descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.dayKey == dayKey })
+
+        return try modelContext
+            .fetch(descriptor)
+            .map { try $0.toDomain() }
+            .filter { $0.deletedAt == nil }
+            .sorted { lhs, rhs in
+                if lhs.mealType.rawValue != rhs.mealType.rawValue {
+                    return lhs.mealType.rawValue < rhs.mealType.rawValue
+                }
+                if lhs.sortOrder != rhs.sortOrder {
+                    return lhs.sortOrder < rhs.sortOrder
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+    }
+
+    func create(_ entry: DiaryEntry) async throws {
+        guard entry.deletedAt == nil else {
+            throw DiaryRepositoryError.invalidCreate
+        }
+
+        let record = makeRecord(entry)
+
+        do {
+            modelContext.insert(record)
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func save(_ entry: DiaryEntry) async throws {
+        guard let record = try entryRecord(id: entry.id) else {
+            throw DiaryRepositoryError.entryNotFound
+        }
+        guard matchesImmutableFields(record, entry),
+              record.mealTypeRaw == entry.mealType.rawValue,
+              record.sortOrder == entry.sortOrder,
+              record.deletedAt == nil,
+              entry.deletedAt == nil
+        else {
+            throw DiaryRepositoryError.invalidAmountUpdate
+        }
+
+        record.amount = entry.amount
+        record.unitToken = entry.unitToken
+        record.calories = entry.nutrition.calories
+        record.protein = entry.nutrition.protein
+        record.fat = entry.nutrition.fat
+        record.carbs = entry.nutrition.carbs
+        record.updatedAt = entry.updatedAt
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func save(_ entries: [DiaryEntry]) async throws {
+        guard !entries.isEmpty else {
+            return
+        }
+        guard Set(entries.map(\.id)).count == entries.count else {
+            throw DiaryRepositoryError.duplicateEntry
+        }
+
+        var updates: [(DiaryEntryRecord, DiaryEntry)] = []
+        for entry in entries {
+            guard let record = try entryRecord(id: entry.id),
+                  matchesImmutableFields(record, entry),
+                  record.deletedAt == nil,
+                  entry.deletedAt == nil
+            else {
+                throw DiaryRepositoryError.invalidOrderUpdate
+            }
+            updates.append((record, entry))
+        }
+
+        for (record, entry) in updates {
+            record.mealTypeRaw = entry.mealType.rawValue
+            record.sortOrder = entry.sortOrder
+            record.updatedAt = entry.updatedAt
+        }
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func softDeleteEntry(id: UUID, at date: Date) async throws {
+        guard let record = try entryRecord(id: id) else {
+            throw DiaryRepositoryError.entryNotFound
+        }
+
+        record.deletedAt = date
+        record.updatedAt = date
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    private func entryRecord(id: UUID) throws -> DiaryEntryRecord? {
+        let descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func matchesImmutableFields(_ record: DiaryEntryRecord, _ entry: DiaryEntry) -> Bool {
+        record.dayKey == entry.day.rawValue
+            && record.sourceTypeRaw == entry.sourceType.rawValue
+            && record.sourceID == entry.sourceID
+            && record.sourceVersionID == entry.sourceVersionID
+            && record.sourceName == entry.sourceName
+            && record.createdAt == entry.createdAt
+    }
+
+    private func makeRecord(_ entry: DiaryEntry) -> DiaryEntryRecord {
+        DiaryEntryRecord(
+            id: entry.id,
+            dayKey: entry.day.rawValue,
+            mealTypeRaw: entry.mealType.rawValue,
+            sortOrder: entry.sortOrder,
+            sourceTypeRaw: entry.sourceType.rawValue,
+            sourceID: entry.sourceID,
+            sourceVersionID: entry.sourceVersionID,
+            sourceName: entry.sourceName,
+            amount: entry.amount,
+            unitToken: entry.unitToken,
+            calories: entry.nutrition.calories,
+            protein: entry.nutrition.protein,
+            fat: entry.nutrition.fat,
+            carbs: entry.nutrition.carbs,
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+            deletedAt: entry.deletedAt,
+        )
+    }
+}
+
+private enum DiaryRepositoryError: LocalizedError {
+    case entryNotFound
+    case invalidCreate
+    case invalidAmountUpdate
+    case invalidOrderUpdate
+    case duplicateEntry
+
+    var errorDescription: String? {
+        switch self {
+        case .entryNotFound:
+            "Запись дневника не найдена."
+        case .invalidCreate:
+            "Не удалось создать запись дневника."
+        case .invalidAmountUpdate:
+            "Можно изменить только количество и единицу записи."
+        case .invalidOrderUpdate:
+            "Не удалось изменить порядок записи."
+        case .duplicateEntry:
+            "Порядок содержит повторяющуюся запись."
+        }
     }
 }
 

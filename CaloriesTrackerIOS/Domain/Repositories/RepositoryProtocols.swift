@@ -20,7 +20,12 @@ protocol RecipeRepository: Sendable {
 
 @MainActor
 protocol DiaryRepository: Sendable {
-    func entry(id: UUID) async throws -> DiaryEntry?
+    func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry?
+    func entries(on day: LocalDay) async throws -> [DiaryEntry]
+    func create(_ entry: DiaryEntry) async throws
+    func save(_ entry: DiaryEntry) async throws
+    func save(_ entries: [DiaryEntry]) async throws
+    func softDeleteEntry(id: UUID, at: Date) async throws
 }
 
 @MainActor

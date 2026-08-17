@@ -18,7 +18,11 @@ struct RootApplicationView: View {
             .tag(AppTab.statistics)
 
             NavigationStack(path: $router.todayPath) {
-                TodayPlaceholderView()
+                TodayRootView(
+                    router: router,
+                    diaryService: dependencies.diaryService,
+                    productService: dependencies.productService,
+                )
             }
             .tabItem {
                 Label("Сегодня", systemImage: "fork.knife")

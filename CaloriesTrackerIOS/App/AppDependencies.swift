@@ -8,6 +8,7 @@ final class AppDependencies {
     let diaryRepository: any DiaryRepository
     let goalRepository: any GoalRepository
     let productService: ProductService
+    let diaryService: DiaryService
 
     init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema(versionedSchema: CaloriesTrackerSchemaV1.self)
@@ -28,5 +29,9 @@ final class AppDependencies {
         diaryRepository = SwiftDataDiaryRepository(modelContainer: modelContainer)
         goalRepository = SwiftDataGoalRepository(modelContainer: modelContainer)
         productService = ProductService(repository: productRepository)
+        diaryService = DiaryService(
+            diaryRepository: diaryRepository,
+            productRepository: productRepository,
+        )
     }
 }

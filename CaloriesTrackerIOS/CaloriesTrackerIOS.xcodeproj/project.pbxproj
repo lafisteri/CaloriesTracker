@@ -35,6 +35,12 @@
 		A10000000000000000000026 /* ProductDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* ProductDetailView.swift */; };
 		A10000000000000000000027 /* ProductEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* ProductEditorView.swift */; };
 		A10000000000000000000028 /* ProductVersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* ProductVersionHistoryView.swift */; };
+		A10000000000000000000029 /* DiaryCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* DiaryCommands.swift */; };
+		A10000000000000000000030 /* DiaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* DiaryService.swift */; };
+		A10000000000000000000031 /* TodayViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* TodayViewModels.swift */; };
+		A10000000000000000000032 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* TodayView.swift */; };
+		A10000000000000000000033 /* FoodSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* FoodSelectionView.swift */; };
+		A10000000000000000000034 /* DiaryAmountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* DiaryAmountView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +73,12 @@
 		A20000000000000000000027 /* ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductDetailView.swift; sourceTree = "<group>"; };
 		A20000000000000000000028 /* ProductEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductEditorView.swift; sourceTree = "<group>"; };
 		A20000000000000000000029 /* ProductVersionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductVersionHistoryView.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* DiaryCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryCommands.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* DiaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryService.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* TodayViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayViewModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* FoodSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodSelectionView.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* DiaryAmountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryAmountView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +129,7 @@
 			children = (
 				A20000000000000000000006 /* RootPlaceholderViews.swift */,
 				A40000000000000000000015 /* Catalog */,
+				A40000000000000000000017 /* Today */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -125,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000014 /* Products */,
+				A40000000000000000000016 /* Diary */,
 			);
 			path = Application;
 			sourceTree = "<group>";
@@ -147,6 +161,25 @@
 				A20000000000000000000029 /* ProductVersionHistoryView.swift */,
 			);
 			path = Catalog;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000016 /* Diary */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000031 /* DiaryService.swift */,
+			);
+			path = Diary;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000017 /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000032 /* TodayViewModels.swift */,
+				A20000000000000000000033 /* TodayView.swift */,
+				A20000000000000000000034 /* FoodSelectionView.swift */,
+				A20000000000000000000035 /* DiaryAmountView.swift */,
+			);
+			path = Today;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000006 /* Domain */ = {
@@ -203,6 +236,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000015 /* DiaryEntry.swift */,
+				A20000000000000000000030 /* DiaryCommands.swift */,
 			);
 			path = Diary;
 			sourceTree = "<group>";
@@ -363,6 +397,12 @@
 				A10000000000000000000026 /* ProductDetailView.swift in Sources */,
 				A10000000000000000000027 /* ProductEditorView.swift in Sources */,
 				A10000000000000000000028 /* ProductVersionHistoryView.swift in Sources */,
+				A10000000000000000000029 /* DiaryCommands.swift in Sources */,
+				A10000000000000000000030 /* DiaryService.swift in Sources */,
+				A10000000000000000000031 /* TodayViewModels.swift in Sources */,
+				A10000000000000000000032 /* TodayView.swift in Sources */,
+				A10000000000000000000033 /* FoodSelectionView.swift in Sources */,
+				A10000000000000000000034 /* DiaryAmountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
