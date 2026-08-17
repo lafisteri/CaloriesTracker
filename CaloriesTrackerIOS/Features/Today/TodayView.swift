@@ -26,104 +26,99 @@ struct TodayRootView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
+        List {
             dateNavigation
-                .padding(.horizontal)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-                .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowSeparator(.hidden)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("За день")
-                    .font(.headline)
+            Section {
                 if let day = model.day {
                     DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
                 } else {
                     ProgressView()
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
                 }
+            } header: {
+                Text("За день")
+                    .textCase(nil)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             if let day = model.day {
                 ForEach(day.meals) { meal in
-                    VStack(spacing: 0) {
+                    Section {
+                        ForEach(meal.entries) { entry in
+                            DiaryListEntryRow(
+                                entry: entry,
+                                isDragging: draggedEntryID == entry.id,
+                                onDragStarted: {
+                                    draggedEntryID = entry.id
+                                },
+                                onDragEnded: {
+                                    clearDraggedEntryID(entry.id)
+                                },
+                                onDelete: {
+                                    Task {
+                                        await model.delete(entryID: entry.id)
+                                    }
+                                },
+                            )
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowSeparator(.hidden)
+                        }
+                        .dropDestination(for: String.self) { identifiers, displayedTargetIndex in
+                            guard let identifier = identifiers.first,
+                                  let entryID = UUID(uuidString: identifier)
+                            else {
+                                return
+                            }
+
+                            move(
+                                entryID: entryID,
+                                to: meal.mealType,
+                                displayedTargetIndex: displayedTargetIndex,
+                            )
+                            clearDraggedEntryID(entryID)
+                        }
+
+                        DiaryMealAddRow(
+                            onAdd: {
+                                router.todayPath.append(
+                                    .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
+                                )
+                            },
+                            onDrop: { entryID in
+                                move(
+                                    entryID: entryID,
+                                    to: meal.mealType,
+                                    displayedTargetIndex: meal.entries.count,
+                                )
+                                clearDraggedEntryID(entryID)
+                            },
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                    } header: {
                         HStack {
                             Text(meal.mealType.russianLabel)
-                                .font(.headline)
                             Spacer()
                             Text("\(diaryNumber(meal.totalNutrition.calories)) ккал")
                                 .foregroundStyle(.secondary)
                         }
-                        .padding()
-
-                        Divider()
-
-                        VStack(spacing: 0) {
-                            DiaryMealDropZone(isEmptyMeal: meal.entries.isEmpty) { draggedEntryID in
-                                move(
-                                    entryID: draggedEntryID,
-                                    to: meal.mealType,
-                                    displayedTargetIndex: 0,
-                                )
-                                self.draggedEntryID = nil
-                            }
-
-                            ForEach(Array(meal.entries.enumerated()), id: \.element.id) { item in
-                            DiaryDraggableEntryRow(
-                                    entry: item.element,
-                                    isDragging: draggedEntryID == item.element.id,
-                                    onTap: {
-                                        router.todayPath.append(.entryEditor(item.element.id))
-                                    },
-                                    onDragStarted: {
-                                        draggedEntryID = item.element.id
-                                    },
-                                    onDragEnded: {
-                                        draggedEntryID = nil
-                                    },
-                                    onDelete: {
-                                        Task {
-                                            await model.delete(entryID: item.element.id)
-                                        }
-                                    },
-                                )
-
-                                DiaryMealDropZone { draggedEntryID in
-                                    move(
-                                        entryID: draggedEntryID,
-                                        to: meal.mealType,
-                                        displayedTargetIndex: item.offset + 1,
-                                    )
-                                    self.draggedEntryID = nil
-                                }
-                            }
-
-                            DiaryMealAddButton {
-                                router.todayPath.append(
-                                    .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
+                        .textCase(nil)
                     }
-                    .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
 
             if let errorMessage = model.errorMessage {
                 DiaryInlineErrorView(message: errorMessage)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .listRowSeparator(.hidden)
             }
         }
-        .padding()
-        }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .task {
             await model.load()
         }
@@ -235,80 +230,41 @@ struct TodayRootView: View {
             )
         }
     }
+
+    private func clearDraggedEntryID(_ entryID: UUID) {
+        if draggedEntryID == entryID {
+            draggedEntryID = nil
+        }
+    }
 }
 
-private struct DiaryDraggableEntryRow: View {
+private struct DiaryListEntryRow: View {
     let entry: DiaryEntry
     let isDragging: Bool
-    let onTap: @MainActor () -> Void
     let onDragStarted: @MainActor () -> Void
     let onDragEnded: @MainActor () -> Void
     let onDelete: @MainActor () -> Void
 
-    @State private var swipeOffset: CGFloat = 0
-    @State private var suppressTapAfterSwipe = false
-
-    private let swipeActionWidth: CGFloat = 72
-
     var body: some View {
-        ZStack(alignment: .trailing) {
+        NavigationLink(value: TodayRoute.entryEditor(entry.id)) {
+            DiaryEntryRow(entry: entry)
+                .draggable(entry.id.uuidString) {
+                    DiaryEntryDragPreview(
+                        entry: entry,
+                        onDragStarted: onDragStarted,
+                        onDragEnded: onDragEnded,
+                    )
+                }
+        }
+        .swipeActions {
             Button(role: .destructive, action: onDelete) {
                 Image(systemName: "trash")
             }
             .accessibilityLabel("Удалить")
-            .frame(width: swipeActionWidth)
-            .frame(maxHeight: .infinity)
-            .foregroundStyle(.white)
-            .background(.red)
-
-            Button {
-                guard !suppressTapAfterSwipe else {
-                    return
-                }
-                onTap()
-            } label: {
-                DiaryEntryRow(entry: entry)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
-            .background(.background)
-            .offset(x: swipeOffset)
-            .draggable(entry.id.uuidString) {
-                DiaryEntryDragPreview(
-                    entry: entry,
-                    onDragStarted: onDragStarted,
-                    onDragEnded: onDragEnded,
-                )
-            }
-            .simultaneousGesture(swipeGesture)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .opacity(isDragging ? 0 : 1)
         .accessibilityHidden(isDragging)
-    }
-
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else {
-                    return
-                }
-                suppressTapAfterSwipe = true
-                swipeOffset = min(0, max(-swipeActionWidth, value.translation.width))
-            }
-            .onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else {
-                    return
-                }
-                withAnimation(.easeOut(duration: 0.15)) {
-                    swipeOffset = value.translation.width < -swipeActionWidth / 2 ? -swipeActionWidth : 0
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    suppressTapAfterSwipe = false
-                }
-            }
+        .allowsHitTesting(!isDragging)
     }
 }
 
@@ -328,43 +284,17 @@ private struct DiaryEntryDragPreview: View {
     }
 }
 
-private struct DiaryMealDropZone: View {
-    let isEmptyMeal: Bool
+private struct DiaryMealAddRow: View {
+    let onAdd: @MainActor () -> Void
     let onDrop: @MainActor (UUID) -> Void
 
-    @State private var isTargeted = false
-
-    init(
-        isEmptyMeal: Bool = false,
-        onDrop: @escaping @MainActor (UUID) -> Void,
-    ) {
-        self.isEmptyMeal = isEmptyMeal
-        self.onDrop = onDrop
-    }
+    @State private var isDropTarget = false
 
     var body: some View {
-        Group {
-            if isEmptyMeal {
-                VStack(spacing: 6) {
-                    Image(systemName: isTargeted ? "arrow.down.to.line" : "arrow.left.and.right")
-                    Text(isTargeted ? "Отпустите запись здесь" : "Перетащите запись сюда")
-                }
-                .font(.subheadline)
-                .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
-                .frame(maxWidth: .infinity, minHeight: 84)
-                .background(
-                    isTargeted ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous),
-                )
-            } else {
-                Capsule()
-                    .fill(isTargeted ? Color.accentColor : Color.clear)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: isTargeted ? 3 : 12)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, isTargeted ? 8 : 0)
-            }
+        Button(action: onAdd) {
+            Label("Добавить", systemImage: "plus")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .dropDestination(
             for: String.self,
@@ -378,20 +308,15 @@ private struct DiaryMealDropZone: View {
                 onDrop(entryID)
                 return true
             },
-            isTargeted: { isTargeted = $0 },
+            isTargeted: { isDropTarget = $0 },
         )
-        .animation(.easeInOut(duration: 0.15), value: isTargeted)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct DiaryMealAddButton: View {
-    let onAdd: @MainActor () -> Void
-
-    var body: some View {
-        Button(action: onAdd) {
-            Label("Добавить", systemImage: "plus")
+        .background {
+            if isDropTarget {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.12))
+            }
         }
+        .animation(.easeInOut(duration: 0.15), value: isDropTarget)
     }
 }
 
