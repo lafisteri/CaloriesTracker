@@ -22,18 +22,5 @@
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
-	<key>UTExportedTypeDeclarations</key>
-	<array>
-		<dict>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.data</string>
-			</array>
-			<key>UTTypeDescription</key>
-			<string>CaloriesTracker diary entry identifier</string>
-			<key>UTTypeIdentifier</key>
-			<string>com.caloriestracker.diary-entry-id</string>
-		</dict>
-	</array>
 </dict>
 </plist>
