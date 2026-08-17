@@ -263,8 +263,9 @@ private struct DiaryDraggableEntryRow: View {
         }
         .swipeActions {
             Button(role: .destructive, action: onDelete) {
-                Label("Удалить", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .accessibilityLabel("Удалить")
         }
         .onDrag {
             DiaryEntryDragPayload.makeItemProvider(for: entry.id)
@@ -406,6 +407,9 @@ private struct DiaryMealDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         onTargetChange(false)
         return DiaryEntryDragPayload.loadEntryID(from: info, completion: onDrop)
+    }
+}
+        }
     }
 }
 
