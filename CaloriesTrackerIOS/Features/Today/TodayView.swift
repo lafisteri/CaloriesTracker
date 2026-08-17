@@ -271,7 +271,7 @@ private struct DiaryListEntryRow: View {
                     )
                 }
         }
-        .swipeActions {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive, action: onDelete) {
                 Image(systemName: "trash")
             }
