@@ -41,6 +41,10 @@
 		A10000000000000000000032 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* TodayView.swift */; };
 		A10000000000000000000033 /* FoodSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* FoodSelectionView.swift */; };
 		A10000000000000000000034 /* DiaryAmountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* DiaryAmountView.swift */; };
+		A10000000000000000000035 /* RecipeCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* RecipeCalculator.swift */; };
+		A10000000000000000000036 /* RecipeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* RecipeService.swift */; };
+		A10000000000000000000037 /* RecipeViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* RecipeViewModels.swift */; };
+		A10000000000000000000038 /* RecipeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000039 /* RecipeViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -79,6 +83,10 @@
 		A20000000000000000000033 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		A20000000000000000000034 /* FoodSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodSelectionView.swift; sourceTree = "<group>"; };
 		A20000000000000000000035 /* DiaryAmountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryAmountView.swift; sourceTree = "<group>"; };
+		A20000000000000000000036 /* RecipeCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCalculator.swift; sourceTree = "<group>"; };
+		A20000000000000000000037 /* RecipeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeService.swift; sourceTree = "<group>"; };
+		A20000000000000000000038 /* RecipeViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeViewModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000039 /* RecipeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +147,7 @@
 			children = (
 				A40000000000000000000014 /* Products */,
 				A40000000000000000000016 /* Diary */,
+				A40000000000000000000018 /* Recipes */,
 			);
 			path = Application;
 			sourceTree = "<group>";
@@ -159,6 +168,8 @@
 				A20000000000000000000027 /* ProductDetailView.swift */,
 				A20000000000000000000028 /* ProductEditorView.swift */,
 				A20000000000000000000029 /* ProductVersionHistoryView.swift */,
+				A20000000000000000000038 /* RecipeViewModels.swift */,
+				A20000000000000000000039 /* RecipeViews.swift */,
 			);
 			path = Catalog;
 			sourceTree = "<group>";
@@ -169,6 +180,14 @@
 				A20000000000000000000031 /* DiaryService.swift */,
 			);
 			path = Diary;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000018 /* Recipes */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000037 /* RecipeService.swift */,
+			);
+			path = Recipes;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000017 /* Today */ = {
@@ -228,6 +247,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000014 /* RecipeModels.swift */,
+				A20000000000000000000036 /* RecipeCalculator.swift */,
 			);
 			path = Recipes;
 			sourceTree = "<group>";
@@ -403,6 +423,10 @@
 				A10000000000000000000032 /* TodayView.swift in Sources */,
 				A10000000000000000000033 /* FoodSelectionView.swift in Sources */,
 				A10000000000000000000034 /* DiaryAmountView.swift in Sources */,
+				A10000000000000000000035 /* RecipeCalculator.swift in Sources */,
+				A10000000000000000000036 /* RecipeService.swift in Sources */,
+				A10000000000000000000037 /* RecipeViewModels.swift in Sources */,
+				A10000000000000000000038 /* RecipeViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -83,14 +83,14 @@ final class TodayViewModel {
 @MainActor
 @Observable
 final class FoodSelectionViewModel {
-    private let productService: ProductService
+    private let diaryService: DiaryService
 
-    private(set) var products: [ProductListItem] = []
+    private(set) var sources: [FoodSelectionItem] = []
     private(set) var isLoading = false
     var errorMessage: String?
 
-    init(productService: ProductService) {
-        self.productService = productService
+    init(diaryService: DiaryService) {
+        self.diaryService = diaryService
     }
 
     func load(matching query: String) async {
@@ -98,9 +98,9 @@ final class FoodSelectionViewModel {
         errorMessage = nil
 
         do {
-            products = try await productService.products(matching: query)
+            sources = try await diaryService.foodSources(matching: query)
         } catch {
-            errorMessage = "Не удалось загрузить продукты."
+            errorMessage = "Не удалось загрузить продукты и рецепты."
         }
 
         isLoading = false
@@ -181,7 +181,7 @@ final class AmountViewModel {
 
         do {
             preview = try diaryService.preview(
-                version: source.version,
+                source: source,
                 amount: amount,
                 unitToken: selectedUnitToken,
             )
@@ -259,6 +259,8 @@ private func diaryErrorMessage(_ error: Error, fallback: String) -> String {
     case let error as UnitConverterError:
         error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
+        error.errorDescription ?? fallback
+    case let error as RecipeCalculatorError:
         error.errorDescription ?? fallback
     case let error as RecordMappingError:
         error.errorDescription ?? fallback

@@ -3,6 +3,7 @@ import SwiftUI
 struct ProductCatalogRootView: View {
     let router: AppRouter
     let productService: ProductService
+    let recipeService: RecipeService
 
     @State private var selectedSection: CatalogSection = .products
 
@@ -23,11 +24,7 @@ struct ProductCatalogRootView: View {
                 case .products:
                     ProductListView(router: router, productService: productService)
                 case .recipes:
-                    ContentUnavailableView(
-                        "Рецепты пока недоступны",
-                        systemImage: "book.closed",
-                        description: Text("Управление рецептами появится в следующей фазе."),
-                    )
+                    RecipeListView(router: router, recipeService: recipeService)
                 }
             }
             .navigationDestination(for: CatalogRoute.self) { route in
@@ -38,11 +35,17 @@ struct ProductCatalogRootView: View {
                     ProductEditorView(productID: id, router: router, productService: productService)
                 case let .productVersionHistory(id):
                     ProductVersionHistoryView(productID: id, productService: productService)
-                case .recipe:
-                    ContentUnavailableView(
-                        "Рецепты пока недоступны",
-                        systemImage: "book.closed",
+                case let .recipe(id):
+                    RecipeDetailView(recipeID: id, router: router, recipeService: recipeService)
+                case let .recipeEditor(id):
+                    RecipeEditorView(
+                        recipeID: id,
+                        router: router,
+                        productService: productService,
+                        recipeService: recipeService,
                     )
+                case let .recipeVersionHistory(id):
+                    RecipeVersionHistoryView(recipeID: id, recipeService: recipeService)
                 }
             }
         }

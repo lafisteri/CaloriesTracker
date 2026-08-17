@@ -7,35 +7,35 @@ struct FoodSelectionView: View {
     @State private var model: FoodSelectionViewModel
     @State private var searchText = ""
 
-    init(context: DiaryContext, router: AppRouter, productService: ProductService) {
+    init(context: DiaryContext, router: AppRouter, diaryService: DiaryService) {
         self.context = context
         self.router = router
-        _model = State(initialValue: FoodSelectionViewModel(productService: productService))
+        _model = State(initialValue: FoodSelectionViewModel(diaryService: diaryService))
     }
 
     var body: some View {
         List {
-            if model.isLoading && model.products.isEmpty {
+            if model.isLoading && model.sources.isEmpty {
                 HStack {
                     Spacer()
                     ProgressView()
                     Spacer()
                 }
                 .listRowSeparator(.hidden)
-            } else if model.products.isEmpty, model.errorMessage == nil {
+            } else if model.sources.isEmpty, model.errorMessage == nil {
                 ContentUnavailableView(
-                    "В базе пока нет продуктов",
+                    "В базе пока нет продуктов и рецептов",
                     systemImage: "shippingbox",
-                    description: Text("Создайте продукт во вкладке «Продукты», чтобы добавить его в дневник."),
+                    description: Text("Создайте продукт или рецепт во вкладке «Продукты», чтобы добавить его в дневник."),
                 )
                 .listRowSeparator(.hidden)
             } else {
-                ForEach(model.products) { item in
+                ForEach(model.sources) { item in
                     Button {
                         router.todayPath.append(
                             .amount(
                                 context: context,
-                                source: FoodSourceReference(sourceType: .product, sourceID: item.product.id),
+                                source: item.source,
                             ),
                         )
                     } label: {
@@ -54,7 +54,7 @@ struct FoodSelectionView: View {
         .listStyle(.plain)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Поиск продукта")
+        .searchable(text: $searchText, prompt: "Поиск продукта или блюда")
         .task {
             await model.load(matching: searchText)
         }
@@ -67,13 +67,13 @@ struct FoodSelectionView: View {
 }
 
 private struct FoodSelectionRow: View {
-    let item: ProductListItem
+    let item: FoodSelectionItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(item.product.name)
+            Text(item.displayName)
                 .font(.body.weight(.medium))
-            Text("\(diaryNumber(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(diaryNumber(item.currentVersion.nutrition.calories)) ккал")
+            Text(item.subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

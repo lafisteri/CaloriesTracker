@@ -21,7 +21,6 @@ struct RootApplicationView: View {
                 TodayRootView(
                     router: router,
                     diaryService: dependencies.diaryService,
-                    productService: dependencies.productService,
                 )
             }
             .tabItem {
@@ -29,7 +28,11 @@ struct RootApplicationView: View {
             }
             .tag(AppTab.today)
 
-            ProductCatalogRootView(router: router, productService: dependencies.productService)
+            ProductCatalogRootView(
+                router: router,
+                productService: dependencies.productService,
+                recipeService: dependencies.recipeService,
+            )
             .tabItem {
                 Label("Продукты", systemImage: "shippingbox")
             }

@@ -28,4 +28,6 @@ enum CatalogRoute: Hashable {
     case productEditor(UUID?)
     case productVersionHistory(UUID)
     case recipe(UUID)
+    case recipeEditor(UUID?)
+    case recipeVersionHistory(UUID)
 }

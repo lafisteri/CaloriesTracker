@@ -33,3 +33,37 @@ struct RecipeIngredient: Identifiable, Hashable, Codable, Sendable {
     let unitToken: String
     let normalizedAmount: Double
 }
+
+/// Editable input. IDs are transient and are replaced by immutable child IDs when a RecipeVersion is saved.
+struct RecipeIngredientDraft: Identifiable, Hashable, Sendable {
+    let id: UUID
+    let productID: UUID
+    let productVersionID: UUID
+    let amount: Double
+    let unitToken: String
+}
+
+struct RecipeDraft: Hashable, Sendable {
+    let name: String
+    let ingredients: [RecipeIngredientDraft]
+    let cookedWeight: Double?
+    let servingsCount: Double?
+}
+
+enum RecipeDiaryUnit: String, CaseIterable, Hashable, Codable, Sendable {
+    case grams = "g"
+    case serving = "piece"
+
+    /// Accepts the short-lived Phase 4 tokens so an already saved local entry
+    /// remains editable after the canonical token format is restored.
+    static func resolve(_ token: String) -> Self? {
+        switch token {
+        case grams.rawValue, "recipe:g":
+            .grams
+        case serving.rawValue, "recipe:serving":
+            .serving
+        default:
+            nil
+        }
+    }
+}

@@ -3,14 +3,12 @@ import SwiftUI
 struct TodayRootView: View {
     let router: AppRouter
     let diaryService: DiaryService
-    let productService: ProductService
 
     @State private var model: TodayViewModel
 
-    init(router: AppRouter, diaryService: DiaryService, productService: ProductService) {
+    init(router: AppRouter, diaryService: DiaryService) {
         self.router = router
         self.diaryService = diaryService
-        self.productService = productService
         _model = State(initialValue: TodayViewModel(diaryService: diaryService))
     }
 
@@ -114,7 +112,7 @@ struct TodayRootView: View {
         .navigationDestination(for: TodayRoute.self) { route in
             switch route {
             case let .foodSelection(context):
-                FoodSelectionView(context: context, router: router, productService: productService)
+                FoodSelectionView(context: context, router: router, diaryService: diaryService)
             case let .amount(context, source):
                 DiaryAmountView(
                     mode: .create(context: context, source: source),
@@ -193,7 +191,7 @@ private struct DiaryEntryRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(entry.sourceName)
                 .font(.body.weight(.medium))
-            Text("\(diaryNumber(entry.amount)) \(diaryUnitLabel(for: entry.unitToken)) · \(diaryNumber(entry.nutrition.calories)) ккал")
+            Text("\(diaryNumber(entry.amount)) \(diaryUnitLabel(for: entry.unitToken, sourceType: entry.sourceType)) · \(diaryNumber(entry.nutrition.calories)) ккал")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Text("Б \(diaryNumber(entry.nutrition.protein)) · Ж \(diaryNumber(entry.nutrition.fat)) · У \(diaryNumber(entry.nutrition.carbs))")
@@ -208,7 +206,15 @@ func diaryNumber(_ value: Double) -> String {
     value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 2)))
 }
 
-func diaryUnitLabel(for token: String) -> String {
+func diaryUnitLabel(for token: String, sourceType: SourceType) -> String {
+    if sourceType == .recipe, let recipeUnit = RecipeDiaryUnit.resolve(token) {
+        switch recipeUnit {
+        case .grams:
+            return "г"
+        case .serving:
+            return "порция"
+        }
+    }
     if let baseUnit = ProductBaseUnit(rawValue: token) {
         return baseUnit.russianLabel
     }

@@ -252,9 +252,211 @@ final class SwiftDataRecipeRepository: RecipeRepository {
         modelContext = ModelContext(modelContainer)
     }
 
-    func recipe(id: UUID) async throws -> Recipe? {
+    func activeRecipes(matching query: String) async throws -> [Recipe] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return try modelContext
+            .fetch(FetchDescriptor<RecipeRecord>())
+            .map { $0.toDomain() }
+            .filter { recipe in
+                guard recipe.deletedAt == nil else {
+                    return false
+                }
+                return query.isEmpty || recipe.name.localizedCaseInsensitiveContains(query)
+            }
+            .sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+    }
+
+    func recipe(id: UUID, includingDeleted: Bool) async throws -> Recipe? {
         let descriptor = FetchDescriptor<RecipeRecord>(predicate: #Predicate { $0.id == id })
+        guard let recipe = try modelContext.fetch(descriptor).first?.toDomain() else {
+            return nil
+        }
+        return includingDeleted || recipe.deletedAt == nil ? recipe : nil
+    }
+
+    func version(id: UUID) async throws -> RecipeVersion? {
+        let descriptor = FetchDescriptor<RecipeVersionRecord>(predicate: #Predicate { $0.id == id })
         return try modelContext.fetch(descriptor).first?.toDomain()
+    }
+
+    func versions(for recipeID: UUID) async throws -> [RecipeVersion] {
+        try modelContext
+            .fetch(FetchDescriptor<RecipeVersionRecord>())
+            .filter { $0.recipeID == recipeID }
+            .map { $0.toDomain() }
+    }
+
+    func create(_ recipe: Recipe, initialVersion: RecipeVersion) async throws {
+        guard initialVersion.recipeID == recipe.id,
+              initialVersion.id == recipe.currentVersionID,
+              initialVersion.versionNumber == 1,
+              initialVersion.basedOnVersionID == nil,
+              initialVersion.ingredients.allSatisfy({ $0.recipeVersionID == initialVersion.id })
+        else {
+            throw RecipeRepositoryError.invalidInitialVersion
+        }
+
+        let recipeRecord = makeRecord(recipe)
+        let versionRecord = makeRecord(initialVersion)
+        versionRecord.recipe = recipeRecord
+        versionRecord.ingredients = initialVersion.ingredients.map(makeRecord)
+        for ingredient in versionRecord.ingredients {
+            ingredient.recipeVersion = versionRecord
+        }
+
+        do {
+            modelContext.insert(recipeRecord)
+            modelContext.insert(versionRecord)
+            for ingredient in versionRecord.ingredients {
+                modelContext.insert(ingredient)
+            }
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func saveLogicalMetadata(_ recipe: Recipe) async throws {
+        guard let record = try recipeRecord(id: recipe.id) else {
+            throw RecipeRepositoryError.recipeNotFound
+        }
+        guard record.currentVersionID == recipe.currentVersionID else {
+            throw RecipeRepositoryError.invalidCurrentVersion
+        }
+
+        record.name = recipe.name
+        record.updatedAt = recipe.updatedAt
+        record.deletedAt = recipe.deletedAt
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func append(_ version: RecipeVersion, settingCurrentVersionOf recipe: Recipe) async throws {
+        guard version.recipeID == recipe.id,
+              recipe.currentVersionID == version.id,
+              version.basedOnVersionID != nil,
+              version.versionNumber > 1,
+              version.ingredients.allSatisfy({ $0.recipeVersionID == version.id })
+        else {
+            throw RecipeRepositoryError.invalidVersionAppend
+        }
+        guard let recipeRecord = try recipeRecord(id: recipe.id) else {
+            throw RecipeRepositoryError.recipeNotFound
+        }
+        guard recipeRecord.currentVersionID == version.basedOnVersionID else {
+            throw RecipeRepositoryError.invalidCurrentVersion
+        }
+
+        let versionRecord = makeRecord(version)
+        versionRecord.recipe = recipeRecord
+        versionRecord.ingredients = version.ingredients.map(makeRecord)
+        for ingredient in versionRecord.ingredients {
+            ingredient.recipeVersion = versionRecord
+        }
+
+        recipeRecord.name = recipe.name
+        recipeRecord.currentVersionID = recipe.currentVersionID
+        recipeRecord.updatedAt = recipe.updatedAt
+        recipeRecord.deletedAt = recipe.deletedAt
+
+        do {
+            modelContext.insert(versionRecord)
+            for ingredient in versionRecord.ingredients {
+                modelContext.insert(ingredient)
+            }
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func softDeleteRecipe(id: UUID, at date: Date) async throws {
+        guard let record = try recipeRecord(id: id) else {
+            throw RecipeRepositoryError.recipeNotFound
+        }
+        record.deletedAt = date
+        record.updatedAt = date
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    private func recipeRecord(id: UUID) throws -> RecipeRecord? {
+        let descriptor = FetchDescriptor<RecipeRecord>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func makeRecord(_ recipe: Recipe) -> RecipeRecord {
+        RecipeRecord(
+            id: recipe.id,
+            name: recipe.name,
+            currentVersionID: recipe.currentVersionID,
+            createdAt: recipe.createdAt,
+            updatedAt: recipe.updatedAt,
+            deletedAt: recipe.deletedAt,
+        )
+    }
+
+    private func makeRecord(_ version: RecipeVersion) -> RecipeVersionRecord {
+        RecipeVersionRecord(
+            id: version.id,
+            recipeID: version.recipeID,
+            basedOnVersionID: version.basedOnVersionID,
+            versionNumber: version.versionNumber,
+            totalCalories: version.totalNutrition.calories,
+            totalProtein: version.totalNutrition.protein,
+            totalFat: version.totalNutrition.fat,
+            totalCarbs: version.totalNutrition.carbs,
+            cookedWeight: version.cookedWeight,
+            servingsCount: version.servingsCount,
+            createdAt: version.createdAt,
+        )
+    }
+
+    private func makeRecord(_ ingredient: RecipeIngredient) -> RecipeIngredientRecord {
+        RecipeIngredientRecord(
+            id: ingredient.id,
+            recipeVersionID: ingredient.recipeVersionID,
+            position: ingredient.position,
+            productID: ingredient.productID,
+            productVersionID: ingredient.productVersionID,
+            amount: ingredient.amount,
+            unitToken: ingredient.unitToken,
+            normalizedAmount: ingredient.normalizedAmount,
+        )
+    }
+}
+
+private enum RecipeRepositoryError: LocalizedError {
+    case recipeNotFound
+    case invalidInitialVersion
+    case invalidVersionAppend
+    case invalidCurrentVersion
+
+    var errorDescription: String? {
+        switch self {
+        case .recipeNotFound:
+            "Рецепт не найден."
+        case .invalidInitialVersion:
+            "Начальная версия рецепта некорректна."
+        case .invalidVersionAppend:
+            "Новая версия рецепта некорректна."
+        case .invalidCurrentVersion:
+            "Текущая версия рецепта изменилась."
+        }
     }
 }
 

@@ -119,6 +119,10 @@ struct DiaryAmountView: View {
             baseUnit.russianLabel
         case let .serving(name):
             name
+        case .recipeGrams:
+            "г"
+        case .recipeServing:
+            "порция"
         }
     }
 }

@@ -8,6 +8,7 @@ final class AppDependencies {
     let diaryRepository: any DiaryRepository
     let goalRepository: any GoalRepository
     let productService: ProductService
+    let recipeService: RecipeService
     let diaryService: DiaryService
 
     init(isStoredInMemoryOnly: Bool = false) throws {
@@ -29,9 +30,14 @@ final class AppDependencies {
         diaryRepository = SwiftDataDiaryRepository(modelContainer: modelContainer)
         goalRepository = SwiftDataGoalRepository(modelContainer: modelContainer)
         productService = ProductService(repository: productRepository)
+        recipeService = RecipeService(
+            recipeRepository: recipeRepository,
+            productRepository: productRepository,
+        )
         diaryService = DiaryService(
             diaryRepository: diaryRepository,
             productRepository: productRepository,
+            recipeRepository: recipeRepository,
         )
     }
 }

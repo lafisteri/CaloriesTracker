@@ -15,7 +15,14 @@ protocol ProductRepository: Sendable {
 
 @MainActor
 protocol RecipeRepository: Sendable {
-    func recipe(id: UUID) async throws -> Recipe?
+    func activeRecipes(matching query: String) async throws -> [Recipe]
+    func recipe(id: UUID, includingDeleted: Bool) async throws -> Recipe?
+    func version(id: UUID) async throws -> RecipeVersion?
+    func versions(for recipeID: UUID) async throws -> [RecipeVersion]
+    func create(_ recipe: Recipe, initialVersion: RecipeVersion) async throws
+    func saveLogicalMetadata(_ recipe: Recipe) async throws
+    func append(_ version: RecipeVersion, settingCurrentVersionOf recipe: Recipe) async throws
+    func softDeleteRecipe(id: UUID, at: Date) async throws
 }
 
 @MainActor
