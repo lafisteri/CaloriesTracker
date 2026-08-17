@@ -8,6 +8,7 @@ struct TodayRootView: View {
     let recipeService: RecipeService
 
     @State private var model: TodayViewModel
+    @State private var draggedEntryID: UUID?
 
     init(
         router: AppRouter,
@@ -67,13 +68,21 @@ struct TodayRootView: View {
                                     to: meal.mealType,
                                     displayedTargetIndex: 0,
                                 )
+                                self.draggedEntryID = nil
                             }
 
                             ForEach(Array(meal.entries.enumerated()), id: \.element.id) { item in
                             DiaryDraggableEntryRow(
                                     entry: item.element,
+                                    isDragging: draggedEntryID == item.element.id,
                                     onTap: {
                                         router.todayPath.append(.entryEditor(item.element.id))
+                                    },
+                                    onDragStarted: {
+                                        draggedEntryID = item.element.id
+                                    },
+                                    onDragEnded: {
+                                        draggedEntryID = nil
                                     },
                                     onDelete: {
                                         Task {
@@ -88,6 +97,7 @@ struct TodayRootView: View {
                                         to: meal.mealType,
                                         displayedTargetIndex: item.offset + 1,
                                     )
+                                    self.draggedEntryID = nil
                                 }
                             }
 
@@ -229,10 +239,14 @@ struct TodayRootView: View {
 
 private struct DiaryDraggableEntryRow: View {
     let entry: DiaryEntry
+    let isDragging: Bool
     let onTap: @MainActor () -> Void
+    let onDragStarted: @MainActor () -> Void
+    let onDragEnded: @MainActor () -> Void
     let onDelete: @MainActor () -> Void
 
     @State private var swipeOffset: CGFloat = 0
+    @State private var suppressTapAfterSwipe = false
 
     private let swipeActionWidth: CGFloat = 72
 
@@ -247,7 +261,12 @@ private struct DiaryDraggableEntryRow: View {
             .foregroundStyle(.white)
             .background(.red)
 
-            Button(action: onTap) {
+            Button {
+                guard !suppressTapAfterSwipe else {
+                    return
+                }
+                onTap()
+            } label: {
                 DiaryEntryRow(entry: entry)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
@@ -257,15 +276,17 @@ private struct DiaryDraggableEntryRow: View {
             .background(.background)
             .offset(x: swipeOffset)
             .draggable(entry.id.uuidString) {
-                DiaryEntryRow(entry: entry)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
+                DiaryEntryDragPreview(
+                    entry: entry,
+                    onDragStarted: onDragStarted,
+                    onDragEnded: onDragEnded,
+                )
             }
             .simultaneousGesture(swipeGesture)
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .opacity(isDragging ? 0 : 1)
+        .accessibilityHidden(isDragging)
     }
 
     private var swipeGesture: some Gesture {
@@ -274,6 +295,7 @@ private struct DiaryDraggableEntryRow: View {
                 guard abs(value.translation.width) > abs(value.translation.height) else {
                     return
                 }
+                suppressTapAfterSwipe = true
                 swipeOffset = min(0, max(-swipeActionWidth, value.translation.width))
             }
             .onEnded { value in
@@ -283,7 +305,26 @@ private struct DiaryDraggableEntryRow: View {
                 withAnimation(.easeOut(duration: 0.15)) {
                     swipeOffset = value.translation.width < -swipeActionWidth / 2 ? -swipeActionWidth : 0
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    suppressTapAfterSwipe = false
+                }
             }
+    }
+}
+
+private struct DiaryEntryDragPreview: View {
+    let entry: DiaryEntry
+    let onDragStarted: @MainActor () -> Void
+    let onDragEnded: @MainActor () -> Void
+
+    var body: some View {
+        DiaryEntryRow(entry: entry)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
+            .onAppear(perform: onDragStarted)
+            .onDisappear(perform: onDragEnded)
     }
 }
 
