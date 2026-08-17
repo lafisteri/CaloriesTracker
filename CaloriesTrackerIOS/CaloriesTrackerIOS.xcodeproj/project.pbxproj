@@ -39,7 +39,6 @@
 		A10000000000000000000030 /* DiaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* DiaryService.swift */; };
 		A10000000000000000000031 /* TodayViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* TodayViewModels.swift */; };
 		A10000000000000000000032 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* TodayView.swift */; };
-		A10000000000000000000033 /* FoodSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* FoodSelectionView.swift */; };
 		A10000000000000000000034 /* DiaryAmountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* DiaryAmountView.swift */; };
 		A10000000000000000000035 /* RecipeCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* RecipeCalculator.swift */; };
 		A10000000000000000000036 /* RecipeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* RecipeService.swift */; };
@@ -88,7 +87,6 @@
 		A20000000000000000000031 /* DiaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryService.swift; sourceTree = "<group>"; };
 		A20000000000000000000032 /* TodayViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayViewModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000033 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
-		A20000000000000000000034 /* FoodSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodSelectionView.swift; sourceTree = "<group>"; };
 		A20000000000000000000035 /* DiaryAmountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryAmountView.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* RecipeCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCalculator.swift; sourceTree = "<group>"; };
 		A20000000000000000000037 /* RecipeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeService.swift; sourceTree = "<group>"; };
@@ -229,7 +227,6 @@
 			children = (
 				A20000000000000000000032 /* TodayViewModels.swift */,
 				A20000000000000000000033 /* TodayView.swift */,
-				A20000000000000000000034 /* FoodSelectionView.swift */,
 				A20000000000000000000035 /* DiaryAmountView.swift */,
 			);
 			path = Today;
@@ -482,7 +479,6 @@
 				A10000000000000000000030 /* DiaryService.swift in Sources */,
 				A10000000000000000000031 /* TodayViewModels.swift in Sources */,
 				A10000000000000000000032 /* TodayView.swift in Sources */,
-				A10000000000000000000033 /* FoodSelectionView.swift in Sources */,
 				A10000000000000000000034 /* DiaryAmountView.swift in Sources */,
 				A10000000000000000000035 /* RecipeCalculator.swift in Sources */,
 				A10000000000000000000036 /* RecipeService.swift in Sources */,

@@ -31,6 +31,8 @@ struct RootApplicationView: View {
                     router: router,
                     diaryService: dependencies.diaryService,
                     goalService: dependencies.goalService,
+                    productService: dependencies.productService,
+                    recipeService: dependencies.recipeService,
                 )
             }
             .tabItem {

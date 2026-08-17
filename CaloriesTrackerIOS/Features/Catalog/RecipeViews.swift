@@ -1,13 +1,22 @@
 import SwiftUI
 
 struct RecipeListView: View {
-    let router: AppRouter
+    let onSelect: (UUID) -> Void
+    let onAdd: () -> Void
+    let allowsManagementActions: Bool
 
     @State private var model: RecipeListViewModel
     @State private var searchText = ""
 
-    init(router: AppRouter, recipeService: RecipeService) {
-        self.router = router
+    init(
+        recipeService: RecipeService,
+        onSelect: @escaping (UUID) -> Void,
+        onAdd: @escaping () -> Void,
+        allowsManagementActions: Bool,
+    ) {
+        self.onSelect = onSelect
+        self.onAdd = onAdd
+        self.allowsManagementActions = allowsManagementActions
         _model = State(initialValue: RecipeListViewModel(recipeService: recipeService))
     }
 
@@ -29,17 +38,26 @@ struct RecipeListView: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(model.recipes) { item in
-                    NavigationLink(value: CatalogRoute.recipe(item.id)) {
-                        RecipeListRow(item: item)
-                    }
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            Task {
-                                await model.softDelete(recipeID: item.id)
-                            }
-                        } label: {
-                            Label("Удалить", systemImage: "trash")
+                    if allowsManagementActions {
+                        NavigationLink(value: CatalogRoute.recipe(item.id)) {
+                            RecipeListRow(item: item)
                         }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                Task {
+                                    await model.softDelete(recipeID: item.id)
+                                }
+                            } label: {
+                                Label("Удалить", systemImage: "trash")
+                            }
+                        }
+                    } else {
+                        Button {
+                            onSelect(item.recipe.id)
+                        } label: {
+                            RecipeListRow(item: item)
+                        }
+                        .foregroundStyle(.primary)
                     }
                 }
             }
@@ -55,7 +73,7 @@ struct RecipeListView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    router.catalogPath.append(.recipeEditor(nil))
+                    onAdd()
                 } label: {
                     Label("Создать рецепт", systemImage: "plus")
                 }
@@ -231,6 +249,7 @@ struct RecipeEditorView: View {
     let router: AppRouter
     let productService: ProductService
     let recipeService: RecipeService
+    let onSaved: (@MainActor () -> Void)?
 
     @State private var model: RecipeEditorViewModel
     @State private var showsIngredientSelection = false
@@ -242,10 +261,12 @@ struct RecipeEditorView: View {
         router: AppRouter,
         productService: ProductService,
         recipeService: RecipeService,
+        onSaved: (@MainActor () -> Void)? = nil,
     ) {
         self.router = router
         self.productService = productService
         self.recipeService = recipeService
+        self.onSaved = onSaved
         _model = State(initialValue: RecipeEditorViewModel(recipeID: recipeID, recipeService: recipeService))
     }
 
@@ -329,7 +350,11 @@ struct RecipeEditorView: View {
                     Task {
                         if await model.save() {
                             focusedField = nil
-                            router.catalogPath = []
+                            if let onSaved {
+                                onSaved()
+                            } else {
+                                router.catalogPath = []
+                            }
                         }
                     }
                 }

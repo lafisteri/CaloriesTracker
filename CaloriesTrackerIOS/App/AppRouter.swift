@@ -15,10 +15,11 @@ enum StatisticsRoute: Hashable {
 }
 
 enum TodayRoute: Hashable {
-    case foodSelection(DiaryContext)
+    case catalogSelection(DiaryContext)
     case amount(context: DiaryContext, source: FoodSourceReference)
     case entryEditor(UUID)
     case productEditor(context: DiaryContext?, prefilledBarcode: String?)
+    case recipeEditor(context: DiaryContext, recipeID: UUID?)
     case productDetails(UUID)
     case recipeDetails(UUID)
 }

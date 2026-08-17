@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct DiaryAmountView: View {
     let router: AppRouter
@@ -77,16 +78,11 @@ struct DiaryAmountView: View {
                 .background(.bar)
             }
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Готово") {
-                    amountIsFocused = false
-                }
-            }
-        }
         .task {
             await model.load()
+            if model.source != nil {
+                focusAndSelectAmount()
+            }
         }
         .onChange(of: model.amountText) { _, _ in
             model.refreshPreview()
@@ -98,18 +94,21 @@ struct DiaryAmountView: View {
 
     @ViewBuilder
     private var nutritionPreview: some View {
-        if let preview = model.preview {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("КБЖУ")
-                    .font(.headline)
-                Text("\(diaryNumber(preview.calories)) ккал")
-                    .font(.title3.weight(.semibold))
-                Text("Б \(diaryNumber(preview.protein)) · Ж \(diaryNumber(preview.fat)) · У \(diaryNumber(preview.carbs))")
-                    .foregroundStyle(.secondary)
-            }
-        } else {
-            Text("Введите количество, чтобы увидеть КБЖУ.")
+        let preview = model.preview ?? .zero
+        VStack(alignment: .leading, spacing: 6) {
+            Text("КБЖУ")
+                .font(.headline)
+            Text("\(diaryNumber(preview.calories)) ккал")
+                .font(.title3.weight(.semibold))
+            Text("Б \(diaryNumber(preview.protein)) · Ж \(diaryNumber(preview.fat)) · У \(diaryNumber(preview.carbs))")
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func focusAndSelectAmount() {
+        amountIsFocused = true
+        DispatchQueue.main.async {
+            UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
         }
     }
 

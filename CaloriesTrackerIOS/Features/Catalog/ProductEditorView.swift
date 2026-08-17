@@ -2,12 +2,19 @@ import SwiftUI
 
 struct ProductEditorView: View {
     let router: AppRouter
+    let onSaved: (@MainActor () -> Void)?
 
     @State private var model: ProductEditorViewModel
     @FocusState private var focusedField: EditorField?
 
-    init(productID: UUID?, router: AppRouter, productService: ProductService) {
+    init(
+        productID: UUID?,
+        router: AppRouter,
+        productService: ProductService,
+        onSaved: (@MainActor () -> Void)? = nil,
+    ) {
         self.router = router
+        self.onSaved = onSaved
         _model = State(initialValue: ProductEditorViewModel(productID: productID, productService: productService))
     }
 
@@ -64,7 +71,11 @@ struct ProductEditorView: View {
                     Task {
                         if await model.save() {
                             focusedField = nil
-                            router.catalogPath = []
+                            if let onSaved {
+                                onSaved()
+                            } else {
+                                router.catalogPath = []
+                            }
                         }
                     }
                 }

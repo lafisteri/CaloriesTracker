@@ -117,33 +117,6 @@ final class TodayViewModel {
     }
 }
 
-@MainActor
-@Observable
-final class FoodSelectionViewModel {
-    private let diaryService: DiaryService
-
-    private(set) var sources: [FoodSelectionItem] = []
-    private(set) var isLoading = false
-    var errorMessage: String?
-
-    init(diaryService: DiaryService) {
-        self.diaryService = diaryService
-    }
-
-    func load(matching query: String) async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            sources = try await diaryService.foodSources(matching: query)
-        } catch {
-            errorMessage = "Не удалось загрузить продукты и рецепты."
-        }
-
-        isLoading = false
-    }
-}
-
 enum DiaryAmountEditorMode: Hashable, Sendable {
     case create(context: DiaryContext, source: FoodSourceReference)
     case edit(entryID: UUID)
@@ -192,7 +165,12 @@ final class AmountViewModel {
             guard let source else {
                 return
             }
-            amountText = source.initialAmount.map(numericString) ?? ""
+            switch mode {
+            case .create:
+                amountText = numericString(100)
+            case .edit:
+                amountText = source.initialAmount.map(numericString) ?? ""
+            }
             selectedUnitToken = source.initialUnitToken
             refreshPreview()
         } catch {

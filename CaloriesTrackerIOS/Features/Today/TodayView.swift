@@ -5,13 +5,23 @@ struct TodayRootView: View {
     let router: AppRouter
     let diaryService: DiaryService
     let goalService: GoalService
+    let productService: ProductService
+    let recipeService: RecipeService
 
     @State private var model: TodayViewModel
 
-    init(router: AppRouter, diaryService: DiaryService, goalService: GoalService) {
+    init(
+        router: AppRouter,
+        diaryService: DiaryService,
+        goalService: GoalService,
+        productService: ProductService,
+        recipeService: RecipeService,
+    ) {
         self.router = router
         self.diaryService = diaryService
         self.goalService = goalService
+        self.productService = productService
+        self.recipeService = recipeService
         _model = State(initialValue: TodayViewModel(diaryService: diaryService, goalService: goalService))
     }
 
@@ -59,7 +69,7 @@ struct TodayRootView: View {
                         DiaryMealDropButton(
                             onAdd: {
                                 router.todayPath.append(
-                                    .foodSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
+                                    .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
                                 )
                             },
                             onDrop: { draggedEntryID in
@@ -108,8 +118,13 @@ struct TodayRootView: View {
         }
         .navigationDestination(for: TodayRoute.self) { route in
             switch route {
-            case let .foodSelection(context):
-                FoodSelectionView(context: context, router: router, diaryService: diaryService)
+            case let .catalogSelection(context):
+                CatalogView(
+                    mode: .selection(context),
+                    router: router,
+                    productService: productService,
+                    recipeService: recipeService,
+                )
             case let .amount(context, source):
                 DiaryAmountView(
                     mode: .create(context: context, source: source),
@@ -122,7 +137,28 @@ struct TodayRootView: View {
                     router: router,
                     diaryService: diaryService,
                 )
-            case .productEditor, .productDetails, .recipeDetails:
+            case let .productEditor(context, _):
+                ProductEditorView(
+                    productID: nil,
+                    router: router,
+                    productService: productService,
+                ) {
+                    if let context {
+                        router.todayPath = [.catalogSelection(context)]
+                    } else {
+                        router.todayPath = []
+                    }
+                }
+            case let .recipeEditor(context, recipeID):
+                RecipeEditorView(
+                    recipeID: recipeID,
+                    router: router,
+                    productService: productService,
+                    recipeService: recipeService,
+                ) {
+                    router.todayPath = [.catalogSelection(context)]
+                }
+            case .productDetails, .recipeDetails:
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")
             }
         }

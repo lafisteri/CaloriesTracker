@@ -1,32 +1,32 @@
 import SwiftUI
 
+enum CatalogMode {
+    case management
+    case selection(DiaryContext)
+
+    var allowsManagementActions: Bool {
+        if case .management = self {
+            return true
+        }
+        return false
+    }
+}
+
 struct ProductCatalogRootView: View {
     let router: AppRouter
     let productService: ProductService
     let recipeService: RecipeService
 
-    @State private var selectedSection: CatalogSection = .products
-
     var body: some View {
         @Bindable var router = router
 
         NavigationStack(path: $router.catalogPath) {
-            VStack(spacing: 0) {
-                Picker("Каталог", selection: $selectedSection) {
-                    ForEach(CatalogSection.allCases) { section in
-                        Text(section.title).tag(section)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding([.horizontal, .top])
-
-                switch selectedSection {
-                case .products:
-                    ProductListView(router: router, productService: productService)
-                case .recipes:
-                    RecipeListView(router: router, recipeService: recipeService)
-                }
-            }
+            CatalogView(
+                mode: .management,
+                router: router,
+                productService: productService,
+                recipeService: recipeService,
+            )
             .navigationDestination(for: CatalogRoute.self) { route in
                 switch route {
                 case let .product(id):
@@ -52,14 +52,107 @@ struct ProductCatalogRootView: View {
     }
 }
 
-private struct ProductListView: View {
+struct CatalogView: View {
+    let mode: CatalogMode
     let router: AppRouter
+    let productService: ProductService
+    let recipeService: RecipeService
+
+    @State private var selectedSection: CatalogSection = .products
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Каталог", selection: $selectedSection) {
+                ForEach(CatalogSection.allCases) { section in
+                    Text(section.title).tag(section)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding([.horizontal, .top])
+
+            switch selectedSection {
+            case .products:
+                ProductListView(
+                    productService: productService,
+                    onSelect: selectProduct,
+                    onAdd: createProduct,
+                    allowsManagementActions: mode.allowsManagementActions,
+                )
+            case .recipes:
+                RecipeListView(
+                    recipeService: recipeService,
+                    onSelect: selectRecipe,
+                    onAdd: createRecipe,
+                    allowsManagementActions: mode.allowsManagementActions,
+                )
+            }
+        }
+    }
+
+    private func selectProduct(_ productID: UUID) {
+        switch mode {
+        case .management:
+            router.catalogPath.append(.product(productID))
+        case let .selection(context):
+            router.todayPath.append(
+                .amount(
+                    context: context,
+                    source: FoodSourceReference(sourceType: .product, sourceID: productID),
+                ),
+            )
+        }
+    }
+
+    private func selectRecipe(_ recipeID: UUID) {
+        switch mode {
+        case .management:
+            router.catalogPath.append(.recipe(recipeID))
+        case let .selection(context):
+            router.todayPath.append(
+                .amount(
+                    context: context,
+                    source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
+                ),
+            )
+        }
+    }
+
+    private func createProduct() {
+        switch mode {
+        case .management:
+            router.catalogPath.append(.productEditor(nil))
+        case let .selection(context):
+            router.todayPath.append(.productEditor(context: context, prefilledBarcode: nil))
+        }
+    }
+
+    private func createRecipe() {
+        switch mode {
+        case .management:
+            router.catalogPath.append(.recipeEditor(nil))
+        case let .selection(context):
+            router.todayPath.append(.recipeEditor(context: context, recipeID: nil))
+        }
+    }
+}
+
+private struct ProductListView: View {
+    let onSelect: (UUID) -> Void
+    let onAdd: () -> Void
+    let allowsManagementActions: Bool
 
     @State private var model: ProductListViewModel
     @State private var searchText = ""
 
-    init(router: AppRouter, productService: ProductService) {
-        self.router = router
+    init(
+        productService: ProductService,
+        onSelect: @escaping (UUID) -> Void,
+        onAdd: @escaping () -> Void,
+        allowsManagementActions: Bool,
+    ) {
+        self.onSelect = onSelect
+        self.onAdd = onAdd
+        self.allowsManagementActions = allowsManagementActions
         _model = State(initialValue: ProductListViewModel(productService: productService))
     }
 
@@ -81,17 +174,26 @@ private struct ProductListView: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(model.products) { item in
-                    NavigationLink(value: CatalogRoute.product(item.id)) {
-                        ProductListRow(item: item)
-                    }
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            Task {
-                                await model.softDelete(productID: item.id)
-                            }
-                        } label: {
-                            Label("Удалить", systemImage: "trash")
+                    if allowsManagementActions {
+                        NavigationLink(value: CatalogRoute.product(item.id)) {
+                            ProductListRow(item: item)
                         }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                Task {
+                                    await model.softDelete(productID: item.id)
+                                }
+                            } label: {
+                                Label("Удалить", systemImage: "trash")
+                            }
+                        }
+                    } else {
+                        Button {
+                            onSelect(item.product.id)
+                        } label: {
+                            ProductListRow(item: item)
+                        }
+                        .foregroundStyle(.primary)
                     }
                 }
             }
@@ -107,7 +209,7 @@ private struct ProductListView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    router.catalogPath.append(.productEditor(nil))
+                    onAdd()
                 } label: {
                     Label("Добавить продукт", systemImage: "plus")
                 }
