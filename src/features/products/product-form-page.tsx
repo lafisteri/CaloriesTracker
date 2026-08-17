@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useRef, useState } from 'react'
-import { useFieldArray, useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { useFieldArray, useForm, type DefaultValues, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { BackLink } from '@/app/layout/back-link'
@@ -17,16 +17,20 @@ import {
   type ProductFormValues,
 } from '@/features/products/product-form-schema'
 
-const defaultValues: ProductFormValues = {
+const defaultValues: DefaultValues<ProductFormValues> = {
   name: '',
   barcode: '',
   baseUnitType: 'g',
   baseAmount: 100,
-  calories: 0,
-  protein: 0,
-  fat: 0,
-  carbs: 0,
+  calories: undefined,
+  protein: undefined,
+  fat: undefined,
+  carbs: undefined,
   servingUnits: [],
+}
+
+const numericFieldOptions = {
+  setValueAs: (value: string): number | undefined => value === '' ? undefined : Number(value),
 }
 
 export function ProductFormPage() {
@@ -193,7 +197,7 @@ export function ProductFormPage() {
           <div className="form-field">
             <label htmlFor="product-base-amount">Количество</label>
             <div className="input-with-unit">
-              <input id="product-base-amount" type="number" inputMode="decimal" min="0" step="any" {...register('baseAmount', { valueAsNumber: true })} />
+              <input id="product-base-amount" type="number" inputMode="decimal" min="0" step="any" {...register('baseAmount', numericFieldOptions)} />
               <span>{formatBaseUnit(baseUnitType)}</span>
             </div>
             <FieldError message={errors.baseAmount?.message} />
@@ -203,10 +207,10 @@ export function ProductFormPage() {
         <fieldset className="form-fieldset">
           <legend>Пищевая ценность</legend>
           <div className="macro-input-grid">
-            <NumberField label="Калории" unit="ккал" error={errors.calories?.message} inputProps={register('calories', { valueAsNumber: true })} />
-            <NumberField label="Белки" unit="г" error={errors.protein?.message} inputProps={register('protein', { valueAsNumber: true })} />
-            <NumberField label="Жиры" unit="г" error={errors.fat?.message} inputProps={register('fat', { valueAsNumber: true })} />
-            <NumberField label="Углеводы" unit="г" error={errors.carbs?.message} inputProps={register('carbs', { valueAsNumber: true })} />
+            <NumberField label="Калории" unit="ккал" error={errors.calories?.message} inputProps={register('calories', numericFieldOptions)} />
+            <NumberField label="Белки" unit="г" error={errors.protein?.message} inputProps={register('protein', numericFieldOptions)} />
+            <NumberField label="Жиры" unit="г" error={errors.fat?.message} inputProps={register('fat', numericFieldOptions)} />
+            <NumberField label="Углеводы" unit="г" error={errors.carbs?.message} inputProps={register('carbs', numericFieldOptions)} />
           </div>
         </fieldset>
 

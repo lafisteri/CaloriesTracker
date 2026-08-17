@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import type { DiaryFoodSource } from '@/application/diary/diary-service'
-import { BackButton } from '@/app/layout/back-link'
 import { applicationServices } from '@/app/providers/application-services'
 
 import {
@@ -11,7 +10,8 @@ import {
   getDiaryFoodSourceType,
   getDiaryPath,
 } from './diary-add-routes'
-import { formatDiaryNumber } from './diary-formatters'
+import { DiaryAmountView } from './diary-amount-view'
+import { isPositiveDiaryAmount } from './diary-amount-utils'
 
 interface DiaryAmountNavigationState {
   diaryAddSelectionInHistory?: boolean
@@ -77,7 +77,7 @@ export function FoodAmountPage() {
   }, [resolvedSourceType, sourceId])
 
   const preview = useMemo(() => {
-    if (source === undefined || unit === '' || !isPositiveDecimal(amount)) {
+    if (source === undefined || unit === '' || !isPositiveDiaryAmount(amount)) {
       return undefined
     }
 
@@ -157,49 +157,20 @@ export function FoodAmountPage() {
   }
 
   return (
-    <section className="diary-add-page diary-add-page--with-bottom-navigation" aria-labelledby="food-amount-title">
-      <header className="diary-add-page__header">
-        <BackButton className="diary-add-page__back" onClick={returnToSelection} />
-      </header>
-      <div className="diary-add-page__scroll diary-amount-page__scroll">
-        <div className="diary-add-page__intro">
-          <h1 id="food-amount-title">{getSourceName(source)}</h1>
-        </div>
-        <div className="diary-entry-form diary-amount-page__form">
-          <NutritionPreview nutrition={preview} />
-          <div className="diary-amount-page__fields">
-            <div className="form-field">
-              <input id="diary-add-amount" aria-label="Количество" type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={(event) => setAmount(event.target.value)} />
-              {!isPositiveDecimal(amount) && amount !== '' ? <span className="field-error">Количество должно быть больше нуля.</span> : null}
-            </div>
-            <div className="form-field diary-amount-page__unit">
-              <select id="diary-add-unit" aria-label="Единица" value={unit} onChange={(event) => setUnit(event.target.value)}>
-                {applicationServices.diary.getFoodUnitOptions(source).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </div>
-            <button className="button button--primary diary-amount-page__submit" type="button" disabled={preview === undefined || isSaving} onClick={() => void addFood()}>
-              {isSaving ? 'Добавление…' : 'Добавить'}
-            </button>
-          </div>
-          {error === undefined ? null : <p className="form-submit-error" role="alert">{error}</p>}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function NutritionPreview({ nutrition }: { nutrition: { calories: number; protein: number; fat: number; carbs: number } | undefined }) {
-  if (nutrition === undefined) {
-    return <p className="nutrition-preview nutrition-preview--empty">Укажите корректное количество, чтобы увидеть КБЖУ.</p>
-  }
-
-  return (
-    <dl className="nutrition-preview">
-      <div><dt>Калории</dt><dd>{formatDiaryNumber(nutrition.calories)} ккал</dd></div>
-      <div><dt>Белки</dt><dd>{formatDiaryNumber(nutrition.protein)} г</dd></div>
-      <div><dt>Жиры</dt><dd>{formatDiaryNumber(nutrition.fat)} г</dd></div>
-      <div><dt>Углеводы</dt><dd>{formatDiaryNumber(nutrition.carbs)} г</dd></div>
-    </dl>
+    <DiaryAmountView
+      mode="create"
+      sourceName={getSourceName(source)}
+      amount={amount}
+      unit={unit}
+      unitOptions={applicationServices.diary.getFoodUnitOptions(source)}
+      nutrition={preview}
+      isSaving={isSaving}
+      error={error}
+      onAmountChange={setAmount}
+      onUnitChange={setUnit}
+      onSubmit={() => void addFood()}
+      onBack={returnToSelection}
+    />
   )
 }
 
@@ -211,12 +182,6 @@ function InvalidDiaryAddContext() {
       <Link className="button button--secondary" to="/">К дневнику</Link>
     </section>
   )
-}
-
-function isPositiveDecimal(value: string): boolean {
-  const numericAmount = Number(value)
-
-  return Number.isFinite(numericAmount) && numericAmount > 0
 }
 
 function getSourceName(source: DiaryFoodSource): string {
