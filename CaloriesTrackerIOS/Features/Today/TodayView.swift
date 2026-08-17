@@ -168,7 +168,7 @@ struct TodayRootView: View {
                         router.todayPath = []
                     }
                 }
-            case let .productEditorFromDetails(productID):
+            case let .productEditorForDiarySelection(productID, _):
                 ProductEditorView(
                     productID: productID,
                     router: router,
@@ -185,12 +185,12 @@ struct TodayRootView: View {
                 ) {
                     router.todayPath = [.catalogSelection(context)]
                 }
-            case let .productDetails(productID):
+            case let .productDetails(productID, context):
                 ProductDetailView(
                     productID: productID,
                     router: router,
                     productService: productService,
-                    presentation: .today,
+                    presentation: .diarySelection(context),
                 )
             case .recipeDetails:
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")

@@ -50,5 +50,11 @@ struct RootApplicationView: View {
             }
             .tag(AppTab.catalog)
         }
+        .onChange(of: router.selectedTab) { previousTab, selectedTab in
+            guard previousTab == .today, selectedTab != .today else {
+                return
+            }
+            router.resetTodaySelectionNavigation()
+        }
     }
 }

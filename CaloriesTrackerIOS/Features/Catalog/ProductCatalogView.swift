@@ -129,10 +129,10 @@ struct CatalogView: View {
     }
 
     private func showProductDetails(_ productID: UUID) {
-        guard case .selection = mode else {
+        guard case let .selection(context) = mode else {
             return
         }
-        router.todayPath.append(.productDetails(productID))
+        router.todayPath.append(.productDetails(productID: productID, context: context))
     }
 
     private func createProduct() {

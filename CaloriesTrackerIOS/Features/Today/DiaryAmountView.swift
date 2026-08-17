@@ -47,10 +47,10 @@ struct DiaryAmountView: View {
         .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
-            if let productID {
+            if case let .create(context, _) = model.mode, let productID {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Продукт") {
-                        router.todayPath.append(.productDetails(productID))
+                    Button("Редактировать") {
+                        router.todayPath.append(.productEditorForDiarySelection(productID: productID, context: context))
                     }
                 }
             }

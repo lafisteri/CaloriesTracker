@@ -8,6 +8,13 @@ final class AppRouter {
     var statisticsPath: [StatisticsRoute] = []
     var todayPath: [TodayRoute] = []
     var catalogPath: [CatalogRoute] = []
+
+    func resetTodaySelectionNavigation() {
+        guard todayPath.contains(where: \.isDiarySelectionRoute) else {
+            return
+        }
+        todayPath = []
+    }
 }
 
 enum StatisticsRoute: Hashable {
@@ -19,10 +26,21 @@ enum TodayRoute: Hashable {
     case amount(context: DiaryContext, source: FoodSourceReference)
     case entryEditor(UUID)
     case productEditor(context: DiaryContext?, prefilledBarcode: String?)
-    case productEditorFromDetails(UUID)
+    case productEditorForDiarySelection(productID: UUID, context: DiaryContext)
     case recipeEditor(context: DiaryContext, recipeID: UUID?)
-    case productDetails(UUID)
+    case productDetails(productID: UUID, context: DiaryContext)
     case recipeDetails(UUID)
+
+    var isDiarySelectionRoute: Bool {
+        switch self {
+        case .catalogSelection, .amount, .productEditorForDiarySelection, .recipeEditor, .productDetails, .recipeDetails:
+            true
+        case let .productEditor(context, _):
+            context != nil
+        case .entryEditor:
+            false
+        }
+    }
 }
 
 enum CatalogRoute: Hashable {

@@ -2,7 +2,7 @@ import SwiftUI
 
 enum ProductDetailPresentation: Equatable {
     case catalog
-    case today
+    case diarySelection(DiaryContext)
 }
 
 struct ProductDetailView: View {
@@ -36,7 +36,7 @@ struct ProductDetailView: View {
                         }
                     }
 
-                    if presentation == .catalog {
+                    if case .catalog = presentation {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
                                 Button("Версии", systemImage: "clock.arrow.circlepath") {
@@ -117,8 +117,8 @@ struct ProductDetailView: View {
         switch presentation {
         case .catalog:
             router.catalogPath.append(.productEditor(productID))
-        case .today:
-            router.todayPath.append(.productEditorFromDetails(productID))
+        case let .diarySelection(context):
+            router.todayPath.append(.productEditorForDiarySelection(productID: productID, context: context))
         }
     }
 }
