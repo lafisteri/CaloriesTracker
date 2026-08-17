@@ -19,6 +19,7 @@ enum TodayRoute: Hashable {
     case amount(context: DiaryContext, source: FoodSourceReference)
     case entryEditor(UUID)
     case productEditor(context: DiaryContext?, prefilledBarcode: String?)
+    case productEditorFromDetails(UUID)
     case recipeEditor(context: DiaryContext, recipeID: UUID?)
     case productDetails(UUID)
     case recipeDetails(UUID)

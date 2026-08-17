@@ -3,6 +3,8 @@
 **Status:** Current product specification
 **Last updated:** 2026-08-17
 
+**Product direction:** shared product behaviour for the web/PWA client and the native iOS client. Platform-specific implementation details belong in the corresponding architecture document.
+
 This document describes the current intended behavior of the application. If it conflicts with older phase prompts or historical planning notes, this document is the source of truth for product behavior. The current code remains the source for implementation details.
 
 ## 1. Product overview
@@ -65,6 +67,7 @@ Bottom navigation сохраняется в Diary add flow:
 
 ## 4. Today and diary
 
+
 В нижней навигации **«Сегодня»** означает дневник, а не статистику.
 
 Обычный переход на `/` открывает текущую локальную дату. Diary date deep links поддерживаются через `/?date=YYYY-MM-DD`; внутри дневника можно перейти на прошлую или будущую дату и вернуться к сегодняшней.
@@ -78,55 +81,113 @@ Bottom navigation сохраняется в Diary add flow:
 - записи дневника;
 - действие **«Добавить»** для каждого meal type.
 
-Сводка не является большой hero-card. Meal cards используют одинаковый compact padding со всех четырёх сторон, а между соседними DiaryEntry нет divider. Пустые секции приёмов пищи остаются компактными и содержат действие добавления; отдельной глобальной empty-state плашки для пустого дня нет.
+Сводка не является большой hero-card. Meal cards используют одинаковый compact padding со всех четырёх сторон, а между соседними DiaryEntry нет divider. Пустые секции приёмов пищи остаются компактными, содержат действие добавления и не показывают технические drop-placeholder тексты вроде **«Перетащите запись сюда»**. Отдельной глобальной empty-state плашки для пустого дня нет.
 
-Короткий tap по DiaryEntry открывает её редактирование. Запись можно удалить или изменить её организацию прямо в Diary:
+Каждая DiaryEntry в meal card показывает только:
 
 ```text
-swipe справа налево → открыть «Удалить» → tap «Удалить»
-long press → перетащить → изменить порядок или meal
+source name
+amount + unit
+calories
 ```
 
-Swipe сам по себе не удаляет запись и не показывает browser confirmation. Удаляется только конкретная DiaryEntry; Product, Recipe и их versions сохраняются. Meal и day totals обновляются, а удаление сохраняется локально.
+Белки, жиры и углеводы не дублируются в каждой строке; они остаются в дневной сводке, статистике и сохранённом nutrition snapshot.
 
-Long press позволяет менять порядок entries внутри meal или переносить запись в другой meal того же дня, включая пустой meal. Пользовательский порядок хранится в `DiaryEntry.sortOrder` и сохраняется после reload. При переносе меняются только `mealType` и `sortOrder`: `date`, source/version reference, amount, unit и nutrition snapshots не изменяются. Внутри Diary жесты различаются так:
+Interaction contract для DiaryEntry:
+
+```text
+tap                  → открыть Amount/Edit текущей DiaryEntry
+swipe справа налево  → открыть red trash action
+long press + drag    → reorder / move
+vertical swipe       → scroll
+```
+
+### Tap
+
+Короткий tap открывает общий Amount/Edit UI для существующей DiaryEntry. В edit mode пользователь может менять только amount и unit. Используются фактические сохранённые `entry.amount`, `entry.unit` и `entry.sourceVersionId`; default create-значение не подставляется. Исторический пересчёт выполняется только через сохранённый `sourceVersionId`.
+
+### Swipe delete
+
+Swipe справа налево раскрывает только destructive action с красным фоном и иконкой корзины. Visible text **«Удалить»** не нужен; accessibility label сохраняется.
+
+Swipe сам по себе не удаляет запись и никогда не открывает Product, Recipe, Amount/Add flow или другой экран. После достаточного swipe пользователь отпускает палец, destructive action остаётся доступным. Затем:
+
+```text
+tap trash     → soft delete конкретной DiaryEntry
+tap elsewhere → закрыть swipe action
+```
+
+Одновременно открыта максимум одна destructive action. Удаление не показывает browser confirmation и не затрагивает Product, Recipe или их versions. Meal/day totals обновляются, а удаление сохраняется локально.
+
+### Drag & Drop
+
+Long press начинает прямой drag & drop без `Edit` mode, без drag handles и без меню **«Переместить в»**.
+
+Пользователь может:
+
+- изменить порядок entries внутри текущего meal;
+- перенести entry в другой meal того же дня;
+- перенести entry в пустой meal;
+- выбрать конкретную insertion position.
+
+Во время реального drag пользователь не должен видеть две полноценные копии одной записи. Простое касание не активирует drag state и не скрывает row.
+
+Пользовательский порядок хранится в `DiaryEntry.sortOrder` и сохраняется после reload. При reorder меняются только `sortOrder` и `updatedAt`. При переносе между meals меняются только `mealType`, `sortOrder` и `updatedAt`: `date`, source/version reference, source-name snapshot, amount, unit и nutrition snapshots не изменяются.
+
+Конкретный SwiftUI container или gesture implementation не является product requirement. Требование продукта — надёжное разделение жестов на physical iPhone:
 
 ```text
 tap             → edit DiaryEntry
-swipe left      → открыть Delete
+swipe left      → reveal trash
+long press+drag → reorder / move
 vertical swipe  → scroll
-long press      → reorder
 ```
 
 ## 5. Food selection and amount flow
+
 
 Основной flow добавления еды:
 
 ```text
 Diary
 → Добавить
-→ Products selection
+→ Catalog selection mode
 → выбрать Product или Recipe
 → Amount / Unit
 → Добавить
 → Diary
 ```
 
-Контекст даты и приёма пищи передаётся в URL. После успешного добавления пользователь возвращается прямо в соответствующий дневник; completed Amount screen не должен появляться при обычном возврате назад.
+Контекст даты и приёма пищи сохраняется на всём flow. После успешного добавления пользователь возвращается прямо в соответствующий дневник; completed Amount screen не должен появляться при обычном возврате назад.
 
-### Food Selection
+### Shared Catalog: management и selection
 
-Это единый экран выбора продуктов и рецептов без page title **«Продукты»**. Header содержит только back navigation; дата и выбранный meal type остаются routing/data context.
+Food Selection не является отдельным урезанным списком. Используется тот же полноценный Catalog UI, что и в табе **«Продукты»**, но с другим tap behaviour.
 
-Верхняя последовательность экрана:
+Catalog поддерживает два контекста:
 
 ```text
-< < <
-[ Сканировать ] [ Добавить ]
-Поиск продукта или блюда...
+management
+→ tap Product/Recipe → details
+
+diarySelection(DiaryContext)
+→ tap Product/Recipe → Amount
 ```
 
-`Добавить` открывает создание нового Product и сохраняет исходный Diary context. Search одновременно находит Products и Recipes, обновляет результаты без отдельной кнопки и имеет clear action. Секция **«Недавние»** в текущем UI не отображается.
+В обоих контекстах сохраняются:
+
+```text
+[ Сканировать ] [ Добавить / Создать рецепт ]
+[ Продукты ] [ Рецепты ]
+Search
+Content
+```
+
+До реализации native scanner action **«Сканировать»** может отсутствовать; fake/non-working scanner не показывается.
+
+В `diarySelection` пользователь видит те же Products/Recipes, tabs, search и creation flows, что и в management Catalog. Создание Product или Recipe из selection mode сохраняет исходный Diary context и возвращает пользователя в тот же selection flow, а не в root Catalog tab.
+
+Search обновляет результаты без отдельной кнопки, работает по Products и Recipes и имеет clear action. Soft-deleted sources не показываются.
 
 При пустой базе показывается:
 
@@ -139,7 +200,7 @@ Diary
 
 ### Amount and units
 
-Экран Amount для продуктов и рецептов показывает back navigation, название источника, live preview КБЖУ и CTA **«Добавить»**. Отдельный subtitle о meal type не показывается.
+Экран Amount для продуктов и рецептов показывает back navigation, название источника, всегда видимый live preview КБЖУ и CTA. Отдельный subtitle о meal type не показывается.
 
 Последовательность экрана:
 
@@ -147,12 +208,42 @@ Diary
 < < <
 source/product info
 nutrition preview
-[ amount ] [ unit ] [ Добавить ]
+[ amount ] [ unit ] [ Добавить / Сохранить ]
 ```
 
-Amount, unit и CTA находятся в одной compact horizontal row; visible labels для amount и unit не показываются. Input и select используют согласованный compact visual style. Количество поддерживает целые и десятичные значения с подходящей numeric keyboard. При открытии Amount screen input не получает focus и его значение не выделяется автоматически: keyboard открывается после user tap. Preview и сохраняемая DiaryEntry используют один расчётный путь.
+Amount, unit и CTA находятся в одной compact horizontal row; visible labels для amount и unit не показываются.
 
-Create и edit DiaryEntry используют общий Amount UI concept. Create завершает действие CTA **«Добавить»**, edit — **«Сохранить»**. На `/entries/:entryId` пользователь может изменить только amount и unit: meal type и date сохраняются, а отдельного delete action нет. Удаление остаётся действием Diary swipe-to-delete.
+#### Create DiaryEntry
+
+Для новой DiaryEntry:
+
+- amount по умолчанию равен `100`;
+- amount input получает initial focus;
+- текст `100` полностью выделен;
+- numeric keyboard открыт сразу;
+- пользователь может сразу ввести новое значение, не получая `100250`;
+- отдельная custom/system keyboard toolbar button **«Готово»** не показывается;
+- КБЖУ preview отображается сразу и не заменяется текстом **«Введите количество, чтобы увидеть КБЖУ»**.
+
+Во время временно невалидного ввода nutrition section остаётся на месте. UI может показать zero/last valid preview согласно реализации, но секция КБЖУ не исчезает.
+
+Для discrete serving/piece sources implementation может использовать более разумный default, если `100` нарушает фактическую unit semantics; такое исключение должно быть осознанным и единообразным.
+
+#### Edit DiaryEntry
+
+Create и edit используют общий Amount UI concept. Create завершает действие CTA **«Добавить»**, edit — **«Сохранить»**.
+
+При edit существующей DiaryEntry:
+
+- открывается фактический сохранённый amount, а не default `100`;
+- можно изменить только amount и unit;
+- meal type и date сохраняются;
+- calculation/preview используют сохранённый `sourceVersionId`, а не current source version;
+- отдельного delete action на Amount/Edit screen нет.
+
+Удаление остаётся действием Diary swipe-to-delete.
+
+Preview и сохраняемая DiaryEntry используют один расчётный путь.
 
 ## 6. Products
 
@@ -167,7 +258,7 @@ Create и edit DiaryEntry используют общий Amount UI concept. Cre
 - базовая пищевая ценность;
 - история версий.
 
-Products и Recipes доступны как отдельные вкладки management catalog на `/products`. Management mode не смешивается с Food Selection mode.
+Products и Recipes доступны как отдельные вкладки общего Catalog на `/products`. Один и тот же Catalog UI используется в management и Diary selection contexts; различается tap/navigation behaviour, а Diary context сохраняется отдельно.
 
 На вкладке Products порядок действий:
 
@@ -394,7 +485,8 @@ Intended deployment model — static Vite PWA, размещённое по HTTPS
 - Ошибки формулируются человеческим языком и не показывают технические исключения пользователю.
 - Do not use native browser alert/confirm/prompt dialogs in product UX.
 - Если primary creation action уже находится в quick-action area, empty state содержит только title и короткое объяснение без повторной CTA.
-- Food Selection начинается с back navigation и quick actions; Products management начинается с quick actions, затем tabs, Search и content.
+- Diary selection использует тот же Catalog UI, что management mode, сохраняя DiaryContext и selection-specific tap behaviour.
+- Destructive swipe actions по всему приложению используют красную action с trash icon без visible text «Удалить»; accessibility label сохраняется.
 - Daily workflow остаётся компактным: без oversized inputs, redundant subtitles, repeated CTA и unnecessary empty-state cards.
 
 ## 15. Out of scope

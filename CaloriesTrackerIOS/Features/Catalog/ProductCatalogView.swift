@@ -32,7 +32,17 @@ struct ProductCatalogRootView: View {
                 case let .product(id):
                     ProductDetailView(productID: id, router: router, productService: productService)
                 case let .productEditor(id):
-                    ProductEditorView(productID: id, router: router, productService: productService)
+                    if let id {
+                        ProductEditorView(
+                            productID: id,
+                            router: router,
+                            productService: productService,
+                        ) {
+                            router.catalogPath.removeLast()
+                        }
+                    } else {
+                        ProductEditorView(productID: nil, router: router, productService: productService)
+                    }
                 case let .productVersionHistory(id):
                     ProductVersionHistoryView(productID: id, productService: productService)
                 case let .recipe(id):
@@ -75,6 +85,7 @@ struct CatalogView: View {
                 ProductListView(
                     productService: productService,
                     onSelect: selectProduct,
+                    onShowDetails: showProductDetails,
                     onAdd: createProduct,
                     allowsManagementActions: mode.allowsManagementActions,
                 )
@@ -117,6 +128,13 @@ struct CatalogView: View {
         }
     }
 
+    private func showProductDetails(_ productID: UUID) {
+        guard case .selection = mode else {
+            return
+        }
+        router.todayPath.append(.productDetails(productID))
+    }
+
     private func createProduct() {
         switch mode {
         case .management:
@@ -138,6 +156,7 @@ struct CatalogView: View {
 
 private struct ProductListView: View {
     let onSelect: (UUID) -> Void
+    let onShowDetails: (UUID) -> Void
     let onAdd: () -> Void
     let allowsManagementActions: Bool
 
@@ -147,10 +166,12 @@ private struct ProductListView: View {
     init(
         productService: ProductService,
         onSelect: @escaping (UUID) -> Void,
+        onShowDetails: @escaping (UUID) -> Void,
         onAdd: @escaping () -> Void,
         allowsManagementActions: Bool,
     ) {
         self.onSelect = onSelect
+        self.onShowDetails = onShowDetails
         self.onAdd = onAdd
         self.allowsManagementActions = allowsManagementActions
         _model = State(initialValue: ProductListViewModel(productService: productService))
@@ -184,16 +205,31 @@ private struct ProductListView: View {
                                     await model.softDelete(productID: item.id)
                                 }
                             } label: {
-                                Label("Удалить", systemImage: "trash")
+                                Image(systemName: "trash")
                             }
+                            .accessibilityLabel("Удалить")
                         }
                     } else {
-                        Button {
-                            onSelect(item.product.id)
-                        } label: {
-                            ProductListRow(item: item)
+                        HStack(spacing: 12) {
+                            Button {
+                                onSelect(item.product.id)
+                            } label: {
+                                ProductListRow(item: item)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.primary)
+                            .contentShape(Rectangle())
+
+                            Button {
+                                onShowDetails(item.product.id)
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.title3)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Открыть продукт")
                         }
-                        .foregroundStyle(.primary)
                     }
                 }
             }

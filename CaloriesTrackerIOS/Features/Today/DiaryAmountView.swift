@@ -46,6 +46,15 @@ struct DiaryAmountView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
+        .toolbar {
+            if let productID {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Продукт") {
+                        router.todayPath.append(.productDetails(productID))
+                    }
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if let source = model.source {
                 HStack(spacing: 10) {
@@ -123,5 +132,14 @@ struct DiaryAmountView: View {
         case .recipeServing:
             "порция"
         }
+    }
+
+    private var productID: UUID? {
+        guard let source = model.source,
+              case let .product(version) = source.calculationSource
+        else {
+            return nil
+        }
+        return version.productID
     }
 }

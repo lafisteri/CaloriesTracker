@@ -1,7 +1,7 @@
 # Native iOS architecture and data design
 
-**Status:** Phase iOS 0 design only  
-**Scope:** a separate Swift / SwiftUI client for the existing product; no Xcode project, screens, sync implementation, or web changes are part of this document.
+**Status:** Current native iOS architecture  
+**Scope:** architecture and intended native implementation constraints for the Swift / SwiftUI client. `PRODUCT_SPEC.md` remains the authority for user-visible product behaviour. The code is the source of truth for concrete implementation details.
 
 `PRODUCT_SPEC.md` is the authority for intended product behaviour. The existing React/Dexie application is the reference for rules, stored fields, and currently implemented behaviour.
 
@@ -151,10 +151,9 @@ CaloriesTrackerIOS/                         # future separate Xcode project root
   Features/
     Today/
       TodayViewModel.swift
-      FoodSelectionViewModel.swift
       AmountViewModel.swift
     Statistics/
-    Catalog/                                # Products and Recipes management mode
+    Catalog/                                # shared Products/Recipes UI: management + Diary selection modes
     Goals/
     Barcode/
 
@@ -164,7 +163,17 @@ CaloriesTrackerIOS/                         # future separate Xcode project root
     Validation/
 ```
 
-`Catalog` is one feature for the management tab while Products and Recipes remain separate domain and service concerns. The diary food-selection flow remains under `Today`; it must not accidentally inherit management-mode navigation or filters.
+`Catalog` is one shared UI feature while Products and Recipes remain separate domain and service concerns. The same Catalog UI supports two explicit contexts:
+
+```text
+management
+→ tap Product/Recipe → details
+
+diarySelection(DiaryContext)
+→ tap Product/Recipe → Amount
+```
+
+The selection context carries `DiaryContext` through search, Product/Recipe tab switching and creation flows. Shared UI does not mean shared navigation semantics: the mode is explicit and typed.
 
 ## Navigation
 
@@ -223,7 +232,7 @@ enum CatalogRoute: Hashable {
 The Today flow is therefore:
 
 ```text
-Today(day) → Food selection(context) → Amount(context, product/recipe)
+Today(day) → Catalog(selection: context) → Amount(context, product/recipe)
            → DiaryService.add… → replace path with Today(day)
 ```
 
@@ -235,7 +244,27 @@ External deep links are deferred. If introduced later, they map at the App bound
 
 ### Native UI principles
 
-Use natural iOS components while preserving behaviour: `TabView`, `NavigationStack`, `List` for catalog and diary data, `Form` for editors, `TextField` with `.decimalPad`, `Picker` for units, `Toolbar`, and `swipeActions` for the explicit destructive Diary delete action. A long-press reorder/move interaction must preserve `sortOrder` and only change meal/order. Native sheets/full-screen covers are appropriate for focused scanner and recipe-editor flows, not the core food logging flow.
+
+Use natural iOS components while preserving behaviour: `TabView`, `NavigationStack`, `List` where it provides reliable native row interactions, `Form` for editors, `TextField` with `.decimalPad`, `Picker` for units, `Toolbar`, and native `swipeActions` where the chosen container supports them.
+
+Do **not** make a specific Today container (`List`, `ScrollView`, `LazyVStack`, etc.) an architectural invariant. The container is an implementation detail. The Today implementation must be chosen by actual runtime reliability on a physical iPhone and must support the complete interaction contract:
+
+```text
+tap             → edit DiaryEntry
+swipe left      → reveal destructive trash action
+vertical swipe  → scroll
+long press+drag → reorder within meal / move between meals
+```
+
+The destructive swipe action must not navigate. After a successful reveal it remains actionable until the user taps trash or dismisses it by interacting elsewhere. Visible delete text is not required; retain an accessibility label.
+
+Direct drag & drop must not require `EditButton`, edit mode, drag handles or a **«Переместить в»** menu. It must support reorder, cross-meal move, insertion position and empty-meal drop while preserving historical fields. A simple touch must not activate drag state, and an active drag must not render a second full visible copy of the row.
+
+Diary rows are intentionally compact and display only source name, amount/unit and calories. Protein/fat/carbs remain in the snapshot and aggregate UI but are not repeated in each row. Empty meals remain compact and must not expose technical drop-placeholder text.
+
+The shared Catalog UI has explicit `management` and `diarySelection(DiaryContext)` modes. Management tap opens details; selection tap opens Amount. Creation inside selection mode preserves the Diary context.
+
+For a new DiaryEntry Amount flow, the intended UX is immediate entry: default amount `100`, initial focus, selected text and an already-open numeric keyboard, with no custom keyboard **«Готово»** button. Nutrition preview remains visible at all times. Editing an existing DiaryEntry uses its saved amount and historic `sourceVersionID`.
 
 Touch targets, keyboard avoidance, safe-area-aware primary actions, concise contextual titles, and human-readable validation errors are product requirements. The app should not reproduce web layout or browser controls pixel-for-pixel.
 
@@ -364,6 +393,21 @@ struct MoveDiaryEntryCommand: Sendable {
 ```
 
 There is no general DiaryEntry update command. In particular, amount editing loads exactly `entry.sourceVersionID`, resolves its unit there, recalculates its snapshot from that historic version, and preserves `localDay`, `mealType`, source IDs, source name, and sort order. Moving preserves source, amount, unit, and snapshot; it changes only `mealType`, `sortOrder`, and `updatedAt`.
+
+The Today UI maps gestures to these narrow commands rather than introducing a general mutable-entry API:
+
+```text
+tap
+→ UpdateDiaryEntryAmountCommand flow
+
+swipe trash
+→ soft delete
+
+long press + drop
+→ MoveDiaryEntryCommand
+```
+
+Reorder inside the same meal is the same move command with the existing `mealType` and a new `targetIndex`.
 
 ### Goals and statistics
 
@@ -646,13 +690,14 @@ This mapping preserves a future import path. Web timestamps are ISO-8601 strings
 
 ## Native Implementation Roadmap
 
-Each phase is intentionally small enough for one focused prompt and commit. The order protects the immutable model before UI expands.
+
+The original phase order has largely been completed. Keep future work separated from parity/UI work.
 
 ### Validation workflow
 
 Automated test infrastructure is not a native rewrite requirement. Do not create XCTest/UI-test targets, an automated regression suite, or fixtures solely for validation unless a future task explicitly requests them.
 
-For every implemented phase, validate with:
+For every implemented change, validate with:
 
 ```text
 Swift compiler
@@ -661,32 +706,33 @@ Swift compiler
 → physical iPhone check where relevant
 ```
 
-The manual scenario checks include the applicable historical-integrity rules above. When actual SwiftData migrations are introduced, use careful manual migration validation with representative existing data.
+Do not launch Simulator as part of the normal Codex workflow; a generic simulator destination may be used only as an `xcodebuild` compile destination.
 
-1. **Phase iOS 1 — project and persistence foundation.** Create the separate iOS project, `SchemaV1`, model container, domain primitives (`LocalDay`, `Nutrition`, enums), record/domain mapping, and migration-plan skeleton. No product UI yet.
-2. **Phase iOS 2 — product data and catalog.** Implement product/serving-unit persistence, repository, service, native Products catalog/detail/create/edit, soft delete, barcode manual lookup seam, and product-version history. Do not expose serving-unit editing yet.
-3. **Phase iOS 3 — diary core.** Implement diary persistence/service, Today default tab, local-day navigation, meal sections/totals, add-product amount flow, historic amount edit, explicit swipe delete, and stable order/reorder/move behaviour.
-4. **Phase iOS 4 — goals and statistics.** Implement weekly-goal child records, Statistics tab, historical goal selection, weekly bars/balance and macro-energy calculations. Goals are reachable only from Statistics.
-5. **Phase iOS 5 — recipes.** Implement recipe records/ingredients/calculator, recipe management/detail/editor, pinned product versions, historical recipe versions, and add-recipe to the Diary flow.
-6. **Phase iOS 6 — barcode scanner and polish.** Add the isolated VisionKit/AVFoundation wrapper, scanner contexts for catalog and diary, unknown-barcode product creation return flow, accessibility, offline/error-state polish, and parity review.
-7. **Phase iOS 7 — migration/import readiness (only after product approval).** Carefully manually validate actual SwiftData migrations and design/implement a user-consented web-data transfer route. This is not automatic in v1.
-8. **Phase iOS 8 — optional Supabase sync (only after product approval).** Add authentication, server schema/RLS/RPCs, outbox/inbox, conflict UX, and manual multi-device conflict scenarios. Sync remains separate from parity work.
+### Current implementation status
 
-### PRODUCT_SPEC parity checklist
+1. **Foundation — implemented.** SwiftUI project, SwiftData `SchemaV1`, model container, domain primitives, mappings, repositories, typed tab/navigation foundation.
+2. **Products — implemented.** Catalog, create/edit/details, soft delete, barcode string semantics, immutable ProductVersion history.
+3. **Diary — implemented, UI interaction polish ongoing.** Today, local-day navigation, meals/totals, Product/Recipe Amount flow, historic edit, soft delete, ordering and move/reorder semantics. The desired tap/swipe/DnD interaction contract is defined by `PRODUCT_SPEC.md`.
+4. **Recipes — implemented.** Recipe records/ingredients/calculator, versioning, pinned ProductVersions, management UI and Diary integration.
+5. **Goals and Statistics — implemented.** Historical weekly goals, Today goal resolution, weekly calories/balance and macro-energy statistics.
+6. **Barcode scanner — next native feature.** Add the isolated VisionKit/AVFoundation wrapper, scanner contexts for catalog and diary, unknown-barcode Product creation return flow, accessibility and offline/error-state polish.
+7. **Parity/UI audit — after scanner.** Verify the native client as one product on a physical iPhone, including gestures, keyboard flows, historical integrity and persistence.
+8. **Migration/import readiness — only after product approval.** Carefully validate actual SwiftData migrations and design/implement a user-consented web-data transfer route.
+9. **Optional Supabase sync — only after product approval.** Add authentication, server schema/RLS/RPCs, outbox/inbox, conflict UX and manual multi-device conflict scenarios. Sync remains separate from parity work.
 
-- [ ] Today is the default tab and shows a local-day diary, four meals, totals, date navigation, add actions, explicit delete, and persistent order.
-- [ ] Food selection searches Products and Recipes together and retains date/meal context.
-- [ ] Amount preview and save share one calculator path; historic edit resolves saved source version only.
-- [ ] Products support create/search/details/edit/soft delete/barcode/current version/version history.
-- [ ] Historical serving units are retained even without first-phase creation UI.
-- [ ] Recipes are versioned and pin concrete ProductVersions.
-- [ ] Goals are immutable, weekly, and effective for the selected historical day.
-- [ ] Statistics derives data from diary snapshots and historic goals; current-week future days are excluded.
-- [ ] Barcode is local-only and preserves leading zeroes.
-- [ ] All ordinary local scenarios work offline after installation.
-- [ ] No version or diary history changes silently after an edit, delete, or future sync.
+### Target PRODUCT_SPEC parity checklist
 
-Backup/import, Supabase sync, AI, weight/water/exercise, notifications, HealthKit, widgets, Watch, sharing, subscriptions, and App Store work are not native-v1 parity work.
+- [x] Today is the default tab and uses local civil days, four meals, totals and persistent ordering.
+- [x] Products support create/search/details/edit/soft delete/barcode/current version/version history.
+- [x] Recipes are versioned and pin concrete ProductVersions.
+- [x] Goals are immutable, weekly and selected historically.
+- [x] Statistics derives data from Diary snapshots and historical goals.
+- [ ] Today interaction polish matches the final tap/swipe/DnD contract on physical iPhone.
+- [ ] Native barcode scanner and scanner return flows.
+- [ ] Final whole-app parity/accessibility/offline audit.
+- [ ] Optional migration/import and Supabase sync only after explicit approval.
+
+Backup/import, Supabase sync, AI, weight/water/exercise, notifications, HealthKit, widgets, Watch, sharing, subscriptions, and App Store work are not native-v1 parity work unless separately approved.
 
 ## Risks / Decisions
 
@@ -712,6 +758,8 @@ Backup/import, Supabase sync, AI, weight/water/exercise, notifications, HealthKi
 - **ADR-011 — Navigation:** Today is the default selected tab; all tabs own a `NavigationStack`; Goals is a Statistics destination; internal navigation is typed rather than URL-based.
 - **ADR-012 — Sync readiness:** cloud records are user-owned UUID records with timestamps/tombstones where mutable; sync status remains local metadata, and Supabase/auth are deferred.
 - **ADR-013 — Calculations:** nutrition, unit conversion, recipe totals, goal lookup, and statistics are domain/application logic, not SwiftUI logic.
+- **ADR-014 — Shared Catalog UI:** Products/Recipes Catalog is shared between management and Diary selection through an explicit typed mode; DiaryContext is preserved without duplicating catalog UI.
+- **ADR-015 — Today interactions:** the required contract is tap → edit, swipe left → destructive trash action, long press+drag → reorder/move. The concrete SwiftUI container is not an architectural invariant and is chosen by physical-iPhone reliability.
 
 ## Open Decisions
 

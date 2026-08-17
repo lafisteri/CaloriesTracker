@@ -1,14 +1,26 @@
 import SwiftUI
 
+enum ProductDetailPresentation: Equatable {
+    case catalog
+    case today
+}
+
 struct ProductDetailView: View {
     let productID: UUID
     let router: AppRouter
+    let presentation: ProductDetailPresentation
 
     @State private var model: ProductDetailViewModel
 
-    init(productID: UUID, router: AppRouter, productService: ProductService) {
+    init(
+        productID: UUID,
+        router: AppRouter,
+        productService: ProductService,
+        presentation: ProductDetailPresentation = .catalog,
+    ) {
         self.productID = productID
         self.router = router
+        self.presentation = presentation
         _model = State(initialValue: ProductDetailViewModel(productID: productID, productService: productService))
     }
 
@@ -20,31 +32,35 @@ struct ProductDetailView: View {
                 if model.details != nil {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Редактировать") {
-                            router.catalogPath.append(.productEditor(productID))
+                            openEditor()
                         }
                     }
 
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button("Версии", systemImage: "clock.arrow.circlepath") {
-                                router.catalogPath.append(.productVersionHistory(productID))
-                            }
-                            Divider()
-                            Button("Удалить", systemImage: "trash", role: .destructive) {
-                                Task {
-                                    if await model.softDelete() {
-                                        router.catalogPath = []
+                    if presentation == .catalog {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Menu {
+                                Button("Версии", systemImage: "clock.arrow.circlepath") {
+                                    router.catalogPath.append(.productVersionHistory(productID))
+                                }
+                                Divider()
+                                Button("Удалить", systemImage: "trash", role: .destructive) {
+                                    Task {
+                                        if await model.softDelete() {
+                                            router.catalogPath = []
+                                        }
                                     }
                                 }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
                             }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
                         }
                     }
                 }
             }
-            .task {
-                await model.load()
+            .onAppear {
+                Task {
+                    await model.load()
+                }
             }
     }
 
@@ -94,6 +110,15 @@ struct ProductDetailView: View {
                 systemImage: "shippingbox",
                 description: model.errorMessage.map(Text.init),
             )
+        }
+    }
+
+    private func openEditor() {
+        switch presentation {
+        case .catalog:
+            router.catalogPath.append(.productEditor(productID))
+        case .today:
+            router.todayPath.append(.productEditorFromDetails(productID))
         }
     }
 }

@@ -48,8 +48,9 @@ struct RecipeListView: View {
                                     await model.softDelete(recipeID: item.id)
                                 }
                             } label: {
-                                Label("Удалить", systemImage: "trash")
+                                Image(systemName: "trash")
                             }
+                            .accessibilityLabel("Удалить")
                         }
                     } else {
                         Button {

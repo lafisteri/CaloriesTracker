@@ -65,7 +65,7 @@ struct TodayRootView: View {
                                     }
                                 },
                             )
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                             .listRowSeparator(.hidden)
                         }
                         .dropDestination(for: String.self) { identifiers, displayedTargetIndex in
@@ -168,6 +168,14 @@ struct TodayRootView: View {
                         router.todayPath = []
                     }
                 }
+            case let .productEditorFromDetails(productID):
+                ProductEditorView(
+                    productID: productID,
+                    router: router,
+                    productService: productService,
+                ) {
+                    router.todayPath.removeLast()
+                }
             case let .recipeEditor(context, recipeID):
                 RecipeEditorView(
                     recipeID: recipeID,
@@ -177,7 +185,14 @@ struct TodayRootView: View {
                 ) {
                     router.todayPath = [.catalogSelection(context)]
                 }
-            case .productDetails, .recipeDetails:
+            case let .productDetails(productID):
+                ProductDetailView(
+                    productID: productID,
+                    router: router,
+                    productService: productService,
+                    presentation: .today,
+                )
+            case .recipeDetails:
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")
             }
         }
@@ -344,7 +359,7 @@ private struct DiaryEntryRow: View {
     let entry: DiaryEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(entry.sourceName)
                 .font(.body.weight(.medium))
 
@@ -356,7 +371,6 @@ private struct DiaryEntryRow: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
     }
 }
 
