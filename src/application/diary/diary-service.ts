@@ -257,11 +257,13 @@ export class DiaryService {
     }
 
     const nutrition = calculateSnapshot(sourceVersion, draft.amount, draft.unit)
+    const sortOrder = await this.getNextSortOrder(draft.date, draft.mealType)
     const now = new Date().toISOString()
     const entry: DiaryEntry = {
       id: createUuid(),
       date: draft.date,
       mealType: draft.mealType,
+      sortOrder,
       sourceType: 'product',
       sourceId: product.id,
       sourceVersionId: sourceVersion.id,
@@ -295,11 +297,13 @@ export class DiaryService {
     }
 
     const nutrition = calculateRecipeSnapshot(sourceVersion, draft.amount, draft.unit)
+    const sortOrder = await this.getNextSortOrder(draft.date, draft.mealType)
     const now = new Date().toISOString()
     const entry: DiaryEntry = {
       id: createUuid(),
       date: draft.date,
       mealType: draft.mealType,
+      sortOrder,
       sourceType: 'recipe',
       sourceId: recipe.id,
       sourceVersionId: sourceVersion.id,
@@ -352,6 +356,48 @@ export class DiaryService {
     await this.diaryRepository.softDeleteEntry(id, new Date().toISOString())
   }
 
+  /** Moves an entry within the current day and normalizes affected meal positions. */
+  async moveEntry(id: string, targetMealType: MealType, targetIndex: number): Promise<void> {
+    assertMealType(targetMealType)
+
+    if (!Number.isInteger(targetIndex) || targetIndex < 0) {
+      throw new Error('Diary target index must be a non-negative integer.')
+    }
+
+    const entry = await this.diaryRepository.getEntryById(id)
+
+    if (entry === undefined || entry.deletedAt !== undefined) {
+      throw new DiaryEntryNotFoundError()
+    }
+
+    const entries = await this.diaryRepository.getEntriesByDate(entry.date)
+    const sourceEntries = getMealEntries(entries, entry.mealType)
+    const targetEntries = entry.mealType === targetMealType ? sourceEntries : getMealEntries(entries, targetMealType)
+    const sourceIndex = sourceEntries.findIndex((candidate) => candidate.id === entry.id)
+
+    if (sourceIndex === -1) {
+      throw new DiaryEntryNotFoundError()
+    }
+
+    const withoutEntry = sourceEntries.filter((candidate) => candidate.id !== entry.id)
+    const targetWithoutEntry = entry.mealType === targetMealType
+      ? withoutEntry
+      : targetEntries
+    const insertionIndex = Math.min(targetIndex, targetWithoutEntry.length)
+    const reorderedTargetEntries = [...targetWithoutEntry]
+    reorderedTargetEntries.splice(insertionIndex, 0, entry)
+    const updatedAt = new Date().toISOString()
+
+    const entriesToUpdate = entry.mealType === targetMealType
+      ? normalizeMealEntries(reorderedTargetEntries, targetMealType, updatedAt)
+      : [
+          ...normalizeMealEntries(withoutEntry, entry.mealType, updatedAt),
+          ...normalizeMealEntries(reorderedTargetEntries, targetMealType, updatedAt),
+        ]
+
+    await this.diaryRepository.updateEntries(entriesToUpdate)
+  }
+
   private async resolveCurrentProducts(products: Product[]): Promise<DiaryProduct[]> {
     const productResults = await Promise.all(products.map(async (product) => {
       const currentVersion = await this.productRepository.getVersionById(product.currentVersionId)
@@ -389,6 +435,13 @@ export class DiaryService {
     } catch {
       return entry.unit
     }
+  }
+
+  private async getNextSortOrder(date: string, mealType: MealType): Promise<number> {
+    const entries = await this.diaryRepository.getEntriesByDate(date)
+    const lastEntry = getMealEntries(entries, mealType).at(-1)
+
+    return lastEntry === undefined ? 0 : lastEntry.sortOrder + 100
   }
 }
 
@@ -492,6 +545,32 @@ function getEntryNutritionSnapshot(entry: DiaryEntry): Nutrition {
     fat: entry.fat,
     carbs: entry.carbs,
   }
+}
+
+function getMealEntries(entries: DiaryEntry[], mealType: MealType): DiaryEntry[] {
+  return entries
+    .filter((entry) => entry.mealType === mealType)
+    .sort(compareDiaryEntries)
+}
+
+function normalizeMealEntries(entries: DiaryEntry[], mealType: MealType, updatedAt: string): DiaryEntry[] {
+  return entries.map((entry, index) => ({
+    ...entry,
+    mealType,
+    sortOrder: index * 100,
+    updatedAt,
+  }))
+}
+
+function compareDiaryEntries(left: DiaryEntry, right: DiaryEntry): number {
+  const sortOrderDifference = left.sortOrder - right.sortOrder
+
+  if (Number.isFinite(sortOrderDifference) && sortOrderDifference !== 0) {
+    return sortOrderDifference
+  }
+
+  const createdAtDifference = left.createdAt.localeCompare(right.createdAt)
+  return createdAtDifference !== 0 ? createdAtDifference : left.id.localeCompare(right.id)
 }
 
 function createEmptyNutrition(): Nutrition {

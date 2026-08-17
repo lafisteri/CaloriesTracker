@@ -74,6 +74,15 @@ export function ProductsPage() {
 
   return (
     <section className="products-page" aria-label="Каталог продуктов и рецептов">
+      <div className={catalogTab === 'products' ? 'quick-actions' : 'quick-actions quick-actions--single'}>
+        {catalogTab === 'products' ? (
+          <>
+            <Link className="button button--secondary" to="/products/scan" state={{ scannerInHistory: true }}>Сканировать</Link>
+            <Link className="button button--primary" to="/products/new">Добавить</Link>
+          </>
+        ) : <Link className="button button--primary" to="/recipes/new">Создать рецепт</Link>}
+      </div>
+
       <div className="catalog-tabs" role="tablist" aria-label="Каталог">
         <button
           className={catalogTab === 'products' ? 'catalog-tabs__tab catalog-tabs__tab--active' : 'catalog-tabs__tab'}
@@ -97,15 +106,6 @@ export function ProductsPage() {
         >
           Рецепты
         </button>
-      </div>
-
-      <div className={catalogTab === 'products' ? 'quick-actions' : 'quick-actions quick-actions--single'}>
-        {catalogTab === 'products' ? (
-          <>
-            <Link className="button button--secondary" to="/products/scan" state={{ scannerInHistory: true }}>Сканировать</Link>
-            <Link className="button button--primary" to="/products/new">Добавить</Link>
-          </>
-        ) : <Link className="button button--primary" to="/recipes/new">Создать рецепт</Link>}
       </div>
 
       <div id={catalogTab === 'products' ? 'products-panel' : 'recipes-panel'} role="tabpanel" aria-labelledby={catalogTab === 'products' ? 'products-tab' : 'recipes-tab'}>

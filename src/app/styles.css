@@ -818,6 +818,8 @@ a {
   position: relative;
   overflow: hidden;
   touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .diary-entry-swipe__delete {
@@ -847,6 +849,24 @@ a {
 
 .diary-entry-list li:first-child .diary-entry-list__item {
   padding-top: 0;
+}
+
+.diary-entry-drop-placeholder {
+  min-height: 58px;
+  border: 1px dashed #a9c3b2;
+  border-radius: 14px;
+  background: #f1f6f1;
+}
+
+.diary-entry-drag-overlay {
+  position: fixed;
+  z-index: 30;
+  padding: 13px 12px;
+  pointer-events: none;
+  border: 1px solid #d7e2da;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgb(31 41 35 / 18%);
+  transform: scale(1.015);
 }
 
 .diary-entry-list__name {
@@ -932,7 +952,6 @@ a {
   gap: 12px;
   padding: 8px 20px;
   background: rgb(247 248 245 / 96%);
-  border-bottom: 1px solid #e6e8e3;
   backdrop-filter: blur(12px);
 }
 

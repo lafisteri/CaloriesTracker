@@ -11,6 +11,8 @@ export interface DiaryEntry extends Nutrition {
   id: string
   date: string
   mealType: MealType
+  /** Persistent position within one date and meal section. */
+  sortOrder: number
   sourceType: DiarySourceType
   sourceId: string
   sourceVersionId: string
