@@ -33,6 +33,7 @@ struct TodayRootView: View {
                             NavigationLink(value: TodayRoute.entryEditor(entry.id)) {
                                 DiaryEntryRow(entry: entry)
                             }
+                            .listRowSeparator(.hidden)
                             .swipeActions {
                                 Button(role: .destructive) {
                                     Task {

@@ -173,9 +173,9 @@ final class AmountViewModel {
             previewErrorMessage = nil
             return
         }
-        guard let amount = numericValue(from: trimmedAmount), amount >= 0 else {
+        guard let amount = numericValue(from: trimmedAmount), amount > 0 else {
             preview = nil
-            previewErrorMessage = "Введите корректное количество."
+            previewErrorMessage = "Количество должно быть больше нуля."
             return
         }
 

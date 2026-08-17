@@ -109,6 +109,7 @@ final class DiaryService {
         amount: Double,
         unitToken: String,
     ) throws -> Nutrition {
+        try validatePositiveAmount(amount)
         let normalizedAmount = try normalizedAmount(
             amount: amount,
             unitToken: unitToken,
@@ -280,7 +281,7 @@ final class DiaryService {
         unitToken: String,
         version: ProductVersion,
     ) throws -> Double {
-        guard amount.isFinite, amount >= 0 else {
+        guard amount.isFinite, amount > 0 else {
             throw DiaryServiceError.invalidAmount
         }
 
