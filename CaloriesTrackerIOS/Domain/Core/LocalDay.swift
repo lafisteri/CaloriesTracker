@@ -70,8 +70,12 @@ struct LocalDay: RawRepresentable, Hashable, Comparable, Codable, Sendable {
     }
 
     static func current(in timeZone: TimeZone = .current) -> LocalDay {
+        from(Date(), in: timeZone)
+    }
+
+    static func from(_ date: Date, in timeZone: TimeZone = .current) -> LocalDay {
         let calendar = gregorianCalendar(in: timeZone)
-        let components = calendar.dateComponents([.year, .month, .day], from: Date())
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
         return LocalDay(
             uncheckedYear: components.year ?? 1970,
             month: components.month ?? 1,
@@ -85,6 +89,32 @@ struct LocalDay: RawRepresentable, Hashable, Comparable, Codable, Sendable {
 
     func previousDay(in timeZone: TimeZone = .current) -> LocalDay {
         adding(days: -1, in: timeZone)
+    }
+
+    func adding(days: Int, in timeZone: TimeZone = .current) -> LocalDay {
+        let calendar = Self.gregorianCalendar(in: timeZone)
+        let shiftedDate = calendar.date(byAdding: .day, value: days, to: presentationDate(in: timeZone))
+            ?? presentationDate(in: timeZone)
+        return Self.from(shiftedDate, in: timeZone)
+    }
+
+    func mondayOfWeek(in timeZone: TimeZone = .current) -> LocalDay {
+        let offset: Int
+        switch weekday(in: timeZone) {
+        case .monday: offset = 0
+        case .tuesday: offset = 1
+        case .wednesday: offset = 2
+        case .thursday: offset = 3
+        case .friday: offset = 4
+        case .saturday: offset = 5
+        case .sunday: offset = 6
+        }
+        return adding(days: -offset, in: timeZone)
+    }
+
+    func weekDaysMondayFirst(in timeZone: TimeZone = .current) -> [LocalDay] {
+        let monday = mondayOfWeek(in: timeZone)
+        return (0..<7).map { monday.adding(days: $0, in: timeZone) }
     }
 
     func weekday(in timeZone: TimeZone = .current) -> Weekday {
@@ -116,18 +146,6 @@ struct LocalDay: RawRepresentable, Hashable, Comparable, Codable, Sendable {
 
     private init(uncheckedYear year: Int, month: Int, day: Int) {
         rawValue = String(format: "%04d-%02d-%02d", year, month, day)
-    }
-
-    private func adding(days: Int, in timeZone: TimeZone) -> LocalDay {
-        let calendar = Self.gregorianCalendar(in: timeZone)
-        let shiftedDate = calendar.date(byAdding: .day, value: days, to: presentationDate(in: timeZone))
-            ?? presentationDate(in: timeZone)
-        let components = calendar.dateComponents([.year, .month, .day], from: shiftedDate)
-        return LocalDay(
-            uncheckedYear: components.year ?? 1970,
-            month: components.month ?? 1,
-            day: components.day ?? 1,
-        )
     }
 
     private static func isValid(year: Int, month: Int, day: Int) -> Bool {

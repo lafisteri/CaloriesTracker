@@ -45,6 +45,13 @@
 		A10000000000000000000036 /* RecipeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* RecipeService.swift */; };
 		A10000000000000000000037 /* RecipeViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* RecipeViewModels.swift */; };
 		A10000000000000000000038 /* RecipeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000039 /* RecipeViews.swift */; };
+		A10000000000000000000039 /* GoalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* GoalService.swift */; };
+		A10000000000000000000040 /* StatisticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* StatisticsService.swift */; };
+		A10000000000000000000041 /* StatisticsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* StatisticsModels.swift */; };
+		A10000000000000000000042 /* GoalViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* GoalViewModels.swift */; };
+		A10000000000000000000043 /* GoalEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000044 /* GoalEditorView.swift */; };
+		A10000000000000000000044 /* StatisticsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* StatisticsViewModels.swift */; };
+		A10000000000000000000045 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000046 /* StatisticsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -87,6 +94,13 @@
 		A20000000000000000000037 /* RecipeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeService.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* RecipeViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeViewModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000039 /* RecipeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000040 /* GoalService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalService.swift; sourceTree = "<group>"; };
+		A20000000000000000000041 /* StatisticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsService.swift; sourceTree = "<group>"; };
+		A20000000000000000000042 /* StatisticsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000043 /* GoalViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalViewModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000044 /* GoalEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalEditorView.swift; sourceTree = "<group>"; };
+		A20000000000000000000045 /* StatisticsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsViewModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000046 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +152,8 @@
 				A20000000000000000000006 /* RootPlaceholderViews.swift */,
 				A40000000000000000000015 /* Catalog */,
 				A40000000000000000000017 /* Today */,
+				A4000000000000000000001B /* Goals */,
+				A4000000000000000000001C /* Statistics */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -148,6 +164,8 @@
 				A40000000000000000000014 /* Products */,
 				A40000000000000000000016 /* Diary */,
 				A40000000000000000000018 /* Recipes */,
+				A40000000000000000000019 /* Goals */,
+				A4000000000000000000001A /* Statistics */,
 			);
 			path = Application;
 			sourceTree = "<group>";
@@ -190,6 +208,22 @@
 			path = Recipes;
 			sourceTree = "<group>";
 		};
+		A40000000000000000000019 /* Goals */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000040 /* GoalService.swift */,
+			);
+			path = Goals;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001A /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000041 /* StatisticsService.swift */,
+			);
+			path = Statistics;
+			sourceTree = "<group>";
+		};
 		A40000000000000000000017 /* Today */ = {
 			isa = PBXGroup;
 			children = (
@@ -201,6 +235,24 @@
 			path = Today;
 			sourceTree = "<group>";
 		};
+		A4000000000000000000001B /* Goals */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000043 /* GoalViewModels.swift */,
+				A20000000000000000000044 /* GoalEditorView.swift */,
+			);
+			path = Goals;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001C /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000045 /* StatisticsViewModels.swift */,
+				A20000000000000000000046 /* StatisticsView.swift */,
+			);
+			path = Statistics;
+			sourceTree = "<group>";
+		};
 		A40000000000000000000006 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
@@ -210,6 +262,7 @@
 				A4000000000000000000000A /* Recipes */,
 				A4000000000000000000000B /* Diary */,
 				A4000000000000000000000C /* Goals */,
+				A4000000000000000000001D /* Statistics */,
 				A4000000000000000000000D /* Repositories */,
 			);
 			path = Domain;
@@ -267,6 +320,14 @@
 				A20000000000000000000016 /* GoalModels.swift */,
 			);
 			path = Goals;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001D /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000042 /* StatisticsModels.swift */,
+			);
+			path = Statistics;
 			sourceTree = "<group>";
 		};
 		A4000000000000000000000D /* Repositories */ = {
@@ -427,6 +488,13 @@
 				A10000000000000000000036 /* RecipeService.swift in Sources */,
 				A10000000000000000000037 /* RecipeViewModels.swift in Sources */,
 				A10000000000000000000038 /* RecipeViews.swift in Sources */,
+				A10000000000000000000039 /* GoalService.swift in Sources */,
+				A10000000000000000000040 /* StatisticsService.swift in Sources */,
+				A10000000000000000000041 /* StatisticsModels.swift in Sources */,
+				A10000000000000000000042 /* GoalViewModels.swift in Sources */,
+				A10000000000000000000043 /* GoalEditorView.swift in Sources */,
+				A10000000000000000000044 /* StatisticsViewModels.swift in Sources */,
+				A10000000000000000000045 /* StatisticsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

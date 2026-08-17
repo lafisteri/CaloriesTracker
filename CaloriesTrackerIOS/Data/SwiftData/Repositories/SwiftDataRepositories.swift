@@ -496,6 +496,30 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             }
     }
 
+    func entries(in days: [LocalDay]) async throws -> [DiaryEntry] {
+        let dayKeys = Set(days.map(\.rawValue))
+        guard !dayKeys.isEmpty else {
+            return []
+        }
+
+        return try modelContext
+            .fetch(FetchDescriptor<DiaryEntryRecord>())
+            .map { try $0.toDomain() }
+            .filter { $0.deletedAt == nil && dayKeys.contains($0.day.rawValue) }
+            .sorted { lhs, rhs in
+                if lhs.day != rhs.day {
+                    return lhs.day < rhs.day
+                }
+                if lhs.mealType.rawValue != rhs.mealType.rawValue {
+                    return lhs.mealType.rawValue < rhs.mealType.rawValue
+                }
+                if lhs.sortOrder != rhs.sortOrder {
+                    return lhs.sortOrder < rhs.sortOrder
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+    }
+
     func create(_ entry: DiaryEntry) async throws {
         guard entry.deletedAt == nil else {
             throw DiaryRepositoryError.invalidCreate
@@ -662,5 +686,101 @@ final class SwiftDataGoalRepository: GoalRepository {
     func weeklyGoal(id: UUID) async throws -> WeeklyGoal? {
         let descriptor = FetchDescriptor<WeeklyGoalRecord>(predicate: #Predicate { $0.id == id })
         return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
+    }
+
+    func latestGoal() async throws -> WeeklyGoal? {
+        try allGoals().max { $0.effectiveFrom < $1.effectiveFrom }
+    }
+
+    func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal? {
+        try allGoals()
+            .filter { $0.effectiveFrom <= day }
+            .max { $0.effectiveFrom < $1.effectiveFrom }
+    }
+
+    func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal] {
+        let goals = try allGoals().sorted { $0.effectiveFrom < $1.effectiveFrom }
+        var result: [LocalDay: WeeklyGoal] = [:]
+
+        for day in Set(days) {
+            result[day] = goals.last { $0.effectiveFrom <= day }
+        }
+
+        return result
+    }
+
+    func create(_ goal: WeeklyGoal) async throws {
+        try validate(goal)
+
+        let effectiveFromKey = goal.effectiveFrom.rawValue
+        let duplicateDescriptor = FetchDescriptor<WeeklyGoalRecord>(
+            predicate: #Predicate { $0.effectiveFromKey == effectiveFromKey },
+        )
+        guard try modelContext.fetch(duplicateDescriptor).isEmpty else {
+            throw GoalRepositoryError.duplicateEffectiveDate
+        }
+
+        let goalRecord = WeeklyGoalRecord(
+            id: goal.id,
+            effectiveFromKey: goal.effectiveFrom.rawValue,
+            createdAt: goal.createdAt,
+        )
+        let dailyGoalRecords = try LocalDay.Weekday.allCases.enumerated().map { position, weekday in
+            guard let dailyGoal = goal.dailyGoals[weekday] else {
+                throw GoalRepositoryError.invalidGoal
+            }
+            return DailyMacroGoalRecord(
+                id: UUID(),
+                weeklyGoalID: goal.id,
+                weekdayRaw: weekday.rawValue,
+                position: position,
+                calories: dailyGoal.calories,
+                protein: dailyGoal.protein,
+                fat: dailyGoal.fat,
+                carbs: dailyGoal.carbs,
+            )
+        }
+        goalRecord.dailyGoals = dailyGoalRecords
+        for dailyGoalRecord in dailyGoalRecords {
+            dailyGoalRecord.weeklyGoal = goalRecord
+        }
+
+        do {
+            modelContext.insert(goalRecord)
+            for dailyGoalRecord in dailyGoalRecords {
+                modelContext.insert(dailyGoalRecord)
+            }
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    private func allGoals() throws -> [WeeklyGoal] {
+        try modelContext.fetch(FetchDescriptor<WeeklyGoalRecord>()).map { try $0.toDomain() }
+    }
+
+    private func validate(_ goal: WeeklyGoal) throws {
+        let weekdays = Set(LocalDay.Weekday.allCases)
+        guard Set(goal.dailyGoals.keys) == weekdays,
+              goal.dailyGoals.values.allSatisfy(\.isValid)
+        else {
+            throw GoalRepositoryError.invalidGoal
+        }
+    }
+}
+
+enum GoalRepositoryError: LocalizedError {
+    case invalidGoal
+    case duplicateEffectiveDate
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidGoal:
+            "Цель недели должна содержать семь корректных дней."
+        case .duplicateEffectiveDate:
+            "Цели с этой датой уже существуют."
+        }
     }
 }

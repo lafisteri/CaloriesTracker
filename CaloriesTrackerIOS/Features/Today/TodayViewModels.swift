@@ -5,23 +5,32 @@ import Observation
 @Observable
 final class TodayViewModel {
     private let diaryService: DiaryService
+    private let goalService: GoalService
 
     private(set) var selectedDay: LocalDay
     private(set) var day: DiaryDayReadModel?
+    private(set) var calorieGoal: Double?
     private(set) var isLoading = false
     var errorMessage: String?
 
-    init(diaryService: DiaryService, selectedDay: LocalDay = .current()) {
+    init(
+        diaryService: DiaryService,
+        goalService: GoalService,
+        selectedDay: LocalDay = .current(),
+    ) {
         self.diaryService = diaryService
+        self.goalService = goalService
         self.selectedDay = selectedDay
     }
 
     func load() async {
         isLoading = true
         errorMessage = nil
+        calorieGoal = nil
 
         do {
             day = try await diaryService.day(for: selectedDay)
+            calorieGoal = try await goalService.goal(for: selectedDay)?.dailyGoals[selectedDay.weekday()]?.calories
         } catch {
             errorMessage = diaryErrorMessage(error, fallback: "Не удалось загрузить дневник.")
         }

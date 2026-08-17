@@ -29,6 +29,7 @@ protocol RecipeRepository: Sendable {
 protocol DiaryRepository: Sendable {
     func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry?
     func entries(on day: LocalDay) async throws -> [DiaryEntry]
+    func entries(in days: [LocalDay]) async throws -> [DiaryEntry]
     func create(_ entry: DiaryEntry) async throws
     func save(_ entry: DiaryEntry) async throws
     func save(_ entries: [DiaryEntry]) async throws
@@ -38,4 +39,8 @@ protocol DiaryRepository: Sendable {
 @MainActor
 protocol GoalRepository: Sendable {
     func weeklyGoal(id: UUID) async throws -> WeeklyGoal?
+    func latestGoal() async throws -> WeeklyGoal?
+    func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal?
+    func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal]
+    func create(_ goal: WeeklyGoal) async throws
 }

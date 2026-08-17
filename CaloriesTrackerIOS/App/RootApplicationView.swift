@@ -10,7 +10,16 @@ struct RootApplicationView: View {
 
         TabView(selection: $router.selectedTab) {
             NavigationStack(path: $router.statisticsPath) {
-                StatisticsPlaceholderView()
+                StatisticsView(
+                    router: router,
+                    statisticsService: dependencies.statisticsService,
+                )
+                .navigationDestination(for: StatisticsRoute.self) { route in
+                    switch route {
+                    case .goals:
+                        GoalEditorView(router: router, goalService: dependencies.goalService)
+                    }
+                }
             }
             .tabItem {
                 Label("Статистика", systemImage: "chart.bar")
@@ -21,6 +30,7 @@ struct RootApplicationView: View {
                 TodayRootView(
                     router: router,
                     diaryService: dependencies.diaryService,
+                    goalService: dependencies.goalService,
                 )
             }
             .tabItem {

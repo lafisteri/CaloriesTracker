@@ -3,13 +3,15 @@ import SwiftUI
 struct TodayRootView: View {
     let router: AppRouter
     let diaryService: DiaryService
+    let goalService: GoalService
 
     @State private var model: TodayViewModel
 
-    init(router: AppRouter, diaryService: DiaryService) {
+    init(router: AppRouter, diaryService: DiaryService, goalService: GoalService) {
         self.router = router
         self.diaryService = diaryService
-        _model = State(initialValue: TodayViewModel(diaryService: diaryService))
+        self.goalService = goalService
+        _model = State(initialValue: TodayViewModel(diaryService: diaryService, goalService: goalService))
     }
 
     var body: some View {
@@ -18,7 +20,7 @@ struct TodayRootView: View {
 
             Section("За день") {
                 if let day = model.day {
-                    DailyNutritionSummary(nutrition: day.totalNutrition)
+                    DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
                 } else {
                     ProgressView()
                 }
@@ -172,11 +174,17 @@ struct TodayRootView: View {
 
 private struct DailyNutritionSummary: View {
     let nutrition: Nutrition
+    let calorieGoal: Double?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(diaryNumber(nutrition.calories)) ккал")
-                .font(.title3.weight(.semibold))
+            if let calorieGoal {
+                Text("\(diaryNumber(nutrition.calories)) / \(diaryNumber(calorieGoal)) ккал")
+                    .font(.title3.weight(.semibold))
+            } else {
+                Text("\(diaryNumber(nutrition.calories)) ккал")
+                    .font(.title3.weight(.semibold))
+            }
             Text("Б \(diaryNumber(nutrition.protein)) · Ж \(diaryNumber(nutrition.fat)) · У \(diaryNumber(nutrition.carbs))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
