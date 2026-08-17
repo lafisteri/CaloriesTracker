@@ -1,7 +1,8 @@
 // !$*UTF8*$!
 {
 	archiveVersion = 1;
-	classes = {};
+	classes = {
+	};
 	objectVersion = 56;
 	objects = {
 
@@ -31,28 +32,28 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A20000000000000000000001 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppTab.swift; sourceTree = "<group>"; };
-		A20000000000000000000002 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppRouter.swift; sourceTree = "<group>"; };
-		A20000000000000000000003 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDependencies.swift; sourceTree = "<group>"; };
-		A20000000000000000000004 /* CaloriesTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/CaloriesTrackerApp.swift; sourceTree = "<group>"; };
-		A20000000000000000000005 /* RootApplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/RootApplicationView.swift; sourceTree = "<group>"; };
-		A20000000000000000000006 /* RootPlaceholderViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/RootPlaceholderViews.swift; sourceTree = "<group>"; };
-		A20000000000000000000007 /* Nutrition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Core/Nutrition.swift; sourceTree = "<group>"; };
-		A20000000000000000000008 /* LocalDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Core/LocalDay.swift; sourceTree = "<group>"; };
-		A20000000000000000000009 /* PersistentEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Core/PersistentEnums.swift; sourceTree = "<group>"; };
-		A20000000000000000000010 /* FoodUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Units/FoodUnit.swift; sourceTree = "<group>"; };
-		A20000000000000000000011 /* UnitConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Units/UnitConverter.swift; sourceTree = "<group>"; };
-		A20000000000000000000012 /* NutritionCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Units/NutritionCalculator.swift; sourceTree = "<group>"; };
-		A20000000000000000000013 /* ProductModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Products/ProductModels.swift; sourceTree = "<group>"; };
-		A20000000000000000000014 /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Recipes/RecipeModels.swift; sourceTree = "<group>"; };
-		A20000000000000000000015 /* DiaryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Diary/DiaryEntry.swift; sourceTree = "<group>"; };
-		A20000000000000000000016 /* GoalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Goals/GoalModels.swift; sourceTree = "<group>"; };
-		A20000000000000000000017 /* RepositoryProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Repositories/RepositoryProtocols.swift; sourceTree = "<group>"; };
-		A20000000000000000000018 /* SwiftDataRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/SwiftData/Models/SwiftDataRecords.swift; sourceTree = "<group>"; };
-		A20000000000000000000019 /* SchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/SwiftData/SchemaV1.swift; sourceTree = "<group>"; };
-		A20000000000000000000020 /* MigrationPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/SwiftData/MigrationPlan.swift; sourceTree = "<group>"; };
-		A20000000000000000000021 /* RecordMappers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/SwiftData/Mappers/RecordMappers.swift; sourceTree = "<group>"; };
-		A20000000000000000000022 /* SwiftDataRepositories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data/SwiftData/Repositories/SwiftDataRepositories.swift; sourceTree = "<group>"; };
+		A20000000000000000000001 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* CaloriesTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaloriesTrackerApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* RootApplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootApplicationView.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* RootPlaceholderViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootPlaceholderViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* Nutrition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Nutrition.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* LocalDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDay.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* PersistentEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistentEnums.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* FoodUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodUnit.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* UnitConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitConverter.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* NutritionCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionCalculator.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* ProductModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* DiaryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryEntry.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* GoalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* RepositoryProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryProtocols.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* SwiftDataRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRecords.swift; sourceTree = "<group>"; };
+		A20000000000000000000019 /* SchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV1.swift; sourceTree = "<group>"; };
+		A20000000000000000000020 /* MigrationPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationPlan.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* RecordMappers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordMappers.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* SwiftDataRepositories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositories.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* CaloriesTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CaloriesTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -60,7 +61,8 @@
 		A30000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -69,38 +71,12 @@
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				A40000000000000000000002 /* Sources */,
+				A40000000000000000000004 /* App */,
+				A40000000000000000000005 /* Features */,
+				A40000000000000000000006 /* Domain */,
+				A4000000000000000000000E /* Data */,
 				A40000000000000000000003 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		A40000000000000000000002 /* Sources */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000001 /* AppTab.swift */,
-				A20000000000000000000002 /* AppRouter.swift */,
-				A20000000000000000000003 /* AppDependencies.swift */,
-				A20000000000000000000004 /* CaloriesTrackerApp.swift */,
-				A20000000000000000000005 /* RootApplicationView.swift */,
-				A20000000000000000000006 /* RootPlaceholderViews.swift */,
-				A20000000000000000000007 /* Nutrition.swift */,
-				A20000000000000000000008 /* LocalDay.swift */,
-				A20000000000000000000009 /* PersistentEnums.swift */,
-				A20000000000000000000010 /* FoodUnit.swift */,
-				A20000000000000000000011 /* UnitConverter.swift */,
-				A20000000000000000000012 /* NutritionCalculator.swift */,
-				A20000000000000000000013 /* ProductModels.swift */,
-				A20000000000000000000014 /* RecipeModels.swift */,
-				A20000000000000000000015 /* DiaryEntry.swift */,
-				A20000000000000000000016 /* GoalModels.swift */,
-				A20000000000000000000017 /* RepositoryProtocols.swift */,
-				A20000000000000000000018 /* SwiftDataRecords.swift */,
-				A20000000000000000000019 /* SchemaV1.swift */,
-				A20000000000000000000020 /* MigrationPlan.swift */,
-				A20000000000000000000021 /* RecordMappers.swift */,
-				A20000000000000000000022 /* SwiftDataRepositories.swift */,
-			);
-			path = "";
 			sourceTree = "<group>";
 		};
 		A40000000000000000000003 /* Products */ = {
@@ -109,6 +85,144 @@
 				A20000000000000000000023 /* CaloriesTracker.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* AppTab.swift */,
+				A20000000000000000000002 /* AppRouter.swift */,
+				A20000000000000000000003 /* AppDependencies.swift */,
+				A20000000000000000000004 /* CaloriesTrackerApp.swift */,
+				A20000000000000000000005 /* RootApplicationView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000006 /* RootPlaceholderViews.swift */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000006 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000007 /* Core */,
+				A40000000000000000000008 /* Units */,
+				A40000000000000000000009 /* Products */,
+				A4000000000000000000000A /* Recipes */,
+				A4000000000000000000000B /* Diary */,
+				A4000000000000000000000C /* Goals */,
+				A4000000000000000000000D /* Repositories */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000007 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000007 /* Nutrition.swift */,
+				A20000000000000000000008 /* LocalDay.swift */,
+				A20000000000000000000009 /* PersistentEnums.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000008 /* Units */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000010 /* FoodUnit.swift */,
+				A20000000000000000000011 /* UnitConverter.swift */,
+				A20000000000000000000012 /* NutritionCalculator.swift */,
+			);
+			path = Units;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000009 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000013 /* ProductModels.swift */,
+			);
+			path = Products;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000A /* Recipes */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000014 /* RecipeModels.swift */,
+			);
+			path = Recipes;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000B /* Diary */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000015 /* DiaryEntry.swift */,
+			);
+			path = Diary;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000C /* Goals */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000016 /* GoalModels.swift */,
+			);
+			path = Goals;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000D /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000017 /* RepositoryProtocols.swift */,
+			);
+			path = Repositories;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000E /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				A4000000000000000000000F /* SwiftData */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000F /* SwiftData */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000010 /* Models */,
+				A40000000000000000000011 /* Mappers */,
+				A40000000000000000000012 /* Repositories */,
+				A20000000000000000000019 /* SchemaV1.swift */,
+				A20000000000000000000020 /* MigrationPlan.swift */,
+			);
+			path = SwiftData;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000010 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000018 /* SwiftDataRecords.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000011 /* Mappers */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000021 /* RecordMappers.swift */,
+			);
+			path = Mappers;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000012 /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000022 /* SwiftDataRepositories.swift */,
+			);
+			path = Repositories;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -122,8 +236,10 @@
 				A30000000000000000000001 /* Frameworks */,
 				A30000000000000000000003 /* Resources */,
 			);
-			buildRules = ();
-			dependencies = ();
+			buildRules = (
+			);
+			dependencies = (
+			);
 			name = CaloriesTracker;
 			productName = CaloriesTracker;
 			productReference = A20000000000000000000023 /* CaloriesTracker.app */;
@@ -136,7 +252,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					A50000000000000000000001 = {
 						CreatedOnToolsVersion = 26.0;
@@ -166,7 +282,8 @@
 		A30000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -208,20 +325,46 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = R89TSN48SZ;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -230,13 +373,36 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = R89TSN48SZ;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
@@ -244,6 +410,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 5.0;
 			};
@@ -255,11 +422,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.caloriestracker.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -276,11 +445,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.caloriestracker.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";

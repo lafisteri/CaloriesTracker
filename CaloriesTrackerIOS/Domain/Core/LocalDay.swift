@@ -35,7 +35,7 @@ struct LocalDay: RawRepresentable, Hashable, Comparable, Codable, Sendable {
               components[0].count == 4,
               components[1].count == 2,
               components[2].count == 2,
-              components.allSatisfy({ $0.allSatisfy(\.isNumber) }),
+              components.allSatisfy({ $0.utf8.allSatisfy { (48...57).contains($0) } }),
               let year = Int(components[0]),
               let month = Int(components[1]),
               let day = Int(components[2]),
@@ -44,7 +44,25 @@ struct LocalDay: RawRepresentable, Hashable, Comparable, Codable, Sendable {
             return nil
         }
 
-        self.rawValue = rawValue
+        self.rawValue = String(format: "%04d-%02d-%02d", year, month, day)
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        guard let localDay = LocalDay(rawValue: rawValue) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "LocalDay must be a valid YYYY-MM-DD Gregorian calendar day.",
+            )
+        }
+
+        self = localDay
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 
     static func < (lhs: LocalDay, rhs: LocalDay) -> Bool {
