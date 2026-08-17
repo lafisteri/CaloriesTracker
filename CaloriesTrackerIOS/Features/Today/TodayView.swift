@@ -436,12 +436,14 @@ private struct DiaryEntryRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(entry.sourceName)
                 .font(.body.weight(.medium))
-            Text("\(diaryNumber(entry.amount)) \(diaryUnitLabel(for: entry.unitToken, sourceType: entry.sourceType)) · \(diaryNumber(entry.nutrition.calories)) ккал")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text("Б \(diaryNumber(entry.nutrition.protein)) · Ж \(diaryNumber(entry.nutrition.fat)) · У \(diaryNumber(entry.nutrition.carbs))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            HStack {
+                Text("\(diaryNumber(entry.amount)) \(diaryUnitLabel(for: entry.unitToken, sourceType: entry.sourceType))")
+                Spacer()
+                Text("\(diaryNumber(entry.nutrition.calories)) ккал")
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }
