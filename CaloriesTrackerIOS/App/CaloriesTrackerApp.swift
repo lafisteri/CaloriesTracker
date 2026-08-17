@@ -20,7 +20,7 @@ struct CaloriesTrackerApp: App {
     var body: some Scene {
         WindowGroup {
             if let dependencies {
-                RootApplicationView()
+                RootApplicationView(dependencies: dependencies)
                     .modelContainer(dependencies.modelContainer)
             } else {
                 StartupFailureView(message: startupMessage ?? "Не удалось запустить приложение.")

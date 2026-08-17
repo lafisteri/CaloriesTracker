@@ -29,6 +29,12 @@
 		A10000000000000000000020 /* MigrationPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* MigrationPlan.swift */; };
 		A10000000000000000000021 /* RecordMappers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* RecordMappers.swift */; };
 		A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* SwiftDataRepositories.swift */; };
+		A10000000000000000000023 /* ProductService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* ProductService.swift */; };
+		A10000000000000000000024 /* ProductViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* ProductViewModels.swift */; };
+		A10000000000000000000025 /* ProductCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* ProductCatalogView.swift */; };
+		A10000000000000000000026 /* ProductDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* ProductDetailView.swift */; };
+		A10000000000000000000027 /* ProductEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* ProductEditorView.swift */; };
+		A10000000000000000000028 /* ProductVersionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* ProductVersionHistoryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -55,6 +61,12 @@
 		A20000000000000000000021 /* RecordMappers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordMappers.swift; sourceTree = "<group>"; };
 		A20000000000000000000022 /* SwiftDataRepositories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositories.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* CaloriesTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CaloriesTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000024 /* ProductService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductService.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* ProductViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductViewModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000026 /* ProductCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductCatalogView.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductDetailView.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* ProductEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductEditorView.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* ProductVersionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductVersionHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000004 /* App */,
+				A40000000000000000000013 /* Application */,
 				A40000000000000000000005 /* Features */,
 				A40000000000000000000006 /* Domain */,
 				A4000000000000000000000E /* Data */,
@@ -103,8 +116,37 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000006 /* RootPlaceholderViews.swift */,
+				A40000000000000000000015 /* Catalog */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000013 /* Application */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000014 /* Products */,
+			);
+			path = Application;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000014 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000024 /* ProductService.swift */,
+			);
+			path = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000015 /* Catalog */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000025 /* ProductViewModels.swift */,
+				A20000000000000000000026 /* ProductCatalogView.swift */,
+				A20000000000000000000027 /* ProductDetailView.swift */,
+				A20000000000000000000028 /* ProductEditorView.swift */,
+				A20000000000000000000029 /* ProductVersionHistoryView.swift */,
+			);
+			path = Catalog;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000006 /* Domain */ = {
@@ -315,6 +357,12 @@
 				A10000000000000000000020 /* MigrationPlan.swift in Sources */,
 				A10000000000000000000021 /* RecordMappers.swift in Sources */,
 				A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */,
+				A10000000000000000000023 /* ProductService.swift in Sources */,
+				A10000000000000000000024 /* ProductViewModels.swift in Sources */,
+				A10000000000000000000025 /* ProductCatalogView.swift in Sources */,
+				A10000000000000000000026 /* ProductDetailView.swift in Sources */,
+				A10000000000000000000027 /* ProductEditorView.swift in Sources */,
+				A10000000000000000000028 /* ProductVersionHistoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

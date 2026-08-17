@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct RootApplicationView: View {
+    let dependencies: AppDependencies
+
     @State private var router = AppRouter()
 
     var body: some View {
@@ -23,9 +25,7 @@ struct RootApplicationView: View {
             }
             .tag(AppTab.today)
 
-            NavigationStack(path: $router.catalogPath) {
-                CatalogPlaceholderView()
-            }
+            ProductCatalogRootView(router: router, productService: dependencies.productService)
             .tabItem {
                 Label("Продукты", systemImage: "shippingbox")
             }

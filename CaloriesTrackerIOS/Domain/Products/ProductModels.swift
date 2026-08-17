@@ -32,3 +32,12 @@ struct ServingUnit: Identifiable, Hashable, Codable, Sendable {
     let conversionAmount: Double
     let conversionUnit: ServingConversionUnit
 }
+
+/// Editable values used to create a product or append a new immutable version.
+struct ProductDraft: Hashable, Sendable {
+    let name: String
+    let barcode: String?
+    let baseUnit: ProductBaseUnit
+    let baseAmount: Double
+    let nutrition: Nutrition
+}
