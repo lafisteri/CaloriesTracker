@@ -1019,10 +1019,6 @@ a {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.diary-amount-page__scroll .diary-entry-form {
-  min-height: 100%;
-}
-
 .diary-amount-page__form {
   align-content: start;
   gap: 12px;
