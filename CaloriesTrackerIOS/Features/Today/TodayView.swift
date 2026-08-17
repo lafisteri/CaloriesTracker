@@ -409,9 +409,6 @@ private struct DiaryMealDropDelegate: DropDelegate {
         return DiaryEntryDragPayload.loadEntryID(from: info, completion: onDrop)
     }
 }
-        }
-    }
-}
 
 private struct DailyNutritionSummary: View {
     let nutrition: Nutrition
