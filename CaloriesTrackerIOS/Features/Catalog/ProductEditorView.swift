@@ -1,8 +1,12 @@
+import OSLog
 import SwiftUI
 
 struct ProductEditorView: View {
+    private static let logger = Logger(subsystem: "com.caloriestracker.ios", category: "ProductEditor")
+
     let router: AppRouter
     let onSaved: (@MainActor () -> Void)?
+    let onDismissed: (@MainActor () -> Void)?
 
     @State private var model: ProductEditorViewModel
     @FocusState private var focusedField: EditorField?
@@ -12,9 +16,11 @@ struct ProductEditorView: View {
         router: AppRouter,
         productService: ProductService,
         onSaved: (@MainActor () -> Void)? = nil,
+        onDismissed: (@MainActor () -> Void)? = nil,
     ) {
         self.router = router
         self.onSaved = onSaved
+        self.onDismissed = onDismissed
         _model = State(initialValue: ProductEditorViewModel(productID: productID, productService: productService))
     }
 
@@ -34,10 +40,12 @@ struct ProductEditorView: View {
                 Section {
                     TextField("Название", text: $model.name)
                         .textInputAutocapitalization(.sentences)
+                        .focused($focusedField, equals: .name)
 
                     TextField("Штрихкод", text: $model.barcode)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .barcode)
 
                     Picker("Единица", selection: $model.baseUnit) {
                         ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
@@ -68,10 +76,15 @@ struct ProductEditorView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(model.isSaving ? "Сохранение…" : "Сохранить") {
+                    Self.logger.notice("action=product_save_tapped focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
                     Task {
-                        if await model.save() {
+                        let didSave = await model.save()
+                        Self.logger.notice("action=product_save_finished success=\(didSave)")
+                        if didSave {
+                            Self.logger.notice("focus=editor_resign_before_save_return")
                             focusedField = nil
                             if let onSaved {
+                                Self.logger.notice("navigation=editor_save_return_requested")
                                 onSaved()
                             } else {
                                 router.catalogPath = []
@@ -85,12 +98,33 @@ struct ProductEditorView: View {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("Готово") {
+                    Self.logger.notice("action=product_keyboard_done focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
                     focusedField = nil
                 }
             }
         }
         .task {
+            Self.logger.debug("lifecycle=editor_load_started")
             await model.loadForEditing()
+            Self.logger.debug("lifecycle=editor_load_finished")
+        }
+        .onAppear {
+            Self.logger.notice("lifecycle=editor_appear")
+        }
+        .onDisappear {
+            Self.logger.notice("lifecycle=editor_disappear focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
+            focusedField = nil
+            guard let onDismissed else {
+                return
+            }
+            Task { @MainActor in
+                await Task.yield()
+                Self.logger.notice("lifecycle=editor_dismissed_callback")
+                onDismissed()
+            }
+        }
+        .onChange(of: focusedField) { previousField, currentField in
+            Self.logger.notice("focus=editor_changed previous=\(previousField?.diagnosticName ?? "none", privacy: .public) current=\(currentField?.diagnosticName ?? "none", privacy: .public)")
         }
     }
 
@@ -102,9 +136,30 @@ struct ProductEditorView: View {
 }
 
 private enum EditorField: Hashable {
+    case name
+    case barcode
     case baseAmount
     case calories
     case protein
     case fat
     case carbs
+
+    var diagnosticName: String {
+        switch self {
+        case .name:
+            "name"
+        case .barcode:
+            "barcode"
+        case .baseAmount:
+            "base_amount"
+        case .calories:
+            "calories"
+        case .protein:
+            "protein"
+        case .fat:
+            "fat"
+        case .carbs:
+            "carbs"
+        }
+    }
 }

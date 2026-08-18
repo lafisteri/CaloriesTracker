@@ -162,21 +162,26 @@ struct TodayRootView: View {
                     productID: nil,
                     router: router,
                     productService: productService,
-                ) {
-                    if let context {
-                        router.todayPath = [.catalogSelection(context)]
-                    } else {
-                        router.todayPath = []
-                    }
-                }
+                    onSaved: {
+                        if let context {
+                            router.todayPath = [.catalogSelection(context)]
+                        } else {
+                            router.todayPath = []
+                        }
+                    },
+                )
             case let .productEditorForDiarySelection(productID, _):
                 ProductEditorView(
                     productID: productID,
                     router: router,
                     productService: productService,
-                ) {
-                    router.todayPath.removeLast()
-                }
+                    onSaved: {
+                        router.todayPath.removeLast()
+                    },
+                    onDismissed: {
+                        router.amountFocusRestorationRevision += 1
+                    },
+                )
             case let .recipeEditor(context, recipeID):
                 RecipeEditorView(
                     recipeID: recipeID,

@@ -8,6 +8,7 @@ final class AppRouter {
     var statisticsPath: [StatisticsRoute] = []
     var todayPath: [TodayRoute] = []
     var catalogPath: [CatalogRoute] = []
+    var amountFocusRestorationRevision = 0
 
     func resetTodaySelectionNavigation() {
         guard todayPath.contains(where: \.isDiarySelectionRoute) else {

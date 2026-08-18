@@ -45,9 +45,10 @@ struct ProductCatalogRootView: View {
                             productID: id,
                             router: router,
                             productService: productService,
-                        ) {
-                            router.catalogPath.removeLast()
-                        }
+                            onSaved: {
+                                router.catalogPath.removeLast()
+                            },
+                        )
                     } else {
                         ProductEditorView(productID: nil, router: router, productService: productService)
                     }
