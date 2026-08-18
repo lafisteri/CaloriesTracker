@@ -520,6 +520,22 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             }
     }
 
+    func activeEntries(for sources: [FoodSourceReference]) async throws -> [DiaryEntry] {
+        let sourceSet = Set(sources)
+        guard !sourceSet.isEmpty else {
+            return []
+        }
+
+        return try modelContext
+            .fetch(FetchDescriptor<DiaryEntryRecord>())
+            .map { try $0.toDomain() }
+            .filter { entry in
+                entry.deletedAt == nil && sourceSet.contains(
+                    FoodSourceReference(sourceType: entry.sourceType, sourceID: entry.sourceID),
+                )
+            }
+    }
+
     func create(_ entry: DiaryEntry) async throws {
         guard entry.deletedAt == nil else {
             throw DiaryRepositoryError.invalidCreate

@@ -2,22 +2,29 @@ import SwiftUI
 
 struct RecipeListView: View {
     let onSelect: (UUID) -> Void
+    let onQuickAddComplete: @MainActor () -> Void
     let onAdd: () -> Void
     let allowsManagementActions: Bool
+    let selectionContext: DiaryContext?
 
     @State private var model: RecipeListViewModel
     @State private var searchText = ""
 
     init(
         recipeService: RecipeService,
+        diaryService: DiaryService?,
+        selectionContext: DiaryContext?,
         onSelect: @escaping (UUID) -> Void,
+        onQuickAddComplete: @escaping @MainActor () -> Void,
         onAdd: @escaping () -> Void,
         allowsManagementActions: Bool,
     ) {
         self.onSelect = onSelect
+        self.onQuickAddComplete = onQuickAddComplete
         self.onAdd = onAdd
         self.allowsManagementActions = allowsManagementActions
-        _model = State(initialValue: RecipeListViewModel(recipeService: recipeService))
+        self.selectionContext = selectionContext
+        _model = State(initialValue: RecipeListViewModel(recipeService: recipeService, diaryService: diaryService))
     }
 
     var body: some View {
@@ -53,12 +60,56 @@ struct RecipeListView: View {
                             .accessibilityLabel("Удалить")
                         }
                     } else {
-                        Button {
-                            onSelect(item.recipe.id)
-                        } label: {
-                            RecipeListRow(item: item)
+                        if let defaultValue = model.selectionDefault(for: item) {
+                            HStack(spacing: 12) {
+                                Button {
+                                    onSelect(item.recipe.id)
+                                } label: {
+                                    RecipeListRow(item: item, selectionDefault: defaultValue)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.primary)
+                                .contentShape(Rectangle())
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                if model.quickAddingRecipeID == item.recipe.id {
+                                    ProgressView()
+                                        .frame(minWidth: 44, minHeight: 44)
+                                } else {
+                                    Button {
+                                        guard let selectionContext else {
+                                            return
+                                        }
+                                        Task {
+                                            if await model.quickAdd(
+                                                recipeID: item.recipe.id,
+                                                context: selectionContext,
+                                                defaultValue: defaultValue,
+                                            ) {
+                                                onQuickAddComplete()
+                                            }
+                                        }
+                                    } label: {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.title3)
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .accessibilityLabel("Добавить \(item.recipe.name)")
+                                }
+                            }
+                        } else {
+                            Button {
+                                onSelect(item.recipe.id)
+                            } label: {
+                                RecipeListRow(item: item)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.primary)
+                            .contentShape(Rectangle())
                         }
-                        .foregroundStyle(.primary)
                     }
                 }
             }
@@ -98,14 +149,26 @@ struct RecipeListView: View {
 
 private struct RecipeListRow: View {
     let item: RecipeListItem
+    let selectionDefault: DiarySelectionAmountDefault?
+
+    init(item: RecipeListItem, selectionDefault: DiarySelectionAmountDefault? = nil) {
+        self.item = item
+        self.selectionDefault = selectionDefault
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.recipe.name)
                 .font(.body.weight(.medium))
-            Text(recipeOutputSummary(for: item.currentVersion))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Group {
+                if let selectionDefault {
+                    Text("\(formattedNumber(selectionDefault.amount)) \(selectionDefault.unitLabel) · \(formattedNumber(item.currentVersion.totalNutrition.calories)) ккал")
+                } else {
+                    Text(recipeOutputSummary(for: item.currentVersion))
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }

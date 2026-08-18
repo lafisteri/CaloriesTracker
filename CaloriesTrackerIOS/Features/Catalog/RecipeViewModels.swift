@@ -14,14 +14,18 @@ struct RecipeIngredientEditorItem: Identifiable, Hashable, Sendable {
 @Observable
 final class RecipeListViewModel {
     private let recipeService: RecipeService
+    private let diaryService: DiaryService?
     private var currentQuery = ""
 
     private(set) var recipes: [RecipeListItem] = []
     private(set) var isLoading = false
+    private(set) var quickAddingRecipeID: UUID?
+    private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
     var errorMessage: String?
 
-    init(recipeService: RecipeService) {
+    init(recipeService: RecipeService, diaryService: DiaryService? = nil) {
         self.recipeService = recipeService
+        self.diaryService = diaryService
     }
 
     func load(matching query: String) async {
@@ -30,7 +34,17 @@ final class RecipeListViewModel {
         errorMessage = nil
 
         do {
-            recipes = try await recipeService.recipes(matching: query)
+            let items = try await recipeService.recipes(matching: query)
+            recipes = items
+            if let diaryService {
+                usageDefaults = try await diaryService.latestUsageDefaults(
+                    for: items.map { item in
+                        FoodSourceReference(sourceType: .recipe, sourceID: item.recipe.id)
+                    },
+                )
+            } else {
+                usageDefaults = [:]
+            }
         } catch {
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить рецепты.")
         }
@@ -47,6 +61,71 @@ final class RecipeListViewModel {
         } catch {
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось удалить рецепт.")
         }
+    }
+
+    func selectionDefault(for item: RecipeListItem) -> DiarySelectionAmountDefault? {
+        let availableUnits = recipeUnits(for: item.currentVersion)
+        guard let fallbackUnit = availableUnits.first else {
+            return nil
+        }
+        let fallback = DiarySelectionAmountDefault(
+            amount: 100,
+            unitToken: fallbackUnit.token,
+            unitLabel: fallbackUnit.label,
+        )
+        let source = FoodSourceReference(sourceType: .recipe, sourceID: item.recipe.id)
+        guard let usageDefault = usageDefaults[source],
+              usageDefault.amount.isFinite,
+              usageDefault.amount > 0,
+              let recipeUnit = RecipeDiaryUnit.resolve(usageDefault.unitToken),
+              let compatibleUnit = availableUnits.first(where: { $0.token == recipeUnit.rawValue })
+        else {
+            return fallback
+        }
+
+        return DiarySelectionAmountDefault(
+            amount: usageDefault.amount,
+            unitToken: compatibleUnit.token,
+            unitLabel: compatibleUnit.label,
+        )
+    }
+
+    func quickAdd(
+        recipeID: UUID,
+        context: DiaryContext,
+        defaultValue: DiarySelectionAmountDefault,
+    ) async -> Bool {
+        guard let diaryService else {
+            return false
+        }
+
+        quickAddingRecipeID = recipeID
+        errorMessage = nil
+        defer { quickAddingRecipeID = nil }
+
+        do {
+            try await diaryService.quickAdd(
+                context: context,
+                source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
+                preferredAmount: defaultValue.amount,
+                preferredUnitToken: defaultValue.unitToken,
+            )
+            return true
+        } catch {
+            errorMessage = recipeErrorMessage(error, fallback: "Не удалось добавить рецепт.")
+            return false
+        }
+    }
+
+    private func recipeUnits(for version: RecipeVersion) -> [(token: String, label: String)] {
+        var units: [(token: String, label: String)] = []
+        if version.cookedWeight != nil {
+            units.append((RecipeDiaryUnit.grams.rawValue, "г"))
+        }
+        if version.servingsCount != nil {
+            units.append((RecipeDiaryUnit.serving.rawValue, "порция"))
+        }
+        return units
     }
 }
 

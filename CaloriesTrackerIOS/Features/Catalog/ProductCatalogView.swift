@@ -10,6 +10,13 @@ enum CatalogMode {
         }
         return false
     }
+
+    var diaryContext: DiaryContext? {
+        guard case let .selection(context) = self else {
+            return nil
+        }
+        return context
+    }
 }
 
 struct ProductCatalogRootView: View {
@@ -26,6 +33,7 @@ struct ProductCatalogRootView: View {
                 router: router,
                 productService: productService,
                 recipeService: recipeService,
+                diaryService: nil,
             )
             .navigationDestination(for: CatalogRoute.self) { route in
                 switch route {
@@ -67,6 +75,7 @@ struct CatalogView: View {
     let router: AppRouter
     let productService: ProductService
     let recipeService: RecipeService
+    let diaryService: DiaryService?
 
     @State private var selectedSection: CatalogSection = .products
 
@@ -84,15 +93,24 @@ struct CatalogView: View {
             case .products:
                 ProductListView(
                     productService: productService,
+                    diaryService: diaryService,
+                    selectionContext: mode.diaryContext,
                     onSelect: selectProduct,
-                    onShowDetails: showProductDetails,
+                    onQuickAddComplete: {
+                        router.todayPath = []
+                    },
                     onAdd: createProduct,
                     allowsManagementActions: mode.allowsManagementActions,
                 )
             case .recipes:
                 RecipeListView(
                     recipeService: recipeService,
+                    diaryService: diaryService,
+                    selectionContext: mode.diaryContext,
                     onSelect: selectRecipe,
+                    onQuickAddComplete: {
+                        router.todayPath = []
+                    },
                     onAdd: createRecipe,
                     allowsManagementActions: mode.allowsManagementActions,
                 )
@@ -128,13 +146,6 @@ struct CatalogView: View {
         }
     }
 
-    private func showProductDetails(_ productID: UUID) {
-        guard case let .selection(context) = mode else {
-            return
-        }
-        router.todayPath.append(.productDetails(productID: productID, context: context))
-    }
-
     private func createProduct() {
         switch mode {
         case .management:
@@ -156,25 +167,29 @@ struct CatalogView: View {
 
 private struct ProductListView: View {
     let onSelect: (UUID) -> Void
-    let onShowDetails: (UUID) -> Void
+    let onQuickAddComplete: @MainActor () -> Void
     let onAdd: () -> Void
     let allowsManagementActions: Bool
+    let selectionContext: DiaryContext?
 
     @State private var model: ProductListViewModel
     @State private var searchText = ""
 
     init(
         productService: ProductService,
+        diaryService: DiaryService?,
+        selectionContext: DiaryContext?,
         onSelect: @escaping (UUID) -> Void,
-        onShowDetails: @escaping (UUID) -> Void,
+        onQuickAddComplete: @escaping @MainActor () -> Void,
         onAdd: @escaping () -> Void,
         allowsManagementActions: Bool,
     ) {
         self.onSelect = onSelect
-        self.onShowDetails = onShowDetails
+        self.onQuickAddComplete = onQuickAddComplete
         self.onAdd = onAdd
         self.allowsManagementActions = allowsManagementActions
-        _model = State(initialValue: ProductListViewModel(productService: productService))
+        self.selectionContext = selectionContext
+        _model = State(initialValue: ProductListViewModel(productService: productService, diaryService: diaryService))
     }
 
     var body: some View {
@@ -210,26 +225,48 @@ private struct ProductListView: View {
                             .accessibilityLabel("Удалить")
                         }
                     } else {
+                        let defaultValue = model.selectionDefault(for: item)
                         HStack(spacing: 12) {
                             Button {
                                 onSelect(item.product.id)
                             } label: {
-                                ProductListRow(item: item)
+                                ProductListRow(item: item, selectionDefault: defaultValue)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .contentShape(Rectangle())
+                            .accessibilityLabel("Открыть \(item.product.name)")
 
-                            Button {
-                                onShowDetails(item.product.id)
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .font(.title3)
+                            if model.quickAddingProductID == item.product.id {
+                                ProgressView()
+                                    .frame(minWidth: 44, minHeight: 44)
+                            } else {
+                                Button {
+                                    guard let selectionContext else {
+                                        return
+                                    }
+                                    Task {
+                                        if await model.quickAdd(
+                                            productID: item.product.id,
+                                            context: selectionContext,
+                                            defaultValue: defaultValue,
+                                        ) {
+                                            onQuickAddComplete()
+                                        }
+                                    }
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title3)
+                                }
+                                .buttonStyle(.borderless)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .accessibilityLabel("Добавить \(item.product.name)")
                             }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Открыть продукт")
                         }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
                 }
             }
@@ -269,15 +306,27 @@ private struct ProductListView: View {
 
 private struct ProductListRow: View {
     let item: ProductListItem
+    let selectionDefault: DiarySelectionAmountDefault?
+
+    init(item: ProductListItem, selectionDefault: DiarySelectionAmountDefault? = nil) {
+        self.item = item
+        self.selectionDefault = selectionDefault
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.product.name)
                 .font(.body.weight(.medium))
 
-            Text("\(formattedNumber(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Group {
+                if let selectionDefault {
+                    Text("\(formattedNumber(selectionDefault.amount)) \(selectionDefault.unitLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
+                } else {
+                    Text("\(formattedNumber(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
 
             if let barcode = item.product.barcode {
                 Text(barcode)

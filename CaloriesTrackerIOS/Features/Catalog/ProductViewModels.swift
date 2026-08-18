@@ -1,18 +1,28 @@
 import Foundation
 import Observation
 
+struct DiarySelectionAmountDefault: Hashable, Sendable {
+    let amount: Double
+    let unitToken: String
+    let unitLabel: String
+}
+
 @MainActor
 @Observable
 final class ProductListViewModel {
     private let productService: ProductService
+    private let diaryService: DiaryService?
     private var currentQuery = ""
 
     private(set) var products: [ProductListItem] = []
     private(set) var isLoading = false
+    private(set) var quickAddingProductID: UUID?
+    private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
     var errorMessage: String?
 
-    init(productService: ProductService) {
+    init(productService: ProductService, diaryService: DiaryService? = nil) {
         self.productService = productService
+        self.diaryService = diaryService
     }
 
     func load(matching query: String) async {
@@ -21,7 +31,17 @@ final class ProductListViewModel {
         errorMessage = nil
 
         do {
-            products = try await productService.products(matching: query)
+            let items = try await productService.products(matching: query)
+            products = items
+            if let diaryService {
+                usageDefaults = try await diaryService.latestUsageDefaults(
+                    for: items.map { item in
+                        FoodSourceReference(sourceType: .product, sourceID: item.product.id)
+                    },
+                )
+            } else {
+                usageDefaults = [:]
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -38,6 +58,70 @@ final class ProductListViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func selectionDefault(for item: ProductListItem) -> DiarySelectionAmountDefault {
+        let fallback = DiarySelectionAmountDefault(
+            amount: 100,
+            unitToken: item.currentVersion.baseUnit.rawValue,
+            unitLabel: item.currentVersion.baseUnit.russianLabel,
+        )
+        let source = FoodSourceReference(sourceType: .product, sourceID: item.product.id)
+        guard let usageDefault = usageDefaults[source],
+              usageDefault.amount.isFinite,
+              usageDefault.amount > 0,
+              let unitLabel = productUnitLabel(
+                  for: usageDefault.unitToken,
+                  version: item.currentVersion,
+              )
+        else {
+            return fallback
+        }
+
+        return DiarySelectionAmountDefault(
+            amount: usageDefault.amount,
+            unitToken: usageDefault.unitToken,
+            unitLabel: unitLabel,
+        )
+    }
+
+    func quickAdd(
+        productID: UUID,
+        context: DiaryContext,
+        defaultValue: DiarySelectionAmountDefault,
+    ) async -> Bool {
+        guard let diaryService else {
+            return false
+        }
+
+        quickAddingProductID = productID
+        errorMessage = nil
+        defer { quickAddingProductID = nil }
+
+        do {
+            try await diaryService.quickAdd(
+                context: context,
+                source: FoodSourceReference(sourceType: .product, sourceID: productID),
+                preferredAmount: defaultValue.amount,
+                preferredUnitToken: defaultValue.unitToken,
+            )
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    private func productUnitLabel(for token: String, version: ProductVersion) -> String? {
+        if token == version.baseUnit.rawValue {
+            return version.baseUnit.russianLabel
+        }
+        guard let servingUnitID = UUID(uuidString: String(token.dropFirst("serving:".count))),
+              token.hasPrefix("serving:")
+        else {
+            return nil
+        }
+        return version.servingUnits.first(where: { $0.id == servingUnitID })?.name
     }
 }
 

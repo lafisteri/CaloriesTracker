@@ -15,33 +15,36 @@ struct DiaryAmountView: View {
     var body: some View {
         @Bindable var model = model
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if model.isLoading && model.source == nil {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 160)
-                } else if let source = model.source {
-                    nutritionPreview
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if model.isLoading && model.source == nil {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, minHeight: 160)
+                    } else if model.source != nil {
+                        nutritionPreview
 
-                    if let previewErrorMessage = model.previewErrorMessage {
-                        DiaryInlineErrorView(message: previewErrorMessage)
+                        if let previewErrorMessage = model.previewErrorMessage {
+                            DiaryInlineErrorView(message: previewErrorMessage)
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            "Источник недоступен",
+                            systemImage: "fork.knife",
+                            description: model.errorMessage.map(Text.init),
+                        )
                     }
-                } else {
-                    ContentUnavailableView(
-                        "Источник недоступен",
-                        systemImage: "fork.knife",
-                        description: model.errorMessage.map(Text.init),
-                    )
-                }
 
-                if let errorMessage = model.errorMessage, model.source != nil {
-                    DiaryInlineErrorView(message: errorMessage)
+                    if let errorMessage = model.errorMessage, model.source != nil {
+                        DiaryInlineErrorView(message: errorMessage)
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.top, 16)
+                .padding(.bottom)
             }
-            .padding(.horizontal)
-            .padding(.top, 16)
-            .padding(.bottom)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(model.source?.sourceName ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
@@ -54,7 +57,7 @@ struct DiaryAmountView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if let source = model.source {
                 HStack(spacing: 8) {
                     TextField("", text: $model.amountText)

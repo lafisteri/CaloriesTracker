@@ -143,6 +143,7 @@ struct TodayRootView: View {
                     router: router,
                     productService: productService,
                     recipeService: recipeService,
+                    diaryService: diaryService,
                 )
             case let .amount(context, source):
                 DiaryAmountView(

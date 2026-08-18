@@ -40,6 +40,11 @@ struct DiaryAmountSource: Hashable, Sendable {
     let initialUnitToken: String
 }
 
+struct DiaryUsageDefault: Hashable, Sendable {
+    let amount: Double
+    let unitToken: String
+}
+
 enum DiaryAmountCalculationSource: Hashable, Sendable {
     case product(ProductVersion)
     case recipe(RecipeVersion)
@@ -157,6 +162,23 @@ final class DiaryService {
         )
     }
 
+    func latestUsageDefaults(for sources: [FoodSourceReference]) async throws -> [FoodSourceReference: DiaryUsageDefault] {
+        let entries = try await diaryRepository.activeEntries(for: sources)
+        var latestEntries: [FoodSourceReference: DiaryEntry] = [:]
+
+        for entry in entries {
+            let source = FoodSourceReference(sourceType: entry.sourceType, sourceID: entry.sourceID)
+            if let existing = latestEntries[source], !isMoreRecent(entry, than: existing) {
+                continue
+            }
+            latestEntries[source] = entry
+        }
+
+        return latestEntries.mapValues { entry in
+            DiaryUsageDefault(amount: entry.amount, unitToken: entry.unitToken)
+        }
+    }
+
     func preview(
         source: DiaryAmountSource,
         amount: Double,
@@ -168,26 +190,65 @@ final class DiaryService {
     func create(_ command: CreateDiaryEntryCommand) async throws {
         try validatePositiveAmount(command.amount)
         let source = try await currentSource(for: command.source)
-        let nutrition = try preview(
-            source: source.calculationSource,
+        try await create(
+            context: command.context,
+            source: source,
             amount: command.amount,
             unitToken: command.unitToken,
         )
-        let existingEntries = try await diaryRepository.entries(on: command.context.day)
+    }
+
+    func quickAdd(
+        context: DiaryContext,
+        source sourceReference: FoodSourceReference,
+        preferredAmount: Double,
+        preferredUnitToken: String,
+    ) async throws {
+        let source = try await currentSource(for: sourceReference)
+        let amountSource = makeAmountSource(
+            from: source,
+            initialAmount: nil,
+            initialUnitToken: nil,
+        )
+        let amount = preferredAmount.isFinite && preferredAmount > 0 ? preferredAmount : 100
+        let unitToken = compatibleUnitToken(
+            preferredUnitToken,
+            options: amountSource.unitOptions,
+        ) ?? amountSource.initialUnitToken
+
+        try await create(
+            context: context,
+            source: source,
+            amount: amount,
+            unitToken: unitToken,
+        )
+    }
+
+    private func create(
+        context: DiaryContext,
+        source: ResolvedDiarySource,
+        amount: Double,
+        unitToken: String,
+    ) async throws {
+        try validatePositiveAmount(amount)
+        let nutrition = try preview(
+            source: source.calculationSource,
+            amount: amount,
+            unitToken: unitToken,
+        )
+        let existingEntries = try await diaryRepository.entries(on: context.day)
         let now = Date()
         let entry = DiaryEntry(
             id: UUID(),
-            day: command.context.day,
-            mealType: command.context.meal,
-            sortOrder: nextSortOrder(
-                for: existingEntries.filter { $0.mealType == command.context.meal },
-            ),
+            day: context.day,
+            mealType: context.meal,
+            sortOrder: nextSortOrder(for: existingEntries.filter { $0.mealType == context.meal }),
             sourceType: source.sourceType,
             sourceID: source.sourceID,
             sourceVersionID: source.sourceVersionID,
             sourceName: source.sourceName,
-            amount: command.amount,
-            unitToken: command.unitToken,
+            amount: amount,
+            unitToken: unitToken,
             nutrition: nutrition,
             createdAt: now,
             updatedAt: now,
@@ -376,6 +437,26 @@ final class DiaryService {
                 initialUnitToken: resolvedInitialToken ?? options.first?.token ?? "",
             )
         }
+    }
+
+    private func compatibleUnitToken(_ preferredToken: String, options: [DiaryUnitOption]) -> String? {
+        if options.contains(where: { $0.token == preferredToken }) {
+            return preferredToken
+        }
+        guard let recipeUnit = RecipeDiaryUnit.resolve(preferredToken) else {
+            return nil
+        }
+        return options.first(where: { $0.token == recipeUnit.rawValue })?.token
+    }
+
+    private func isMoreRecent(_ candidate: DiaryEntry, than existing: DiaryEntry) -> Bool {
+        if candidate.updatedAt != existing.updatedAt {
+            return candidate.updatedAt > existing.updatedAt
+        }
+        if candidate.createdAt != existing.createdAt {
+            return candidate.createdAt > existing.createdAt
+        }
+        return candidate.id.uuidString > existing.id.uuidString
     }
 
     private func preview(
