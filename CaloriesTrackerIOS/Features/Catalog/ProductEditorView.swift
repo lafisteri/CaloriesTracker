@@ -48,7 +48,7 @@ struct ProductEditorView: View {
                         .focused($focusedField, equals: .barcode)
 
                     Picker("Единица", selection: $model.baseUnit) {
-                        ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
+                        ForEach(ProductBaseUnit.editorUnitOptions, id: \.self) { unit in
                             Text(unit.russianLabel).tag(unit)
                         }
                     }
@@ -161,4 +161,8 @@ private enum EditorField: Hashable {
             "carbs"
         }
     }
+}
+
+private extension ProductBaseUnit {
+    static let editorUnitOptions: [Self] = [.g, .serving]
 }

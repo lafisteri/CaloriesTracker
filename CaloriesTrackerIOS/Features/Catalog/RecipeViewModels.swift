@@ -168,6 +168,25 @@ final class RecipeEditorViewModel {
     var name = ""
     var cookedWeightText = ""
     var servingsCountText = ""
+    var outputUnit: RecipeDiaryUnit = .grams
+    var outputAmountText: String {
+        get {
+            switch outputUnit {
+            case .grams:
+                cookedWeightText
+            case .serving:
+                servingsCountText
+            }
+        }
+        set {
+            switch outputUnit {
+            case .grams:
+                cookedWeightText = newValue
+            case .serving:
+                servingsCountText = newValue
+            }
+        }
+    }
     private(set) var ingredients: [RecipeIngredientEditorItem] = []
     private(set) var preview: Nutrition?
     private(set) var previewErrorMessage: String?
@@ -195,6 +214,7 @@ final class RecipeEditorViewModel {
             name = draft.name
             cookedWeightText = draft.cookedWeight.map(recipeNumericString) ?? ""
             servingsCountText = draft.servingsCount.map(recipeNumericString) ?? ""
+            outputUnit = draft.cookedWeight == nil && draft.servingsCount != nil ? .serving : .grams
             try await setIngredients(from: draft.ingredients)
             await refreshPreview()
         } catch {
@@ -303,8 +323,8 @@ final class RecipeEditorViewModel {
         RecipeDraft(
             name: name,
             ingredients: ingredients.map(\.draft),
-            cookedWeight: try recipeOptionalNumber(cookedWeightText, field: "Готовый вес"),
-            servingsCount: try recipeOptionalNumber(servingsCountText, field: "Количество порций"),
+            cookedWeight: try recipeOptionalNumber(cookedWeightText, field: "Количество"),
+            servingsCount: try recipeOptionalNumber(servingsCountText, field: "Количество"),
         )
     }
 }

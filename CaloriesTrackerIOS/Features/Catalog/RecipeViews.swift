@@ -361,12 +361,16 @@ struct RecipeEditorView: View {
                 Section {
                     TextField("Название", text: $model.name)
                         .textInputAutocapitalization(.sentences)
-                    TextField("Готовый вес", text: $model.cookedWeightText)
+
+                    Picker("Единица", selection: $model.outputUnit) {
+                        ForEach(RecipeDiaryUnit.allCases, id: \.self) { unit in
+                            Text(recipeOutputUnitLabel(unit)).tag(unit)
+                        }
+                    }
+
+                    TextField("Количество", text: $model.outputAmountText)
                         .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .cookedWeight)
-                    TextField("Количество порций", text: $model.servingsCountText)
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .servings)
+                        .focused($focusedField, equals: .outputAmount)
                 }
 
                 FoodCompositionSection(
@@ -620,8 +624,7 @@ private struct RecipeIngredientListEntryRow: View {
 }
 
 private enum RecipeEditorField: Hashable {
-    case cookedWeight
-    case servings
+    case outputAmount
 }
 
 struct RecipeVersionHistoryView: View {
@@ -920,6 +923,15 @@ private struct RecipeCompositionAmountView: View {
         .onChange(of: model.amountText) { _, _ in
             model.refreshPreview()
         }
+    }
+}
+
+private func recipeOutputUnitLabel(_ unit: RecipeDiaryUnit) -> String {
+    switch unit {
+    case .grams:
+        "г"
+    case .serving:
+        "порция"
     }
 }
 
