@@ -60,13 +60,20 @@ struct GoalEditorView: View {
         .disabled(model.isSaving)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(model.isSaving ? "Сохранение…" : "Сохранить") {
+                Button {
                     Task {
                         if await model.save() {
                             router.statisticsPath = []
                         }
                     }
+                } label: {
+                    if model.isSaving {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "checkmark")
+                    }
                 }
+                .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isSaving)
             }
         }

@@ -59,7 +59,7 @@ struct DiaryAmountView: View {
                         .frame(minWidth: 64, alignment: .leading)
                         .accessibilityLabel("Единица: \(selectedUnitLabel(for: source))")
 
-                    Button(model.isSaving ? "…" : model.actionTitle) {
+                    Button {
                         Self.logger.notice("action=amount_save_tapped mode=\(modeDiagnostic, privacy: .public)")
                         Task {
                             let didSave = await model.save()
@@ -69,10 +69,18 @@ struct DiaryAmountView: View {
                                 router.todayPath = []
                             }
                         }
+                    } label: {
+                        Group {
+                            if model.isSaving {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityLabel(model.actionTitle)
                     .disabled(model.isLoading || model.isSaving)
                 }
                 .padding(.horizontal)

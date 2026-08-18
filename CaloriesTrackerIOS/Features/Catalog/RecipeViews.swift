@@ -413,7 +413,7 @@ struct RecipeEditorView: View {
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(model.isSaving ? "Сохранение…" : "Сохранить") {
+                Button {
                     Task {
                         if await model.save() {
                             focusedField = nil
@@ -424,7 +424,14 @@ struct RecipeEditorView: View {
                             }
                         }
                     }
+                } label: {
+                    if model.isSaving {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "checkmark")
+                    }
                 }
+                .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isLoading || model.isSaving)
             }
             ToolbarItemGroup(placement: .keyboard) {
@@ -749,13 +756,17 @@ private struct RecipeIngredientAmountView: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
 
-                Button("Добавить") {
+                Button {
                     if let draft = model.makeDraft() {
                         amountIsFocused = false
                         onComplete(draft, source.productName)
                     }
+                } label: {
+                    Image(systemName: "checkmark")
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityLabel("Добавить")
             }
             .padding(.horizontal)
             .padding(.vertical, 8)

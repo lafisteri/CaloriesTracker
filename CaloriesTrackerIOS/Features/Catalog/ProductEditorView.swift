@@ -75,14 +75,14 @@ struct ProductEditorView: View {
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(model.isSaving ? "Сохранение…" : "Сохранить") {
+                Button {
                     Self.logger.notice("action=product_save_tapped focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
+                    Self.logger.notice("focus=editor_resign_before_save")
+                    focusedField = nil
                     Task {
                         let didSave = await model.save()
                         Self.logger.notice("action=product_save_finished success=\(didSave)")
                         if didSave {
-                            Self.logger.notice("focus=editor_resign_before_save_return")
-                            focusedField = nil
                             if let onSaved {
                                 Self.logger.notice("navigation=editor_save_return_requested")
                                 onSaved()
@@ -91,16 +91,15 @@ struct ProductEditorView: View {
                             }
                         }
                     }
+                } label: {
+                    if model.isSaving {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "checkmark")
+                    }
                 }
+                .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isLoading || model.isSaving)
-            }
-
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Готово") {
-                    Self.logger.notice("action=product_keyboard_done focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
-                    focusedField = nil
-                }
             }
         }
         .task {
