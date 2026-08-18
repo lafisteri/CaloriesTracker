@@ -230,13 +230,16 @@ private struct ProductListView: View {
                             Button {
                                 onSelect(item.product.id)
                             } label: {
-                                ProductListRow(item: item, selectionDefault: defaultValue)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                HStack(spacing: 0) {
+                                    ProductListRow(item: item, selectionDefault: defaultValue)
+                                    Spacer(minLength: 0)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
                             .accessibilityLabel("Открыть \(item.product.name)")
 
                             if model.quickAddingProductID == item.product.id {
@@ -266,7 +269,6 @@ private struct ProductListView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .contentShape(Rectangle())
                     }
                 }
             }
