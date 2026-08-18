@@ -193,9 +193,12 @@ struct RecipeDetailView: View {
             .toolbar {
                 if model.details != nil {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Редактировать") {
+                        Button {
                             router.catalogPath.append(.recipeEditor(recipeID))
+                        } label: {
+                            Image(systemName: "pencil")
                         }
+                        .accessibilityLabel("Редактировать")
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {

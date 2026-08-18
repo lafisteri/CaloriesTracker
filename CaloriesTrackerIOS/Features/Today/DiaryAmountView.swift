@@ -85,16 +85,19 @@ struct DiaryAmountView: View {
         .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
-            if case let .create(context, _) = model.mode, let productID {
+            if let productID {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Редактировать") {
+                    Button {
                         Self.logger.notice("action=product_edit_tapped mode=\(modeDiagnostic, privacy: .public)")
                         Self.logger.notice("focus=amount_disabled_for_product_editor")
                         isAmountFocusEnabled = false
                         amountIsFocused = false
-                        router.todayPath.append(.productEditorForDiarySelection(productID: productID, context: context))
+                        router.todayPath.append(productEditorRoute(for: productID))
                         Self.logger.debug("navigation=product_editor_pushed path_count=\(router.todayPath.count)")
+                    } label: {
+                        Image(systemName: "pencil")
                     }
+                    .accessibilityLabel("Редактировать")
                 }
             }
         }
@@ -248,6 +251,8 @@ struct DiaryAmountView: View {
             "product_editor"
         case .productEditorForDiarySelection:
             "product_editor_for_diary_selection"
+        case .productEditorForEntryAmount:
+            "product_editor_for_entry_amount"
         case .recipeEditor:
             "recipe_editor"
         case .productDetails:
@@ -299,5 +304,14 @@ struct DiaryAmountView: View {
             return nil
         }
         return version.productID
+    }
+
+    private func productEditorRoute(for productID: UUID) -> TodayRoute {
+        switch model.mode {
+        case let .create(context, _):
+            return .productEditorForDiarySelection(productID: productID, context: context)
+        case .edit:
+            return .productEditorForEntryAmount(productID: productID)
+        }
     }
 }

@@ -182,6 +182,18 @@ struct TodayRootView: View {
                         router.amountFocusRestorationRevision += 1
                     },
                 )
+            case let .productEditorForEntryAmount(productID):
+                ProductEditorView(
+                    productID: productID,
+                    router: router,
+                    productService: productService,
+                    onSaved: {
+                        router.todayPath.removeLast()
+                    },
+                    onDismissed: {
+                        router.amountFocusRestorationRevision += 1
+                    },
+                )
             case let .recipeEditor(context, recipeID):
                 RecipeEditorView(
                     recipeID: recipeID,

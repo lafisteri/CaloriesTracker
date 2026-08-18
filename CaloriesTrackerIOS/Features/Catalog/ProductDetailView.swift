@@ -31,9 +31,12 @@ struct ProductDetailView: View {
             .toolbar {
                 if model.details != nil {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Редактировать") {
+                        Button {
                             openEditor()
+                        } label: {
+                            Image(systemName: "pencil")
                         }
+                        .accessibilityLabel("Редактировать")
                     }
 
                     if case .catalog = presentation {

@@ -28,6 +28,7 @@ enum TodayRoute: Hashable {
     case entryEditor(UUID)
     case productEditor(context: DiaryContext?, prefilledBarcode: String?)
     case productEditorForDiarySelection(productID: UUID, context: DiaryContext)
+    case productEditorForEntryAmount(productID: UUID)
     case recipeEditor(context: DiaryContext, recipeID: UUID?)
     case productDetails(productID: UUID, context: DiaryContext)
     case recipeDetails(UUID)
@@ -38,7 +39,7 @@ enum TodayRoute: Hashable {
             true
         case let .productEditor(context, _):
             context != nil
-        case .entryEditor:
+        case .entryEditor, .productEditorForEntryAmount:
             false
         }
     }
