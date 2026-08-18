@@ -88,7 +88,7 @@ Network work in a future `SyncService` belongs in an actor. It passes `Codable` 
 ## Project Structure
 
 ```text
-CaloriesTrackerIOS/                         # future separate Xcode project root
+ios/                                         # iOS application and Xcode project
   App/
     CaloriesTrackerApp.swift
     AppDependencies.swift

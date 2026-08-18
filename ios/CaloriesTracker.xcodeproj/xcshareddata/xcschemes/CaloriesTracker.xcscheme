@@ -17,7 +17,7 @@
                BlueprintIdentifier = "A50000000000000000000001"
                BuildableName = "CaloriesTracker.app"
                BlueprintName = "CaloriesTracker"
-               ReferencedContainer = "container:CaloriesTrackerIOS.xcodeproj">
+               ReferencedContainer = "container:CaloriesTracker.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,7 +46,7 @@
             BlueprintIdentifier = "A50000000000000000000001"
             BuildableName = "CaloriesTracker.app"
             BlueprintName = "CaloriesTracker"
-            ReferencedContainer = "container:CaloriesTrackerIOS.xcodeproj">
+            ReferencedContainer = "container:CaloriesTracker.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -63,7 +63,7 @@
             BlueprintIdentifier = "A50000000000000000000001"
             BuildableName = "CaloriesTracker.app"
             BlueprintName = "CaloriesTracker"
-            ReferencedContainer = "container:CaloriesTrackerIOS.xcodeproj">
+            ReferencedContainer = "container:CaloriesTracker.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

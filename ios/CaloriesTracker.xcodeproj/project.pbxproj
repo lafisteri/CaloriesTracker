@@ -409,7 +409,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A60000000000000000000001 /* Build configuration list for PBXProject "CaloriesTrackerIOS" */;
+			buildConfigurationList = A60000000000000000000001 /* Build configuration list for PBXProject "CaloriesTracker" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -635,7 +635,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A60000000000000000000001 /* Build configuration list for PBXProject "CaloriesTrackerIOS" */ = {
+		A60000000000000000000001 /* Build configuration list for PBXProject "CaloriesTracker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A80000000000000000000001 /* Debug */,
