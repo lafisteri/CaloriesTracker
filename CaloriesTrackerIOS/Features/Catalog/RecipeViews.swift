@@ -2,28 +2,23 @@ import SwiftUI
 
 struct RecipeListView: View {
     let onSelect: (UUID) -> Void
-    let onQuickAddComplete: @MainActor () -> Void
     let onAdd: () -> Void
-    let allowsManagementActions: Bool
-    let selectionContext: DiaryContext?
+    let mode: RecipeListMode
 
     @State private var model: RecipeListViewModel
     @State private var searchText = ""
+    @State private var quickAddingRecipeID: UUID?
 
     init(
         recipeService: RecipeService,
         diaryService: DiaryService?,
-        selectionContext: DiaryContext?,
+        mode: RecipeListMode,
         onSelect: @escaping (UUID) -> Void,
-        onQuickAddComplete: @escaping @MainActor () -> Void,
         onAdd: @escaping () -> Void,
-        allowsManagementActions: Bool,
     ) {
         self.onSelect = onSelect
-        self.onQuickAddComplete = onQuickAddComplete
         self.onAdd = onAdd
-        self.allowsManagementActions = allowsManagementActions
-        self.selectionContext = selectionContext
+        self.mode = mode
         _model = State(initialValue: RecipeListViewModel(recipeService: recipeService, diaryService: diaryService))
     }
 
@@ -45,7 +40,8 @@ struct RecipeListView: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(model.recipes) { item in
-                    if allowsManagementActions {
+                    switch mode {
+                    case .management:
                         NavigationLink(value: CatalogRoute.recipe(item.id)) {
                             RecipeListRow(item: item)
                         }
@@ -59,35 +55,35 @@ struct RecipeListView: View {
                             }
                             .accessibilityLabel("Удалить")
                         }
-                    } else {
+                    case let .selection(context):
                         if let defaultValue = model.selectionDefault(for: item) {
                             HStack(spacing: 12) {
                                 Button {
                                     onSelect(item.recipe.id)
                                 } label: {
-                                    RecipeListRow(item: item, selectionDefault: defaultValue)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    HStack(spacing: 0) {
+                                        RecipeListRow(item: item, selectionDefault: defaultValue)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.primary)
-                                .contentShape(Rectangle())
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 
-                                if model.quickAddingRecipeID == item.recipe.id {
+                                if quickAddingRecipeID == item.recipe.id {
                                     ProgressView()
                                         .frame(minWidth: 44, minHeight: 44)
                                 } else {
                                     Button {
-                                        guard let selectionContext else {
-                                            return
-                                        }
                                         Task {
-                                            if await model.quickAdd(
-                                                recipeID: item.recipe.id,
-                                                context: selectionContext,
-                                                defaultValue: defaultValue,
-                                            ) {
-                                                onQuickAddComplete()
+                                            quickAddingRecipeID = item.recipe.id
+                                            defer { quickAddingRecipeID = nil }
+                                            do {
+                                                try await context.onQuickAddRecipe(item.recipe.id, defaultValue)
+                                            } catch {
+                                                model.errorMessage = error.localizedDescription
                                             }
                                         }
                                     } label: {
@@ -99,16 +95,21 @@ struct RecipeListView: View {
                                     .accessibilityLabel("Добавить \(item.recipe.name)")
                                 }
                             }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         } else {
                             Button {
                                 onSelect(item.recipe.id)
                             } label: {
-                                RecipeListRow(item: item)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                HStack(spacing: 0) {
+                                    RecipeListRow(item: item)
+                                    Spacer(minLength: 0)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.primary)
-                            .contentShape(Rectangle())
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         }
                     }
                 }
@@ -149,9 +150,9 @@ struct RecipeListView: View {
 
 private struct RecipeListRow: View {
     let item: RecipeListItem
-    let selectionDefault: DiarySelectionAmountDefault?
+    let selectionDefault: FoodSelectionAmountDefault?
 
-    init(item: RecipeListItem, selectionDefault: DiarySelectionAmountDefault? = nil) {
+    init(item: RecipeListItem, selectionDefault: FoodSelectionAmountDefault? = nil) {
         self.item = item
         self.selectionDefault = selectionDefault
     }
@@ -316,10 +317,15 @@ struct RecipeEditorView: View {
     let router: AppRouter
     let productService: ProductService
     let recipeService: RecipeService
+    let diaryService: DiaryService
     let onSaved: (@MainActor () -> Void)?
 
     @State private var model: RecipeEditorViewModel
     @State private var showsIngredientSelection = false
+    @State private var selectedIngredientProduct: RecipeIngredientProductSelection?
+    @State private var selectedIngredientRecipe: RecipeIngredientRecipeSelection?
+    @State private var showsIngredientProductCreation = false
+    @State private var showsIngredientRecipeCreation = false
     @State private var editingIngredient: RecipeIngredientEditorItem?
     @FocusState private var focusedField: RecipeEditorField?
 
@@ -328,11 +334,13 @@ struct RecipeEditorView: View {
         router: AppRouter,
         productService: ProductService,
         recipeService: RecipeService,
+        diaryService: DiaryService,
         onSaved: (@MainActor () -> Void)? = nil,
     ) {
         self.router = router
         self.productService = productService
         self.recipeService = recipeService
+        self.diaryService = diaryService
         self.onSaved = onSaved
         _model = State(initialValue: RecipeEditorViewModel(recipeID: recipeID, recipeService: recipeService))
     }
@@ -340,7 +348,7 @@ struct RecipeEditorView: View {
     var body: some View {
         @Bindable var model = model
 
-        Form {
+        List {
             if model.isLoading {
                 Section {
                     HStack {
@@ -361,32 +369,32 @@ struct RecipeEditorView: View {
                         .focused($focusedField, equals: .servings)
                 }
 
-                Section("Ингредиенты") {
+                FoodCompositionSection(
+                    title: "Ингредиенты",
+                    nutrition: model.preview ?? .zero,
+                ) {
                     ForEach(model.ingredients) { item in
-                        Button {
-                            editingIngredient = item
-                        } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.productName)
-                                    .foregroundStyle(.primary)
-                                Text("\(formattedNumber(item.draft.amount)) \(recipeIngredientTokenLabel(item.draft.unitToken))")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        RecipeIngredientListEntryRow(
+                            item: item,
+                            onSelect: {
+                                editingIngredient = item
+                            },
+                            onDelete: {
+                                model.removeIngredient(id: item.id)
+                                Task {
+                                    await model.refreshPreview()
+                                }
+                            },
+                        )
+                        .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                        .listRowSeparator(.hidden)
                     }
-                    .onDelete { offsets in
-                        model.removeIngredients(at: offsets)
-                        Task {
-                            await model.refreshPreview()
-                        }
-                    }
-
-                    Button {
+                } addRow: {
+                    FoodCompositionAddRow {
                         showsIngredientSelection = true
-                    } label: {
-                        Label("Добавить ингредиент", systemImage: "plus")
                     }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
                 }
 
                 Section("Пищевая ценность") {
@@ -408,6 +416,8 @@ struct RecipeEditorView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle(model.recipeID == nil ? "Новый рецепт" : "Редактировать рецепт")
         .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
@@ -454,27 +464,157 @@ struct RecipeEditorView: View {
                 await model.refreshPreview()
             }
         }
-        .sheet(isPresented: $showsIngredientSelection) {
-            RecipeIngredientPickerView(
+        .navigationDestination(isPresented: $showsIngredientSelection) {
+            CatalogView(
+                mode: .selection(
+                    FoodSelectionContext(
+                        onSelectProduct: { productID in
+                            selectedIngredientProduct = RecipeIngredientProductSelection(productID: productID)
+                        },
+                        onSelectRecipe: { recipeID in
+                            selectedIngredientRecipe = RecipeIngredientRecipeSelection(recipeID: recipeID)
+                        },
+                        onQuickAddProduct: { productID, defaultValue in
+                            try await quickAddIngredient(productID: productID, defaultValue: defaultValue)
+                        },
+                        onQuickAddRecipe: { recipeID, defaultValue in
+                            try await quickAddRecipeComposition(recipeID: recipeID, defaultValue: defaultValue)
+                        },
+                        onCreateProduct: {
+                            showsIngredientProductCreation = true
+                        },
+                        onCreateRecipe: {
+                            showsIngredientRecipeCreation = true
+                        },
+                    ),
+                ),
+                router: router,
                 productService: productService,
                 recipeService: recipeService,
+                diaryService: diaryService,
+            )
+            .navigationDestination(item: $selectedIngredientProduct) { selection in
+                RecipeIngredientAmountDestination(
+                    productID: selection.productID,
+                    recipeService: recipeService,
+                ) { draft, productName in
+                    model.addIngredient(draft, productName: productName)
+                    selectedIngredientProduct = nil
+                    showsIngredientSelection = false
+                    Task {
+                        await model.refreshPreview()
+                    }
+                }
+            }
+            .navigationDestination(item: $selectedIngredientRecipe) { selection in
+                RecipeIngredientRecipeAmountDestination(
+                    recipeID: selection.recipeID,
+                    recipeService: recipeService,
+                ) { drafts in
+                    Task {
+                        if await model.addIngredients(drafts) {
+                            selectedIngredientRecipe = nil
+                            showsIngredientSelection = false
+                        }
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showsIngredientProductCreation) {
+                ProductEditorView(
+                    productID: nil,
+                    router: router,
+                    productService: productService,
+                    onSaved: {
+                        showsIngredientProductCreation = false
+                    },
+                )
+            }
+            .navigationDestination(isPresented: $showsIngredientRecipeCreation) {
+                RecipeEditorView(
+                    recipeID: nil,
+                    router: router,
+                    productService: productService,
+                    recipeService: recipeService,
+                    diaryService: diaryService,
+                    onSaved: {
+                        showsIngredientRecipeCreation = false
+                    },
+                )
+            }
+        }
+        .navigationDestination(item: $editingIngredient) { item in
+            ExistingRecipeIngredientAmountDestination(
+                draft: item.draft,
+                recipeService: recipeService,
             ) { draft, productName in
-                model.addIngredient(draft, productName: productName)
+                model.replaceIngredient(draft, productName: productName)
+                editingIngredient = nil
                 Task {
                     await model.refreshPreview()
                 }
             }
         }
-        .sheet(item: $editingIngredient) { item in
-            ExistingRecipeIngredientEditorSheet(
-                draft: item.draft,
-                recipeService: recipeService,
-            ) { draft, productName in
-                model.replaceIngredient(draft, productName: productName)
-                Task {
-                    await model.refreshPreview()
-                }
+    }
+
+    @MainActor
+    private func quickAddIngredient(
+        productID: UUID,
+        defaultValue: FoodSelectionAmountDefault,
+    ) async throws {
+        let source = try await recipeService.ingredientSource(forProductID: productID)
+        let draft = try recipeService.makeIngredientDraft(
+            source: source,
+            amount: defaultValue.amount,
+            unitToken: defaultValue.unitToken,
+        )
+        model.addIngredient(draft, productName: source.productName)
+        await model.refreshPreview()
+        showsIngredientSelection = false
+    }
+
+    @MainActor
+    private func quickAddRecipeComposition(
+        recipeID: UUID,
+        defaultValue: FoodSelectionAmountDefault,
+    ) async throws {
+        let source = try await recipeService.compositionSource(forRecipeID: recipeID)
+        let drafts = try recipeService.makeIngredientDrafts(
+            from: source,
+            amount: defaultValue.amount,
+            unitToken: defaultValue.unitToken,
+        )
+        try await model.appendIngredients(drafts)
+        showsIngredientSelection = false
+    }
+}
+
+private struct RecipeIngredientListEntryRow: View {
+    let item: RecipeIngredientEditorItem
+    let onSelect: @MainActor () -> Void
+    let onDelete: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 0) {
+                FoodCompositionEntryRow(
+                    title: item.productName,
+                    amount: item.draft.amount,
+                    unitLabel: recipeIngredientTokenLabel(item.draft.unitToken),
+                    calories: item.nutrition?.calories ?? 0,
+                )
+                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "trash")
+            }
+            .accessibilityLabel("Удалить")
         }
     }
 }
@@ -541,144 +681,118 @@ struct RecipeVersionHistoryView: View {
     }
 }
 
-private struct RecipeIngredientPickerView: View {
+private struct RecipeIngredientProductSelection: Hashable, Identifiable {
+    let productID: UUID
+
+    var id: UUID {
+        productID
+    }
+}
+
+private struct RecipeIngredientRecipeSelection: Hashable, Identifiable {
+    let recipeID: UUID
+
+    var id: UUID {
+        recipeID
+    }
+}
+
+private struct RecipeIngredientAmountDestination: View {
+    let productID: UUID
     let recipeService: RecipeService
     let onComplete: (RecipeIngredientDraft, String) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var model: RecipeIngredientSelectionViewModel
-    @State private var searchText = ""
-    @State private var selectedSource: RecipeIngredientSource?
-    @State private var sourceErrorMessage: String?
-
-    init(
-        productService: ProductService,
-        recipeService: RecipeService,
-        onComplete: @escaping (RecipeIngredientDraft, String) -> Void,
-    ) {
-        self.recipeService = recipeService
-        self.onComplete = onComplete
-        _model = State(initialValue: RecipeIngredientSelectionViewModel(productService: productService))
-    }
+    @State private var source: RecipeIngredientSource?
+    @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            List {
-                if model.isLoading && model.products.isEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                    .listRowSeparator(.hidden)
-                } else if model.products.isEmpty, model.errorMessage == nil {
-                    ContentUnavailableView(
-                        "Продуктов пока нет",
-                        systemImage: "shippingbox",
-                        description: Text("Сначала создайте продукт во вкладке «Продукты»"),
-                    )
-                    .listRowSeparator(.hidden)
-                } else {
-                    ForEach(model.products) { item in
-                        Button {
-                            Task {
-                                do {
-                                    selectedSource = try await recipeService.ingredientSource(forProductID: item.product.id)
-                                } catch {
-                                    sourceErrorMessage = recipeErrorMessage(error, fallback: "Не удалось выбрать продукт.")
-                                }
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.product.name)
-                                    .foregroundStyle(.primary)
-                                Text("\(formattedNumber(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-
-                if let errorMessage = model.errorMessage ?? sourceErrorMessage {
-                    Section {
-                        InlineErrorView(message: errorMessage)
-                    }
-                }
+        Group {
+            if let source {
+                RecipeIngredientAmountView(source: source, recipeService: recipeService, onComplete: onComplete)
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Продукт недоступен",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage),
+                )
+            } else {
+                ProgressView()
             }
-            .listStyle(.plain)
-            .navigationTitle("Ингредиент")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Поиск продукта")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Отмена") {
-                        dismiss()
-                    }
-                }
-            }
-            .task {
-                await model.load(matching: searchText)
-            }
-            .onChange(of: searchText) { _, query in
-                Task {
-                    await model.load(matching: query)
-                }
-            }
-            .navigationDestination(item: $selectedSource) { source in
-                RecipeIngredientAmountView(source: source, recipeService: recipeService) { draft, productName in
-                    onComplete(draft, productName)
-                    dismiss()
-                }
+        }
+        .task {
+            do {
+                source = try await recipeService.ingredientSource(forProductID: productID)
+            } catch {
+                errorMessage = recipeErrorMessage(error, fallback: "Не удалось выбрать продукт.")
             }
         }
     }
 }
 
-private struct ExistingRecipeIngredientEditorSheet: View {
+private struct RecipeIngredientRecipeAmountDestination: View {
+    let recipeID: UUID
+    let recipeService: RecipeService
+    let onComplete: ([RecipeIngredientDraft]) -> Void
+
+    @State private var source: RecipeCompositionSource?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if let source {
+                RecipeCompositionAmountView(source: source, recipeService: recipeService, onComplete: onComplete)
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Рецепт недоступен",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage),
+                )
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            do {
+                source = try await recipeService.compositionSource(forRecipeID: recipeID)
+            } catch {
+                errorMessage = recipeErrorMessage(error, fallback: "Не удалось выбрать рецепт.")
+            }
+        }
+    }
+}
+
+private struct ExistingRecipeIngredientAmountDestination: View {
     let draft: RecipeIngredientDraft
     let recipeService: RecipeService
     let onComplete: (RecipeIngredientDraft, String) -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var source: RecipeIngredientSource?
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let source {
-                    RecipeIngredientAmountView(
-                        source: source,
-                        replacing: draft,
-                        recipeService: recipeService,
-                    ) { updatedDraft, productName in
-                        onComplete(updatedDraft, productName)
-                        dismiss()
-                    }
-                } else if let errorMessage {
-                    ContentUnavailableView(
-                        "Ингредиент недоступен",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text(errorMessage),
-                    )
-                } else {
-                    ProgressView()
-                }
+        Group {
+            if let source {
+                RecipeIngredientAmountView(
+                    source: source,
+                    replacing: draft,
+                    recipeService: recipeService,
+                    onComplete: onComplete,
+                )
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Ингредиент недоступен",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage),
+                )
+            } else {
+                ProgressView()
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Отмена") {
-                        dismiss()
-                    }
-                }
-            }
-            .task {
-                do {
-                    source = try await recipeService.ingredientSource(for: draft)
-                } catch {
-                    errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить ингредиент.")
-                }
+        }
+        .task {
+            do {
+                source = try await recipeService.ingredientSource(for: draft)
+            } catch {
+                errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить ингредиент.")
             }
         }
     }
@@ -711,73 +825,34 @@ private struct RecipeIngredientAmountView: View {
     var body: some View {
         @Bindable var model = model
 
-        VStack(alignment: .leading, spacing: 20) {
-            Text(source.productName)
-                .font(.title2.weight(.semibold))
-
-            if let preview = model.preview {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("КБЖУ")
-                        .font(.headline)
-                    Text("\(formattedNumber(preview.calories)) ккал")
-                        .font(.title3.weight(.semibold))
-                    Text("Б \(formattedNumber(preview.protein)) · Ж \(formattedNumber(preview.fat)) · У \(formattedNumber(preview.carbs))")
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Text("Введите количество, чтобы увидеть КБЖУ.")
-                    .foregroundStyle(.secondary)
-            }
-
-            if let previewErrorMessage = model.previewErrorMessage {
-                InlineErrorView(message: previewErrorMessage)
-            }
-            if let errorMessage = model.errorMessage {
-                InlineErrorView(message: errorMessage)
-            }
-
-            Spacer()
-        }
-        .padding()
-        .navigationTitle("Количество")
-        .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 10) {
-                TextField("Количество", text: $model.amountText)
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($amountIsFocused)
-
-                Picker("Единица", selection: $model.selectedUnitToken) {
-                    ForEach(source.unitOptions) { option in
-                        Text(recipeIngredientOptionLabel(option)).tag(option.token)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-
-                Button {
-                    if let draft = model.makeDraft() {
-                        amountIsFocused = false
-                        onComplete(draft, source.productName)
-                    }
-                } label: {
-                    Image(systemName: "checkmark")
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .accessibilityLabel("Добавить")
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(.bar)
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Готово") {
+        AmountEditorView(
+            title: source.productName,
+            isLoading: false,
+            isAvailable: true,
+            preview: model.preview,
+            previewErrorMessage: model.previewErrorMessage,
+            errorMessage: model.errorMessage,
+            unavailableTitle: "Продукт недоступен",
+            unavailableSystemImage: "shippingbox",
+            amountText: $model.amountText,
+            amountIsFocused: amountIsFocused,
+            amountFocus: $amountIsFocused,
+            autoFocusAmount: true,
+            actionTitle: "Добавить",
+            isSaving: false,
+            onConfirm: {
+                if let draft = model.makeDraft() {
                     amountIsFocused = false
+                    onComplete(draft, source.productName)
                 }
+            },
+        ) {
+            if let option = source.unitOptions.first(where: { $0.token == model.selectedUnitToken }) {
+                Text(recipeIngredientOptionLabel(option))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 64, alignment: .leading)
+                    .accessibilityLabel("Единица: \(recipeIngredientOptionLabel(option))")
             }
         }
         .onAppear {
@@ -786,7 +861,63 @@ private struct RecipeIngredientAmountView: View {
         .onChange(of: model.amountText) { _, _ in
             model.refreshPreview()
         }
-        .onChange(of: model.selectedUnitToken) { _, _ in
+    }
+}
+
+private struct RecipeCompositionAmountView: View {
+    let source: RecipeCompositionSource
+    let onComplete: ([RecipeIngredientDraft]) -> Void
+
+    @State private var model: RecipeCompositionAmountViewModel
+    @FocusState private var amountIsFocused: Bool
+
+    init(
+        source: RecipeCompositionSource,
+        recipeService: RecipeService,
+        onComplete: @escaping ([RecipeIngredientDraft]) -> Void,
+    ) {
+        self.source = source
+        self.onComplete = onComplete
+        _model = State(initialValue: RecipeCompositionAmountViewModel(source: source, recipeService: recipeService))
+    }
+
+    var body: some View {
+        @Bindable var model = model
+
+        AmountEditorView(
+            title: source.recipeName,
+            isLoading: false,
+            isAvailable: true,
+            preview: model.preview,
+            previewErrorMessage: model.previewErrorMessage,
+            errorMessage: model.errorMessage,
+            unavailableTitle: "Рецепт недоступен",
+            unavailableSystemImage: "book.closed",
+            amountText: $model.amountText,
+            amountIsFocused: amountIsFocused,
+            amountFocus: $amountIsFocused,
+            autoFocusAmount: true,
+            actionTitle: "Добавить",
+            isSaving: false,
+            onConfirm: {
+                if let drafts = model.makeDrafts() {
+                    amountIsFocused = false
+                    onComplete(drafts)
+                }
+            },
+        ) {
+            if let option = source.outputUnits.first(where: { $0.token == model.selectedUnitToken }) {
+                Text(option.label)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 64, alignment: .leading)
+                    .accessibilityLabel("Единица: \(option.label)")
+            }
+        }
+        .onAppear {
+            model.refreshPreview()
+        }
+        .onChange(of: model.amountText) { _, _ in
             model.refreshPreview()
         }
     }

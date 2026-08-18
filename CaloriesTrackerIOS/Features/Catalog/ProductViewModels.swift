@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-struct DiarySelectionAmountDefault: Hashable, Sendable {
+struct FoodSelectionAmountDefault: Hashable, Sendable {
     let amount: Double
     let unitToken: String
     let unitLabel: String
@@ -16,7 +16,6 @@ final class ProductListViewModel {
 
     private(set) var products: [ProductListItem] = []
     private(set) var isLoading = false
-    private(set) var quickAddingProductID: UUID?
     private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
     var errorMessage: String?
 
@@ -60,8 +59,8 @@ final class ProductListViewModel {
         }
     }
 
-    func selectionDefault(for item: ProductListItem) -> DiarySelectionAmountDefault {
-        let fallback = DiarySelectionAmountDefault(
+    func selectionDefault(for item: ProductListItem) -> FoodSelectionAmountDefault {
+        let fallback = FoodSelectionAmountDefault(
             amount: 100,
             unitToken: item.currentVersion.baseUnit.rawValue,
             unitLabel: item.currentVersion.baseUnit.russianLabel,
@@ -78,38 +77,11 @@ final class ProductListViewModel {
             return fallback
         }
 
-        return DiarySelectionAmountDefault(
+        return FoodSelectionAmountDefault(
             amount: usageDefault.amount,
             unitToken: usageDefault.unitToken,
             unitLabel: unitLabel,
         )
-    }
-
-    func quickAdd(
-        productID: UUID,
-        context: DiaryContext,
-        defaultValue: DiarySelectionAmountDefault,
-    ) async -> Bool {
-        guard let diaryService else {
-            return false
-        }
-
-        quickAddingProductID = productID
-        errorMessage = nil
-        defer { quickAddingProductID = nil }
-
-        do {
-            try await diaryService.quickAdd(
-                context: context,
-                source: FoodSourceReference(sourceType: .product, sourceID: productID),
-                preferredAmount: defaultValue.amount,
-                preferredUnitToken: defaultValue.unitToken,
-            )
-            return true
-        } catch {
-            errorMessage = error.localizedDescription
-            return false
-        }
     }
 
     private func productUnitLabel(for token: String, version: ProductVersion) -> String? {

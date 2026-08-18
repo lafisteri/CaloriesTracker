@@ -44,6 +44,7 @@ struct RootApplicationView: View {
                 router: router,
                 productService: dependencies.productService,
                 recipeService: dependencies.recipeService,
+                diaryService: dependencies.diaryService,
             )
             .tabItem {
                 Label("Продукты", systemImage: "shippingbox")

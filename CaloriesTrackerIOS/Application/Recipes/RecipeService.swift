@@ -36,6 +36,28 @@ struct RecipeIngredientSource: Identifiable, Hashable, Sendable {
     }
 }
 
+/// A saved recipe selected for composition. It is flattened into its pinned
+/// product ingredients rather than being stored as a nested recipe reference.
+struct RecipeCompositionSource: Identifiable, Hashable, Sendable {
+    let recipeID: UUID
+    let recipeName: String
+    let version: RecipeVersion
+    let outputUnits: [RecipeCompositionOutputUnit]
+
+    var id: UUID {
+        recipeID
+    }
+}
+
+struct RecipeCompositionOutputUnit: Identifiable, Hashable, Sendable {
+    let token: String
+    let label: String
+
+    var id: String {
+        token
+    }
+}
+
 struct RecipeIngredientReadModel: Identifiable, Hashable, Sendable {
     let ingredient: RecipeIngredient
     let productName: String
@@ -149,6 +171,54 @@ final class RecipeService {
             initialAmount: nil,
             initialUnitToken: version.baseUnit.rawValue,
         )
+    }
+
+    func compositionSource(forRecipeID recipeID: UUID) async throws -> RecipeCompositionSource {
+        guard let recipe = try await recipeRepository.recipe(id: recipeID, includingDeleted: false) else {
+            throw RecipeServiceError.recipeNotFound
+        }
+        let version = try await currentVersion(for: recipe)
+        let outputUnits = compositionOutputUnits(for: version)
+        guard !outputUnits.isEmpty else {
+            throw RecipeServiceError.outputRequired
+        }
+
+        return RecipeCompositionSource(
+            recipeID: recipe.id,
+            recipeName: recipe.name,
+            version: version,
+            outputUnits: outputUnits,
+        )
+    }
+
+    func previewComposition(
+        source: RecipeCompositionSource,
+        amount: Double,
+        unitToken: String,
+    ) throws -> Nutrition {
+        source.version.totalNutrition.scaled(by: try compositionFactor(for: source, amount: amount, unitToken: unitToken))
+    }
+
+    func makeIngredientDrafts(
+        from source: RecipeCompositionSource,
+        amount: Double,
+        unitToken: String,
+    ) throws -> [RecipeIngredientDraft] {
+        let factor = try compositionFactor(for: source, amount: amount, unitToken: unitToken)
+
+        return try source.version.ingredients.map { ingredient in
+            let scaledAmount = ingredient.amount * factor
+            guard scaledAmount.isFinite, scaledAmount > 0 else {
+                throw RecipeServiceError.invalidCompositionAmount
+            }
+            return RecipeIngredientDraft(
+                id: UUID(),
+                productID: ingredient.productID,
+                productVersionID: ingredient.productVersionID,
+                amount: scaledAmount,
+                unitToken: ingredient.unitToken,
+            )
+        }
     }
 
     func ingredientSource(for draft: RecipeIngredientDraft) async throws -> RecipeIngredientSource {
@@ -369,6 +439,49 @@ final class RecipeService {
         return version
     }
 
+    private func compositionOutputUnits(for version: RecipeVersion) -> [RecipeCompositionOutputUnit] {
+        var units: [RecipeCompositionOutputUnit] = []
+        if version.cookedWeight != nil {
+            units.append(RecipeCompositionOutputUnit(token: RecipeDiaryUnit.grams.rawValue, label: "г"))
+        }
+        if version.servingsCount != nil {
+            units.append(RecipeCompositionOutputUnit(token: RecipeDiaryUnit.serving.rawValue, label: "порция"))
+        }
+        return units
+    }
+
+    private func compositionFactor(
+        for source: RecipeCompositionSource,
+        amount: Double,
+        unitToken: String,
+    ) throws -> Double {
+        guard amount.isFinite, amount > 0 else {
+            throw RecipeServiceError.invalidCompositionAmount
+        }
+
+        let outputAmount: Double
+        switch RecipeDiaryUnit.resolve(unitToken) {
+        case .grams:
+            guard let cookedWeight = source.version.cookedWeight, cookedWeight.isFinite, cookedWeight > 0 else {
+                throw RecipeServiceError.unavailableCompositionUnit
+            }
+            outputAmount = cookedWeight
+        case .serving:
+            guard let servingsCount = source.version.servingsCount, servingsCount.isFinite, servingsCount > 0 else {
+                throw RecipeServiceError.unavailableCompositionUnit
+            }
+            outputAmount = servingsCount
+        case nil:
+            throw RecipeServiceError.unavailableCompositionUnit
+        }
+
+        let factor = amount / outputAmount
+        guard factor.isFinite, factor > 0 else {
+            throw RecipeServiceError.invalidCompositionAmount
+        }
+        return factor
+    }
+
     private func ingredientReadModels(for version: RecipeVersion) async throws -> [RecipeIngredientReadModel] {
         var result: [RecipeIngredientReadModel] = []
         for ingredient in version.ingredients.sorted(by: { $0.position < $1.position }) {
@@ -559,6 +672,8 @@ enum RecipeServiceError: LocalizedError {
     case duplicateIngredient
     case calculationMismatch
     case noCompatibleIngredientUpdates
+    case unavailableCompositionUnit
+    case invalidCompositionAmount
 
     var errorDescription: String? {
         switch self {
@@ -588,6 +703,10 @@ enum RecipeServiceError: LocalizedError {
             "Не удалось рассчитать ингредиенты рецепта."
         case .noCompatibleIngredientUpdates:
             "Нет совместимых обновлений ингредиентов."
+        case .unavailableCompositionUnit:
+            "Для этого рецепта недоступна выбранная единица выхода."
+        case .invalidCompositionAmount:
+            "Количество рецепта должно быть больше нуля."
         }
     }
 }

@@ -20,77 +20,40 @@ struct DiaryAmountView: View {
     var body: some View {
         @Bindable var model = model
 
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if model.isLoading && model.source == nil {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, minHeight: 160)
-                    } else if model.source != nil {
-                        nutritionPreview
-
-                        if let previewErrorMessage = model.previewErrorMessage {
-                            DiaryInlineErrorView(message: previewErrorMessage)
-                        }
-                    } else {
-                        ContentUnavailableView(
-                            "Источник недоступен",
-                            systemImage: "fork.knife",
-                            description: model.errorMessage.map(Text.init),
-                        )
-                    }
-
-                    if let errorMessage = model.errorMessage, model.source != nil {
-                        DiaryInlineErrorView(message: errorMessage)
+        AmountEditorView(
+            title: model.source?.sourceName ?? "",
+            isLoading: model.isLoading,
+            isAvailable: model.source != nil,
+            preview: model.preview,
+            previewErrorMessage: model.previewErrorMessage,
+            errorMessage: model.errorMessage,
+            unavailableTitle: "Источник недоступен",
+            unavailableSystemImage: "fork.knife",
+            amountText: $model.amountText,
+            amountIsFocused: amountIsFocused,
+            amountFocus: isAmountFocusEnabled ? $amountIsFocused : nil,
+            actionTitle: model.actionTitle,
+            isSaving: model.isSaving,
+            onConfirm: {
+                Self.logger.notice("action=amount_save_tapped mode=\(modeDiagnostic, privacy: .public)")
+                Task {
+                    let didSave = await model.save()
+                    Self.logger.notice("action=amount_save_finished success=\(didSave)")
+                    if didSave {
+                        amountIsFocused = false
+                        router.todayPath = []
                     }
                 }
-                .padding(.horizontal)
-                .padding(.top, 16)
-                .padding(.bottom)
-            }
-
+            },
+        ) {
             if let source = model.source {
-                HStack(spacing: 8) {
-                    amountTextField(text: $model.amountText)
-
-                    Text(selectedUnitLabel(for: source))
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .frame(minWidth: 64, alignment: .leading)
-                        .accessibilityLabel("Единица: \(selectedUnitLabel(for: source))")
-
-                    Button {
-                        Self.logger.notice("action=amount_save_tapped mode=\(modeDiagnostic, privacy: .public)")
-                        Task {
-                            let didSave = await model.save()
-                            Self.logger.notice("action=amount_save_finished success=\(didSave)")
-                            if didSave {
-                                amountIsFocused = false
-                                router.todayPath = []
-                            }
-                        }
-                    } label: {
-                        Group {
-                            if model.isSaving {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                        .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityLabel(model.actionTitle)
-                    .disabled(model.isLoading || model.isSaving)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(.bar)
+                Text(selectedUnitLabel(for: source))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 64, alignment: .leading)
+                    .accessibilityLabel("Единица: \(selectedUnitLabel(for: source))")
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(model.source?.sourceName ?? "")
-        .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
             if let productID {
@@ -146,76 +109,6 @@ struct DiaryAmountView: View {
         .onChange(of: model.amountText) { _, _ in
             model.refreshPreview()
         }
-    }
-
-    @ViewBuilder
-    private var nutritionPreview: some View {
-        let preview = model.preview ?? .zero
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Калории")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(diaryNumber(preview.calories))
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                    Text("ккал")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Divider()
-
-            HStack(spacing: 12) {
-                macroValue(title: "Белки", value: preview.protein)
-                macroValue(title: "Жиры", value: preview.fat)
-                macroValue(title: "Углеводы", value: preview.carbs)
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func macroValue(title: String, value: Double) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("\(diaryNumber(value)) г")
-                .font(.subheadline.weight(.semibold))
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func amountTextField(text: Binding<String>) -> some View {
-        if isAmountFocusEnabled {
-            styledAmountTextField(text: text)
-                .focused($amountIsFocused)
-        } else {
-            styledAmountTextField(text: text)
-        }
-    }
-
-    private func styledAmountTextField(text: Binding<String>) -> some View {
-        TextField("", text: text)
-            .keyboardType(.decimalPad)
-            .multilineTextAlignment(.trailing)
-            .font(.body.weight(.semibold))
-            .frame(width: 64)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(amountIsFocused ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 1)
-            }
-            .accessibilityLabel("Количество")
     }
 
     private func restoreAmountFocus() {
@@ -321,5 +214,207 @@ struct DiaryAmountView: View {
         case .edit:
             return .productEditorForEntryAmount(productID: productID)
         }
+    }
+}
+
+struct AmountEditorView<UnitContent: View>: View {
+    let title: String
+    let contextDescription: String?
+    let isLoading: Bool
+    let isAvailable: Bool
+    let preview: Nutrition?
+    let previewErrorMessage: String?
+    let errorMessage: String?
+    let unavailableTitle: String
+    let unavailableSystemImage: String
+    @Binding private var amountText: String
+    let amountIsFocused: Bool
+    let amountFocus: FocusState<Bool>.Binding?
+    let autoFocusAmount: Bool
+    let actionTitle: String
+    let isSaving: Bool
+    let onConfirm: () -> Void
+    private let unitContent: UnitContent
+
+    init(
+        title: String,
+        contextDescription: String? = nil,
+        isLoading: Bool,
+        isAvailable: Bool,
+        preview: Nutrition?,
+        previewErrorMessage: String?,
+        errorMessage: String?,
+        unavailableTitle: String,
+        unavailableSystemImage: String,
+        amountText: Binding<String>,
+        amountIsFocused: Bool,
+        amountFocus: FocusState<Bool>.Binding?,
+        autoFocusAmount: Bool = false,
+        actionTitle: String,
+        isSaving: Bool,
+        onConfirm: @escaping () -> Void,
+        @ViewBuilder unitContent: () -> UnitContent,
+    ) {
+        self.title = title
+        self.contextDescription = contextDescription
+        self.isLoading = isLoading
+        self.isAvailable = isAvailable
+        self.preview = preview
+        self.previewErrorMessage = previewErrorMessage
+        self.errorMessage = errorMessage
+        self.unavailableTitle = unavailableTitle
+        self.unavailableSystemImage = unavailableSystemImage
+        _amountText = amountText
+        self.amountIsFocused = amountIsFocused
+        self.amountFocus = amountFocus
+        self.autoFocusAmount = autoFocusAmount
+        self.actionTitle = actionTitle
+        self.isSaving = isSaving
+        self.onConfirm = onConfirm
+        self.unitContent = unitContent()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if isLoading && !isAvailable {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, minHeight: 160)
+                    } else if isAvailable {
+                        if let contextDescription {
+                            Text(contextDescription)
+                                .foregroundStyle(.secondary)
+                        }
+                        AmountNutritionPreview(nutrition: preview ?? .zero)
+
+                        if let previewErrorMessage {
+                            DiaryInlineErrorView(message: previewErrorMessage)
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            unavailableTitle,
+                            systemImage: unavailableSystemImage,
+                            description: errorMessage.map(Text.init),
+                        )
+                    }
+
+                    if let errorMessage, isAvailable {
+                        DiaryInlineErrorView(message: errorMessage)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 16)
+                .padding(.bottom)
+            }
+
+            if isAvailable {
+                HStack(spacing: 8) {
+                    amountTextField
+                    unitContent
+
+                    Button(action: onConfirm) {
+                        Group {
+                            if isSaving {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityLabel(actionTitle)
+                    .disabled(isLoading || isSaving)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.bar)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard autoFocusAmount, let amountFocus else {
+                return
+            }
+            await Task.yield()
+            amountFocus.wrappedValue = true
+            await Task.yield()
+            UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+        }
+    }
+
+    @ViewBuilder
+    private var amountTextField: some View {
+        if let amountFocus {
+            styledAmountTextField
+                .focused(amountFocus)
+        } else {
+            styledAmountTextField
+        }
+    }
+
+    private var styledAmountTextField: some View {
+        TextField("", text: $amountText)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .font(.body.weight(.semibold))
+            .frame(width: 64)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(amountIsFocused ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 1)
+            }
+            .accessibilityLabel("Количество")
+    }
+}
+
+private struct AmountNutritionPreview: View {
+    let nutrition: Nutrition
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Калории")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(diaryNumber(nutrition.calories))
+                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text("ккал")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                macroValue(title: "Белки", value: nutrition.protein)
+                macroValue(title: "Жиры", value: nutrition.fat)
+                macroValue(title: "Углеводы", value: nutrition.carbs)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func macroValue(title: String, value: Double) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(diaryNumber(value)) г")
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

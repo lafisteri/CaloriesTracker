@@ -164,14 +164,15 @@ Diary
 
 Food Selection не является отдельным урезанным списком. Используется тот же полноценный Catalog UI, что и в табе **«Продукты»**, но с другим tap behaviour.
 
-Catalog поддерживает два контекста:
+Catalog поддерживает typed contexts:
 
 ```text
 management
 → tap Product/Recipe → details
 
-diarySelection(DiaryContext)
-→ tap Product/Recipe → Amount
+selection(FoodSelectionContext)
+→ tap Product/Recipe → shared Amount
+→ tap + → quick-add the latest compatible amount (or the base fallback)
 ```
 
 В обоих контекстах сохраняются:
@@ -345,6 +346,21 @@ per serving = total / servingsCount
 Изменение ингредиентов, их количества, единиц, pinned `ProductVersion`, cooked weight или servings count создаёт новую `RecipeVersion`. Старая версия остаётся неизменной.
 
 `RecipeIngredient` хранит конкретный `productVersionId`. Рецепт не переключается автоматически на `Product.currentVersionId`.
+
+### Recipe composition
+
+В выборе ингредиентов Recipe Catalog показывает и **Products**, и **Recipes**. Выбор Product добавляет один Product ingredient обычным способом. Выбор Recipe не создаёт вложенную связь `RecipeIngredient → Recipe` и не создаёт рекурсивную композицию.
+
+Пользователь указывает количество выбранного Recipe в доступной единице выхода:
+
+```text
+г        → selected amount / RecipeVersion.cookedWeight
+порция   → selected amount / RecipeVersion.servingsCount
+```
+
+Полученный коэффициент применяется к количеству каждого Product ingredient выбранной текущей `RecipeVersion`. В редактируемый Recipe добавляются новые Product ingredients с теми же pinned `ProductVersion`, unit и пропорционально изменённым amount. Поэтому, например, 100 г соуса добавляет в пиццу пропорциональную часть его продуктов, а не динамическую ссылку на рецепт соуса.
+
+После flattening изменение рецепта-источника не меняет уже добавленный состав. Циклы Recipe→Recipe невозможны, потому что сохранённый `RecipeIngredient` по-прежнему ссылается только на `ProductVersion`.
 
 Если продукт получает новую версию, Recipe UI может показать **«Есть обновлённые ингредиенты»**. Пользователь может вручную применить актуальные совместимые версии; это создаёт новую `RecipeVersion`.
 

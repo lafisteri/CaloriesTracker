@@ -4,6 +4,7 @@ import Observation
 struct RecipeIngredientEditorItem: Identifiable, Hashable, Sendable {
     let draft: RecipeIngredientDraft
     let productName: String
+    let nutrition: Nutrition?
 
     var id: UUID {
         draft.id
@@ -19,7 +20,6 @@ final class RecipeListViewModel {
 
     private(set) var recipes: [RecipeListItem] = []
     private(set) var isLoading = false
-    private(set) var quickAddingRecipeID: UUID?
     private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
     var errorMessage: String?
 
@@ -63,12 +63,12 @@ final class RecipeListViewModel {
         }
     }
 
-    func selectionDefault(for item: RecipeListItem) -> DiarySelectionAmountDefault? {
+    func selectionDefault(for item: RecipeListItem) -> FoodSelectionAmountDefault? {
         let availableUnits = recipeUnits(for: item.currentVersion)
         guard let fallbackUnit = availableUnits.first else {
             return nil
         }
-        let fallback = DiarySelectionAmountDefault(
+        let fallback = FoodSelectionAmountDefault(
             amount: 100,
             unitToken: fallbackUnit.token,
             unitLabel: fallbackUnit.label,
@@ -83,38 +83,11 @@ final class RecipeListViewModel {
             return fallback
         }
 
-        return DiarySelectionAmountDefault(
+        return FoodSelectionAmountDefault(
             amount: usageDefault.amount,
             unitToken: compatibleUnit.token,
             unitLabel: compatibleUnit.label,
         )
-    }
-
-    func quickAdd(
-        recipeID: UUID,
-        context: DiaryContext,
-        defaultValue: DiarySelectionAmountDefault,
-    ) async -> Bool {
-        guard let diaryService else {
-            return false
-        }
-
-        quickAddingRecipeID = recipeID
-        errorMessage = nil
-        defer { quickAddingRecipeID = nil }
-
-        do {
-            try await diaryService.quickAdd(
-                context: context,
-                source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
-                preferredAmount: defaultValue.amount,
-                preferredUnitToken: defaultValue.unitToken,
-            )
-            return true
-        } catch {
-            errorMessage = recipeErrorMessage(error, fallback: "Не удалось добавить рецепт.")
-            return false
-        }
     }
 
     private func recipeUnits(for version: RecipeVersion) -> [(token: String, label: String)] {
@@ -232,18 +205,43 @@ final class RecipeEditorViewModel {
     }
 
     func addIngredient(_ draft: RecipeIngredientDraft, productName: String) {
-        ingredients.append(RecipeIngredientEditorItem(draft: draft, productName: productName))
+        ingredients.append(RecipeIngredientEditorItem(draft: draft, productName: productName, nutrition: nil))
+    }
+
+    @discardableResult
+    func addIngredients(_ drafts: [RecipeIngredientDraft]) async -> Bool {
+        do {
+            try await appendIngredients(drafts)
+            return true
+        } catch {
+            errorMessage = recipeErrorMessage(error, fallback: "Не удалось добавить состав рецепта.")
+            return false
+        }
+    }
+
+    func appendIngredients(_ drafts: [RecipeIngredientDraft]) async throws {
+        var newItems: [RecipeIngredientEditorItem] = []
+        for draft in drafts {
+            let source = try await recipeService.ingredientSource(for: draft)
+            newItems.append(RecipeIngredientEditorItem(draft: draft, productName: source.productName, nutrition: nil))
+        }
+        ingredients.append(contentsOf: newItems)
+        await refreshPreview()
     }
 
     func replaceIngredient(_ draft: RecipeIngredientDraft, productName: String) {
         guard let index = ingredients.firstIndex(where: { $0.draft.id == draft.id }) else {
             return
         }
-        ingredients[index] = RecipeIngredientEditorItem(draft: draft, productName: productName)
+        ingredients[index] = RecipeIngredientEditorItem(draft: draft, productName: productName, nutrition: nil)
     }
 
     func removeIngredients(at offsets: IndexSet) {
         ingredients.remove(atOffsets: offsets)
+    }
+
+    func removeIngredient(id: UUID) {
+        ingredients.removeAll { $0.id == id }
     }
 
     func draft(for item: RecipeIngredientEditorItem) -> RecipeIngredientDraft {
@@ -252,7 +250,18 @@ final class RecipeEditorViewModel {
 
     func refreshPreview() async {
         do {
-            preview = try await recipeService.preview(makeDraft()).totalNutrition
+            let calculation = try await recipeService.preview(makeDraft())
+            let nutritionByDraftID = Dictionary(
+                uniqueKeysWithValues: calculation.ingredientCalculations.map { ($0.draftID, $0.nutrition) },
+            )
+            ingredients = ingredients.map { item in
+                RecipeIngredientEditorItem(
+                    draft: item.draft,
+                    productName: item.productName,
+                    nutrition: nutritionByDraftID[item.draft.id],
+                )
+            }
+            preview = calculation.totalNutrition
             previewErrorMessage = nil
         } catch {
             preview = nil
@@ -285,7 +294,7 @@ final class RecipeEditorViewModel {
         var loaded: [RecipeIngredientEditorItem] = []
         for draft in drafts {
             let source = try await recipeService.ingredientSource(for: draft)
-            loaded.append(RecipeIngredientEditorItem(draft: draft, productName: source.productName))
+            loaded.append(RecipeIngredientEditorItem(draft: draft, productName: source.productName, nutrition: nil))
         }
         ingredients = loaded
     }
@@ -336,33 +345,6 @@ final class RecipeVersionHistoryViewModel {
 
 @MainActor
 @Observable
-final class RecipeIngredientSelectionViewModel {
-    private let productService: ProductService
-
-    private(set) var products: [ProductListItem] = []
-    private(set) var isLoading = false
-    var errorMessage: String?
-
-    init(productService: ProductService) {
-        self.productService = productService
-    }
-
-    func load(matching query: String) async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            products = try await productService.products(matching: query)
-        } catch {
-            errorMessage = "Не удалось загрузить продукты."
-        }
-
-        isLoading = false
-    }
-}
-
-@MainActor
-@Observable
 final class RecipeIngredientAmountViewModel {
     private let recipeService: RecipeService
     let source: RecipeIngredientSource
@@ -382,7 +364,7 @@ final class RecipeIngredientAmountViewModel {
         self.source = source
         self.replacing = replacing
         self.recipeService = recipeService
-        amountText = source.initialAmount.map(recipeNumericString) ?? ""
+        amountText = source.initialAmount.map(recipeNumericString) ?? recipeNumericString(100)
         selectedUnitToken = source.initialUnitToken
     }
 
@@ -433,8 +415,73 @@ final class RecipeIngredientAmountViewModel {
     }
 }
 
+@MainActor
+@Observable
+final class RecipeCompositionAmountViewModel {
+    private let recipeService: RecipeService
+    let source: RecipeCompositionSource
+
+    var amountText = ""
+    var selectedUnitToken = ""
+    private(set) var preview: Nutrition?
+    private(set) var previewErrorMessage: String?
+    var errorMessage: String?
+
+    init(source: RecipeCompositionSource, recipeService: RecipeService) {
+        self.source = source
+        self.recipeService = recipeService
+        amountText = recipeNumericString(100)
+        selectedUnitToken = source.outputUnits.first?.token ?? ""
+    }
+
+    func refreshPreview() {
+        let trimmed = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            preview = nil
+            previewErrorMessage = nil
+            return
+        }
+        guard let amount = recipeNumericValue(trimmed), amount > 0 else {
+            preview = nil
+            previewErrorMessage = "Количество должно быть больше нуля."
+            return
+        }
+
+        do {
+            preview = try recipeService.previewComposition(
+                source: source,
+                amount: amount,
+                unitToken: selectedUnitToken,
+            )
+            previewErrorMessage = nil
+        } catch {
+            preview = nil
+            previewErrorMessage = recipeErrorMessage(error, fallback: "Не удалось рассчитать КБЖУ рецепта.")
+        }
+    }
+
+    func makeDrafts() -> [RecipeIngredientDraft]? {
+        errorMessage = nil
+        guard let amount = recipeNumericValue(amountText), amount > 0 else {
+            errorMessage = "Количество должно быть больше нуля."
+            return nil
+        }
+
+        do {
+            return try recipeService.makeIngredientDrafts(
+                from: source,
+                amount: amount,
+                unitToken: selectedUnitToken,
+            )
+        } catch {
+            errorMessage = recipeErrorMessage(error, fallback: "Не удалось добавить состав рецепта.")
+            return nil
+        }
+    }
+}
+
 func recipeNumericString(_ value: Double) -> String {
-    String(value)
+    value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 3)))
 }
 
 func recipeNumericValue(_ text: String) -> Double? {

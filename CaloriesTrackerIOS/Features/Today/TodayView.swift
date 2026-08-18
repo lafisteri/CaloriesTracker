@@ -48,7 +48,10 @@ struct TodayRootView: View {
 
             if let day = model.day {
                 ForEach(day.meals) { meal in
-                    Section {
+                    FoodCompositionSection(
+                        title: meal.mealType.russianLabel,
+                        nutrition: meal.totalNutrition,
+                    ) {
                         ForEach(meal.entries) { entry in
                             DiaryListEntryRow(
                                 entry: entry,
@@ -83,7 +86,8 @@ struct TodayRootView: View {
                             clearDraggedEntryID(entryID)
                         }
 
-                        DiaryMealAddRow(
+                    } addRow: {
+                        FoodCompositionAddRow(
                             onAdd: {
                                 router.todayPath.append(
                                     .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
@@ -100,14 +104,6 @@ struct TodayRootView: View {
                         )
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(.hidden)
-                    } header: {
-                        HStack {
-                            Text(meal.mealType.russianLabel)
-                            Spacer()
-                            Text("\(diaryNumber(meal.totalNutrition.calories)) ккал")
-                                .foregroundStyle(.secondary)
-                        }
-                        .textCase(nil)
                     }
                 }
             }
@@ -139,7 +135,7 @@ struct TodayRootView: View {
             switch route {
             case let .catalogSelection(context):
                 CatalogView(
-                    mode: .selection(context),
+                    mode: .selection(foodSelectionContext(for: context)),
                     router: router,
                     productService: productService,
                     recipeService: recipeService,
@@ -200,6 +196,7 @@ struct TodayRootView: View {
                     router: router,
                     productService: productService,
                     recipeService: recipeService,
+                    diaryService: diaryService,
                 ) {
                     router.todayPath = [.catalogSelection(context)]
                 }
@@ -214,6 +211,51 @@ struct TodayRootView: View {
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")
             }
         }
+    }
+
+    private func foodSelectionContext(for context: DiaryContext) -> FoodSelectionContext {
+        FoodSelectionContext(
+            onSelectProduct: { productID in
+                router.todayPath.append(
+                    .amount(
+                        context: context,
+                        source: FoodSourceReference(sourceType: .product, sourceID: productID),
+                    ),
+                )
+            },
+            onSelectRecipe: { recipeID in
+                router.todayPath.append(
+                    .amount(
+                        context: context,
+                        source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
+                    ),
+                )
+            },
+            onQuickAddProduct: { productID, defaultValue in
+                try await diaryService.quickAdd(
+                    context: context,
+                    source: FoodSourceReference(sourceType: .product, sourceID: productID),
+                    preferredAmount: defaultValue.amount,
+                    preferredUnitToken: defaultValue.unitToken,
+                )
+                router.todayPath = []
+            },
+            onQuickAddRecipe: { recipeID, defaultValue in
+                try await diaryService.quickAdd(
+                    context: context,
+                    source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
+                    preferredAmount: defaultValue.amount,
+                    preferredUnitToken: defaultValue.unitToken,
+                )
+                router.todayPath = []
+            },
+            onCreateProduct: {
+                router.todayPath.append(.productEditor(context: context, prefilledBarcode: nil))
+            },
+            onCreateRecipe: {
+                router.todayPath.append(.recipeEditor(context: context, recipeID: nil))
+            },
+        )
     }
 
     private var dateNavigation: some View {
@@ -317,39 +359,111 @@ private struct DiaryEntryDragPreview: View {
     }
 }
 
-private struct DiaryMealAddRow: View {
+struct FoodCompositionSection<Rows: View, AddRow: View>: View {
+    let title: String
+    let nutrition: Nutrition
+    private let rows: Rows
+    private let addRow: AddRow
+
+    init(
+        title: String,
+        nutrition: Nutrition,
+        @ViewBuilder rows: () -> Rows,
+        @ViewBuilder addRow: () -> AddRow,
+    ) {
+        self.title = title
+        self.nutrition = nutrition
+        self.rows = rows()
+        self.addRow = addRow()
+    }
+
+    var body: some View {
+        Section {
+            rows
+            addRow
+        } header: {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(diaryNumber(nutrition.calories)) ккал")
+                    .foregroundStyle(.secondary)
+            }
+            .textCase(nil)
+        }
+    }
+}
+
+struct FoodCompositionEntryRow: View {
+    let title: String
+    let amount: Double
+    let unitLabel: String
+    let calories: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.body.weight(.medium))
+
+            HStack {
+                Text("\(diaryNumber(amount)) \(unitLabel)")
+                Spacer()
+                Text("\(diaryNumber(calories)) ккал")
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct FoodCompositionAddRow: View {
     let onAdd: @MainActor () -> Void
-    let onDrop: @MainActor (UUID) -> Void
+    let onDrop: (@MainActor (UUID) -> Void)?
 
     @State private var isDropTarget = false
 
+    init(
+        onAdd: @escaping @MainActor () -> Void,
+        onDrop: (@MainActor (UUID) -> Void)? = nil,
+    ) {
+        self.onAdd = onAdd
+        self.onDrop = onDrop
+    }
+
     var body: some View {
+        if let onDrop {
+            addButton
+                .dropDestination(
+                    for: String.self,
+                    action: { identifiers, _ in
+                        guard let identifier = identifiers.first,
+                              let entryID = UUID(uuidString: identifier)
+                        else {
+                            return false
+                        }
+
+                        onDrop(entryID)
+                        return true
+                    },
+                    isTargeted: { isDropTarget = $0 },
+                )
+                .background {
+                    if isDropTarget {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.accentColor.opacity(0.12))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.15), value: isDropTarget)
+        } else {
+            addButton
+        }
+    }
+
+    private var addButton: some View {
         Button(action: onAdd) {
             Label("Добавить", systemImage: "plus")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .dropDestination(
-            for: String.self,
-            action: { identifiers, _ in
-                guard let identifier = identifiers.first,
-                      let entryID = UUID(uuidString: identifier)
-                else {
-                    return false
-                }
-
-                onDrop(entryID)
-                return true
-            },
-            isTargeted: { isDropTarget = $0 },
-        )
-        .background {
-            if isDropTarget {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.12))
-            }
-        }
-        .animation(.easeInOut(duration: 0.15), value: isDropTarget)
     }
 }
 
@@ -377,18 +491,12 @@ private struct DiaryEntryRow: View {
     let entry: DiaryEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(entry.sourceName)
-                .font(.body.weight(.medium))
-
-            HStack {
-                Text("\(diaryNumber(entry.amount)) \(diaryUnitLabel(for: entry.unitToken, sourceType: entry.sourceType))")
-                Spacer()
-                Text("\(diaryNumber(entry.nutrition.calories)) ккал")
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-        }
+        FoodCompositionEntryRow(
+            title: entry.sourceName,
+            amount: entry.amount,
+            unitLabel: diaryUnitLabel(for: entry.unitToken, sourceType: entry.sourceType),
+            calories: entry.nutrition.calories,
+        )
     }
 }
 

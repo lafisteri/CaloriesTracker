@@ -1,28 +1,52 @@
 import SwiftUI
 
+struct FoodSelectionContext {
+    let onSelectProduct: @MainActor (UUID) -> Void
+    let onSelectRecipe: @MainActor (UUID) -> Void
+    let onQuickAddProduct: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
+    let onQuickAddRecipe: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
+    let onCreateProduct: @MainActor () -> Void
+    let onCreateRecipe: @MainActor () -> Void
+}
+
 enum CatalogMode {
     case management
-    case selection(DiaryContext)
+    case selection(FoodSelectionContext)
 
-    var allowsManagementActions: Bool {
-        if case .management = self {
-            return true
+    var productListMode: ProductListMode {
+        switch self {
+        case .management:
+            .management
+        case let .selection(context):
+            .selection(context)
         }
-        return false
     }
 
-    var diaryContext: DiaryContext? {
-        guard case let .selection(context) = self else {
-            return nil
+    var recipeListMode: RecipeListMode {
+        switch self {
+        case .management:
+            .management
+        case let .selection(context):
+            .selection(context)
         }
-        return context
     }
+}
+
+enum ProductListMode {
+    case management
+    case selection(FoodSelectionContext)
+}
+
+enum RecipeListMode {
+    case management
+    case selection(FoodSelectionContext)
 }
 
 struct ProductCatalogRootView: View {
     let router: AppRouter
     let productService: ProductService
     let recipeService: RecipeService
+    let diaryService: DiaryService
 
     var body: some View {
         @Bindable var router = router
@@ -62,6 +86,7 @@ struct ProductCatalogRootView: View {
                         router: router,
                         productService: productService,
                         recipeService: recipeService,
+                        diaryService: diaryService,
                     )
                 case let .recipeVersionHistory(id):
                     RecipeVersionHistoryView(recipeID: id, recipeService: recipeService)
@@ -95,25 +120,17 @@ struct CatalogView: View {
                 ProductListView(
                     productService: productService,
                     diaryService: diaryService,
-                    selectionContext: mode.diaryContext,
+                    mode: mode.productListMode,
                     onSelect: selectProduct,
-                    onQuickAddComplete: {
-                        router.todayPath = []
-                    },
                     onAdd: createProduct,
-                    allowsManagementActions: mode.allowsManagementActions,
                 )
             case .recipes:
                 RecipeListView(
                     recipeService: recipeService,
                     diaryService: diaryService,
-                    selectionContext: mode.diaryContext,
+                    mode: mode.recipeListMode,
                     onSelect: selectRecipe,
-                    onQuickAddComplete: {
-                        router.todayPath = []
-                    },
                     onAdd: createRecipe,
-                    allowsManagementActions: mode.allowsManagementActions,
                 )
             }
         }
@@ -124,12 +141,7 @@ struct CatalogView: View {
         case .management:
             router.catalogPath.append(.product(productID))
         case let .selection(context):
-            router.todayPath.append(
-                .amount(
-                    context: context,
-                    source: FoodSourceReference(sourceType: .product, sourceID: productID),
-                ),
-            )
+            context.onSelectProduct(productID)
         }
     }
 
@@ -138,12 +150,7 @@ struct CatalogView: View {
         case .management:
             router.catalogPath.append(.recipe(recipeID))
         case let .selection(context):
-            router.todayPath.append(
-                .amount(
-                    context: context,
-                    source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
-                ),
-            )
+            context.onSelectRecipe(recipeID)
         }
     }
 
@@ -152,7 +159,7 @@ struct CatalogView: View {
         case .management:
             router.catalogPath.append(.productEditor(nil))
         case let .selection(context):
-            router.todayPath.append(.productEditor(context: context, prefilledBarcode: nil))
+            context.onCreateProduct()
         }
     }
 
@@ -161,35 +168,30 @@ struct CatalogView: View {
         case .management:
             router.catalogPath.append(.recipeEditor(nil))
         case let .selection(context):
-            router.todayPath.append(.recipeEditor(context: context, recipeID: nil))
+            context.onCreateRecipe()
         }
     }
 }
 
 private struct ProductListView: View {
     let onSelect: (UUID) -> Void
-    let onQuickAddComplete: @MainActor () -> Void
     let onAdd: () -> Void
-    let allowsManagementActions: Bool
-    let selectionContext: DiaryContext?
+    let mode: ProductListMode
 
     @State private var model: ProductListViewModel
     @State private var searchText = ""
+    @State private var quickAddingProductID: UUID?
 
     init(
         productService: ProductService,
         diaryService: DiaryService?,
-        selectionContext: DiaryContext?,
+        mode: ProductListMode,
         onSelect: @escaping (UUID) -> Void,
-        onQuickAddComplete: @escaping @MainActor () -> Void,
         onAdd: @escaping () -> Void,
-        allowsManagementActions: Bool,
     ) {
         self.onSelect = onSelect
-        self.onQuickAddComplete = onQuickAddComplete
         self.onAdd = onAdd
-        self.allowsManagementActions = allowsManagementActions
-        self.selectionContext = selectionContext
+        self.mode = mode
         _model = State(initialValue: ProductListViewModel(productService: productService, diaryService: diaryService))
     }
 
@@ -211,7 +213,8 @@ private struct ProductListView: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(model.products) { item in
-                    if allowsManagementActions {
+                    switch mode {
+                    case .management:
                         NavigationLink(value: CatalogRoute.product(item.id)) {
                             ProductListRow(item: item)
                         }
@@ -225,7 +228,7 @@ private struct ProductListView: View {
                             }
                             .accessibilityLabel("Удалить")
                         }
-                    } else {
+                    case let .selection(context):
                         let defaultValue = model.selectionDefault(for: item)
                         HStack(spacing: 12) {
                             Button {
@@ -243,21 +246,18 @@ private struct ProductListView: View {
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .accessibilityLabel("Открыть \(item.product.name)")
 
-                            if model.quickAddingProductID == item.product.id {
+                            if quickAddingProductID == item.product.id {
                                 ProgressView()
                                     .frame(minWidth: 44, minHeight: 44)
                             } else {
                                 Button {
-                                    guard let selectionContext else {
-                                        return
-                                    }
                                     Task {
-                                        if await model.quickAdd(
-                                            productID: item.product.id,
-                                            context: selectionContext,
-                                            defaultValue: defaultValue,
-                                        ) {
-                                            onQuickAddComplete()
+                                        quickAddingProductID = item.product.id
+                                        defer { quickAddingProductID = nil }
+                                        do {
+                                            try await context.onQuickAddProduct(item.product.id, defaultValue)
+                                        } catch {
+                                            model.errorMessage = error.localizedDescription
                                         }
                                     }
                                 } label: {
@@ -309,9 +309,9 @@ private struct ProductListView: View {
 
 private struct ProductListRow: View {
     let item: ProductListItem
-    let selectionDefault: DiarySelectionAmountDefault?
+    let selectionDefault: FoodSelectionAmountDefault?
 
-    init(item: ProductListItem, selectionDefault: DiarySelectionAmountDefault? = nil) {
+    init(item: ProductListItem, selectionDefault: FoodSelectionAmountDefault? = nil) {
         self.item = item
         self.selectionDefault = selectionDefault
     }

@@ -163,17 +163,18 @@ CaloriesTrackerIOS/                         # future separate Xcode project root
     Validation/
 ```
 
-`Catalog` is one shared UI feature while Products and Recipes remain separate domain and service concerns. The same Catalog UI supports two explicit contexts:
+`Catalog` is one shared UI feature while Products and Recipes remain separate domain and service concerns. The same Catalog UI supports explicit contexts:
 
 ```text
 management
 → tap Product/Recipe → details
 
-diarySelection(DiaryContext)
-→ tap Product/Recipe → Amount
+selection(FoodSelectionContext)
+→ tap Product/Recipe → the shared Amount screen
+→ tap + → quick-add the latest compatible amount (or the base fallback)
 ```
 
-The selection context carries `DiaryContext` through search, Product/Recipe tab switching and creation flows. Shared UI does not mean shared navigation semantics: the mode is explicit and typed.
+Today and Recipe ingredient composition create the same `FoodSelectionContext`, so the Catalog, Products/Recipes tabs, search, full-row tap, default display, `+` quick-add, and toolbar actions are one implementation. Their callbacks preserve different persistence semantics: Today writes a `DiaryEntry`; Recipe composition adds pinned Product ingredient drafts (and flattens a selected Recipe). Shared UI does not mean shared persistence semantics.
 
 ## Navigation
 
@@ -262,7 +263,9 @@ Direct drag & drop must not require `EditButton`, edit mode, drag handles or a *
 
 Diary rows are intentionally compact and display only source name, amount/unit and calories. Protein/fat/carbs remain in the snapshot and aggregate UI but are not repeated in each row. Empty meals remain compact and must not expose technical drop-placeholder text.
 
-The shared Catalog UI has explicit `management` and `diarySelection(DiaryContext)` modes. Management tap opens details; selection tap opens Amount. Creation inside selection mode preserves the Diary context.
+`FoodCompositionSection` is the shared SwiftUI section for Breakfast, Lunch, Dinner, Snacks, and Recipe ingredients. It owns the title/total-calories header, compact food row, and Add row; each context supplies only its items and persistence actions. Diary-only drag/drop and recipe-only edit/delete behaviour wrap those shared visuals.
+
+The shared Catalog UI has explicit `management` and `selection(FoodSelectionContext)` modes. The selection context is used unchanged by both Today and Recipe composition; it differs only in the action callbacks. Today opens/saves Diary Amount, while Recipe composition opens the same Amount UI and adds pinned Product drafts (or flattens a selected Recipe's drafts).
 
 For a new DiaryEntry Amount flow, the intended UX is immediate entry: default amount `100`, initial focus, selected text and an already-open numeric keyboard, with no custom keyboard **«Готово»** button. Nutrition preview remains visible at all times. Editing an existing DiaryEntry uses its saved amount and historic `sourceVersionID`.
 
@@ -345,6 +348,8 @@ Recipe (logical identity)
 ```
 
 An ingredient resolves nutrition from its pinned `productVersionID`, never from `Product.currentVersionID`. `normalizedAmount` is stored as an audit/value convenience: it records the amount in the product version's base unit that was used when the recipe version was made. The service validates that the pinned product version belongs to `productID`.
+
+A recipe can be selected while editing another recipe, but this is a UI composition operation rather than a persisted Recipe-to-Recipe relationship. The selected current `RecipeVersion` is scaled by the requested output amount (`grams / cookedWeight` or `servings / servingsCount`), then its Product ingredient drafts are copied with scaled amounts and the same pinned ProductVersion IDs. The resulting parent RecipeVersion still contains Product ingredients only, so recursion and cycles are impossible and later changes to the source recipe do not alter an existing parent version.
 
 `RecipeCalculator` is the only recipe calculation path:
 
@@ -758,7 +763,7 @@ Backup/import, Supabase sync, AI, weight/water/exercise, notifications, HealthKi
 - **ADR-011 — Navigation:** Today is the default selected tab; all tabs own a `NavigationStack`; Goals is a Statistics destination; internal navigation is typed rather than URL-based.
 - **ADR-012 — Sync readiness:** cloud records are user-owned UUID records with timestamps/tombstones where mutable; sync status remains local metadata, and Supabase/auth are deferred.
 - **ADR-013 — Calculations:** nutrition, unit conversion, recipe totals, goal lookup, and statistics are domain/application logic, not SwiftUI logic.
-- **ADR-014 — Shared Catalog UI:** Products/Recipes Catalog is shared between management and Diary selection through an explicit typed mode; DiaryContext is preserved without duplicating catalog UI.
+- **ADR-014 — Shared food selection UI:** Products/Recipes Catalog has `management` and one `selection(FoodSelectionContext)` mode. Today and Recipe ingredient composition use the exact same selection UI and controls; typed callbacks keep diary writes separate from recipe-draft composition and flattening.
 - **ADR-015 — Today interactions:** the required contract is tap → edit, swipe left → destructive trash action, long press+drag → reorder/move. The concrete SwiftUI container is not an architectural invariant and is chosen by physical-iPhone reliability.
 
 ## Open Decisions
