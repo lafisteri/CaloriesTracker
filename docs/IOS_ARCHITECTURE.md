@@ -102,13 +102,9 @@ CaloriesTrackerIOS/                         # future separate Xcode project root
       LocalDay.swift
       PersistentEnums.swift
       DomainError.swift
-    Units/
-      FoodUnit.swift
-      UnitConverter.swift
     Products/
       Product.swift
       ProductVersion.swift
-      ServingUnit.swift
     Recipes/
       Recipe.swift
       RecipeVersion.swift
@@ -175,6 +171,20 @@ selection(FoodSelectionContext)
 ```
 
 Today and Recipe ingredient composition create the same `FoodSelectionContext`, so the Catalog, Products/Recipes tabs, search, full-row tap, default display, `+` quick-add, and toolbar actions are one implementation. Their callbacks preserve different persistence semantics: Today writes a `DiaryEntry`; Recipe composition adds pinned Product ingredient drafts (and flattens a selected Recipe). Shared UI does not mean shared persistence semantics.
+
+### UI reuse policy
+
+Reuse is the default for SwiftUI work. Before creating a new view, extend an existing shared view with an explicit context, binding, generic content, or action callback when the visual and interaction contract are the same. A new view is justified only when the UI contract itself is materially different; a different persistence action alone is not a reason to duplicate UI.
+
+The current shared UI implementations are:
+
+| Shared view | Reused by |
+| --- | --- |
+| `CatalogView` (including its Product and Recipe lists) | Products root tab in `management` mode; Today → Add; Recipe editor → Add ingredient, both in `selection(FoodSelectionContext)` mode. |
+| `AmountEditorView` | Diary entry create/edit; adding a Product ingredient to a Recipe; adding a Recipe's flattened composition to another Recipe; editing an existing Recipe ingredient. |
+| `FoodCompositionSection`, `FoodCompositionEntryRow`, `FoodCompositionAddRow` | Breakfast, Lunch, Dinner, Snacks, and the Recipe editor's Ingredients section. |
+
+When a new flow needs one of these interactions, it must use the listed shared view rather than a lookalike implementation. Context-specific code belongs in typed callbacks and view models, keeping navigation and persistence semantics separate from the reused UI.
 
 ## Navigation
 
@@ -300,13 +310,12 @@ enum MealType: String, Codable, CaseIterable, Sendable {
 }
 
 enum SourceType: String, Codable, Sendable { case product, recipe }
-enum ProductBaseUnit: String, Codable, CaseIterable, Sendable { case g, ml, piece, serving }
-enum ServingConversionUnit: String, Codable, Sendable { case g, ml, piece }
+enum ProductBaseUnit: String, Codable, CaseIterable, Sendable { case g, serving }
 ```
 
-The raw values are persistence/API values only. UI labels live in localisation/formatting. `barcode` is an opaque `String?`; normalisation is trim-to-nil only, never numeric parsing, so leading zeros survive.
+The raw values are persistence/API values only. UI labels live in localisation/formatting. The product model and product-editor selector support only `g` and `serving` (shown as «г» and «порция»); no compatibility or migration path accepts other unit tokens. `barcode` is an opaque `String?`; normalisation is trim-to-nil only, never numeric parsing, so leading zeros survive.
 
-### Products and historical serving units
+### Products
 
 ```text
 Product (logical identity)
@@ -315,23 +324,17 @@ Product (logical identity)
                 └── ProductVersion (immutable)
                     id, productID, versionNumber, baseUnit, baseAmount,
                     Nutrition, createdAt
-                    └── ServingUnit[] (immutable children)
 ```
 
-`ProductVersion` additionally has a future-sync `basedOnVersionID?`: nil for v1, otherwise the version that was current when this version was authored. It does not affect nutrition and makes a concurrent-version conflict observable. A version's nutrition, base unit, base amount, and serving-unit collection are never edited.
+`ProductVersion` additionally has a future-sync `basedOnVersionID?`: nil for v1, otherwise the version that was current when this version was authored. It does not affect nutrition and makes a concurrent-version conflict observable. A version's nutrition, base unit, and base amount are never edited.
 
-`ServingUnit` is preserved even though the first native product editor will not create or edit them. It has `id`, `productVersionID`, `position`, `name`, `conversionAmount`, and `conversionUnit`. It can represent `1 кусок = 32 г` or `1 стакан = 250 мл`. A base `serving` product cannot have conversion units, matching the web validation.
-
-The persisted diary/ingredient unit token is compatible with the web format:
+The persisted diary/ingredient token is always the selected base unit:
 
 | Situation | Persisted token |
 | --- | --- |
-| Product base unit | `g`, `ml`, `piece`, or `serving` |
-| Historical product serving unit | `serving:<ServingUnit UUID>` |
+| Product base unit | `g` or `serving` |
 | Recipe by cooked weight | `g` |
-| Recipe by servings | `piece` |
-
-`UnitConverter` validates a selected token against the referenced **version**, then converts a serving amount to that version's base amount. It does not calculate nutrition.
+| Recipe by servings | `serving` |
 
 `NutritionCalculator` takes a `ProductVersion`, a base-normalised amount, and returns `version.nutrition × normalizedAmount / baseAmount`. It rejects non-finite values, a non-positive base amount, or a negative amount. The service requires a strictly positive user-entered diary/ingredient amount even though the calculator itself can represent zero.
 
@@ -359,7 +362,7 @@ A recipe can be selected while editing another recipe, but this is a UI composit
 4. derive per-100-g nutrition as `total × 100 / cookedWeight` when supplied;
 5. derive per-serving nutrition as `total / servingsCount` when supplied.
 
-A valid recipe has a non-empty name, at least one ingredient, and at least one of `cookedWeight` or `servingsCount`. Changing name alone updates the logical recipe's metadata; changing composition, pinned version, amount, unit, cooked weight, servings count, or derived totals appends a new recipe version.
+A valid recipe has a non-empty name, at least one ingredient, and at least one of `cookedWeight` or `servingsCount`. The native recipe editor uses the same `Unit`/`Amount` controls as the product editor: `g` edits `cookedWeight`, while `serving` edits `servingsCount`. Both stored output values are retained when the user changes the active selector. Changing name alone updates the logical recipe's metadata; changing composition, pinned version, amount, unit, cooked weight, servings count, or derived totals appends a new recipe version.
 
 ### Diary
 
@@ -457,7 +460,6 @@ The following is the exact logical SwiftData schema (initialiser boilerplate omi
 | --- | --- | --- |
 | `ProductRecord` | `id`, `name`, `barcode?`, `currentVersionID`, `createdAt`, `updatedAt`, `deletedAt?` | `id`; fetch active products by `deletedAt`, search name/barcode, resolve `currentVersionID`. |
 | `ProductVersionRecord` | `id`, `productID`, `basedOnVersionID?`, `versionNumber`, `baseUnitRaw`, `baseAmount`, `calories`, `protein`, `fat`, `carbs`, `createdAt` | `id`; `(productID, versionNumber)` is service-unique locally; fetch versions by product. |
-| `ServingUnitRecord` | `id`, `productVersionID`, `position`, `name`, `conversionAmount`, `conversionUnitRaw` | `id`; fetch/relationship by version, ordered by position. |
 | `RecipeRecord` | `id`, `name`, `currentVersionID`, `createdAt`, `updatedAt`, `deletedAt?` | `id`; active/search by `deletedAt` and name. |
 | `RecipeVersionRecord` | `id`, `recipeID`, `basedOnVersionID?`, `versionNumber`, four `total…` values, `cookedWeight?`, `servingsCount?`, `createdAt` | `id`; `(recipeID, versionNumber)` service-unique locally; fetch versions by recipe. |
 | `RecipeIngredientRecord` | `id`, `recipeVersionID`, `position`, `productID`, `productVersionID`, `amount`, `unitToken`, `normalizedAmount` | `id`; fetch/relationship by recipe version, ordered by position. |
@@ -465,7 +467,7 @@ The following is the exact logical SwiftData schema (initialiser boilerplate omi
 | `WeeklyGoalRecord` | `id`, `effectiveFromKey`, `createdAt` | `id`, `effectiveFromKey` (unique in a single local profile); fetch latest effective date. |
 | `DailyMacroGoalRecord` | `id`, `weeklyGoalID`, `weekdayRaw`, `position`, `calories`, `protein`, `fat`, `carbs` | `id`; service enforces one of seven weekdays per weekly goal. |
 
-All numeric values are finite; `baseAmount`, conversion amounts, ingredient amounts, cooked weight, and servings count are positive where present. Nutrition and goals are non-negative. `sourceName`, unit tokens, and enum raws are non-empty valid values.
+All numeric values are finite; `baseAmount`, ingredient amounts, cooked weight, and servings count are positive where present. Nutrition and goals are non-negative. `sourceName`, unit tokens, and enum raws are non-empty valid values.
 
 ## Relationships & Delete Rules
 
@@ -474,13 +476,12 @@ Relationships improve local traversal but UUID foreign-key fields remain the aut
 | Owner relationship | Inverse | Delete rule | Rationale |
 | --- | --- | --- | --- |
 | `ProductRecord.versions` ↔ optional `ProductVersionRecord.product` | Product version has `productID` too | `.nullify` | A physical product cleanup must not remove versions; ordinary user delete is soft only. |
-| `ProductVersionRecord.servingUnits` ↔ optional `ServingUnitRecord.productVersion` | Serving unit has `productVersionID` too | `.cascade` | Units are inseparable implementation children of an immutable version. A version is never user-deleted. |
 | `RecipeRecord.versions` ↔ optional `RecipeVersionRecord.recipe` | Recipe version has `recipeID` too | `.nullify` | Product-level soft/physical cleanup cannot erase recipe-version history. |
 | `RecipeVersionRecord.ingredients` ↔ optional `RecipeIngredientRecord.recipeVersion` | Ingredient has `recipeVersionID` too | `.cascade` | Ingredients are inseparable children of that version. A version is never user-deleted. |
 | `WeeklyGoalRecord.dailyGoals` ↔ optional `DailyMacroGoalRecord.weeklyGoal` | Child has `weeklyGoalID` too | `.cascade` | Exactly seven child records define one immutable goal. User-visible goal deletion is not in v1. |
 | Diary source IDs / ingredient product IDs | none | none | They are polymorphic/historical UUID references, deliberately not cascaded relationships. |
 
-No user action calls `ModelContext.delete` for Product, Recipe, ProductVersion, RecipeVersion, RecipeIngredient, ServingUnit, or DiaryEntry. `ProductService.softDelete`, `RecipeService.softDelete`, and `DiaryService.softDelete` set `deletedAt` (and `updatedAt` for mutable logical/diary entities). A future technical cleanup may physically delete only data proven unreferenced and safely synced; it is not a normal product feature.
+No user action calls `ModelContext.delete` for Product, Recipe, ProductVersion, RecipeVersion, RecipeIngredient, or DiaryEntry. `ProductService.softDelete`, `RecipeService.softDelete`, and `DiaryService.softDelete` set `deletedAt` (and `updatedAt` for mutable logical/diary entities). A future technical cleanup may physically delete only data proven unreferenced and safely synced; it is not a normal product feature.
 
 ### Seven child records for goals
 
@@ -660,7 +661,7 @@ This requires an approved server RPC in the future sync phase; do not attempt to
 Start the first implementation with explicit `SchemaV1: VersionedSchema`, a `MigrationPlan`, stable record names, and a `ModelContainer` constructed from that versioned schema. This adds little code now and avoids treating a production local store as disposable later.
 
 - Use lightweight stages for additive optional fields and safe renames (with `originalName` when appropriate).
-- Use a custom staged migration for splits/merges, such as moving an encoded collection to child records, changing a unit representation, or repairing invalid legacy data.
+- Use a custom staged migration for splits/merges, such as moving an encoded collection to child records, changing a unit representation, or repairing invalid imported data.
 - Never change the meaning of a field in place. Add a new field/table, backfill, switch reads, then retire only in a later safe schema stage.
 - When a real migration is introduced, carefully validate it manually with representative existing data, including soft-deleted sources and old diary/version references. Do not reset user data as a migration strategy.
 
@@ -679,8 +680,6 @@ This mapping preserves a future import path. Web timestamps are ISO-8601 strings
 | `products.createdAt`, `updatedAt`, `deletedAt?` | same camel-case `Date` properties | `created_at`, `updated_at`, `deleted_at` |
 | `productVersions.id`, `productId`, `versionNumber` | `ProductVersionRecord.id`, `productID`, `versionNumber` | `product_versions.id`, `product_id`, `version_number` |
 | `baseUnitType`, `baseAmount`, nutrition scalar fields | `baseUnitRaw`, `baseAmount`, scalar nutrition | `base_unit`, `base_amount`, `calories`, `protein`, `fat`, `carbs` |
-| embedded `productVersions.servingUnits[]` | `ServingUnitRecord[]` owned by the product version | `product_serving_units` rows |
-| serving-unit `id`, `name`, `conversionAmount`, `conversionUnit` | same + `productVersionID`, `position` | `id`, `name`, `conversion_amount`, `conversion_unit`, FK/version position |
 | `recipes.id`, `name`, `currentVersionId`, timestamps/tombstone | `RecipeRecord` equivalents | `recipes` equivalents |
 | `recipeVersions` nutritional/output fields | `RecipeVersionRecord` equivalents | `recipe_versions` columns |
 | embedded `recipeVersions.ingredients[]` | `RecipeIngredientRecord[]` owned by recipe version | `recipe_ingredients` rows |

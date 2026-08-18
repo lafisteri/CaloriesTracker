@@ -108,7 +108,7 @@ enum RecipeCalculator {
             throw RecipeCalculatorError.invalidAmount
         }
 
-        guard let unit = RecipeDiaryUnit.resolve(unitToken) else {
+        guard let unit = RecipeDiaryUnit(rawValue: unitToken) else {
             throw RecipeCalculatorError.unavailableDiaryUnit
         }
 
@@ -141,22 +141,9 @@ enum RecipeCalculator {
             throw RecipeCalculatorError.invalidAmount
         }
 
-        if unitToken == version.baseUnit.rawValue {
-            return amount
-        }
-
-        let prefix = "serving:"
-        guard unitToken.hasPrefix(prefix),
-              let servingID = UUID(uuidString: String(unitToken.dropFirst(prefix.count))),
-              let servingUnit = version.servingUnits.first(where: { $0.id == servingID })
-        else {
+        guard unitToken == version.baseUnit.rawValue else {
             throw RecipeCalculatorError.invalidUnit
         }
-
-        return try UnitConverter.baseAmount(
-            from: amount,
-            servingUnit: servingUnit,
-            expectedBaseUnit: version.baseUnit,
-        )
+        return amount
     }
 }

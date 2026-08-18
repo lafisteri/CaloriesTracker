@@ -16,8 +16,6 @@
 		A10000000000000000000007 /* Nutrition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* Nutrition.swift */; };
 		A10000000000000000000008 /* LocalDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* LocalDay.swift */; };
 		A10000000000000000000009 /* PersistentEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PersistentEnums.swift */; };
-		A10000000000000000000010 /* FoodUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* FoodUnit.swift */; };
-		A10000000000000000000011 /* UnitConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* UnitConverter.swift */; };
 		A10000000000000000000012 /* NutritionCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* NutritionCalculator.swift */; };
 		A10000000000000000000013 /* ProductModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ProductModels.swift */; };
 		A10000000000000000000014 /* RecipeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* RecipeModels.swift */; };
@@ -63,8 +61,6 @@
 		A20000000000000000000007 /* Nutrition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Nutrition.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* LocalDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDay.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PersistentEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistentEnums.swift; sourceTree = "<group>"; };
-		A20000000000000000000010 /* FoodUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodUnit.swift; sourceTree = "<group>"; };
-		A20000000000000000000011 /* UnitConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitConverter.swift; sourceTree = "<group>"; };
 		A20000000000000000000012 /* NutritionCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionCalculator.swift; sourceTree = "<group>"; };
 		A20000000000000000000013 /* ProductModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000014 /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
@@ -280,8 +276,6 @@
 		A40000000000000000000008 /* Units */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000010 /* FoodUnit.swift */,
-				A20000000000000000000011 /* UnitConverter.swift */,
 				A20000000000000000000012 /* NutritionCalculator.swift */,
 			);
 			path = Units;
@@ -458,8 +452,6 @@
 				A10000000000000000000007 /* Nutrition.swift in Sources */,
 				A10000000000000000000008 /* LocalDay.swift in Sources */,
 				A10000000000000000000009 /* PersistentEnums.swift in Sources */,
-				A10000000000000000000010 /* FoodUnit.swift in Sources */,
-				A10000000000000000000011 /* UnitConverter.swift in Sources */,
 				A10000000000000000000012 /* NutritionCalculator.swift in Sources */,
 				A10000000000000000000013 /* ProductModels.swift in Sources */,
 				A10000000000000000000014 /* RecipeModels.swift in Sources */,

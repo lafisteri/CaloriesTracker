@@ -271,8 +271,6 @@ private func diaryErrorMessage(_ error: Error, fallback: String) -> String {
     switch error {
     case let error as DiaryServiceError:
         error.errorDescription ?? fallback
-    case let error as UnitConverterError:
-        error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
         error.errorDescription ?? fallback
     case let error as RecipeCalculatorError:

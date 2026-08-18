@@ -45,27 +45,7 @@ extension ProductVersionRecord {
             baseUnit: baseUnit,
             baseAmount: baseAmount,
             nutrition: Nutrition(calories: calories, protein: protein, fat: fat, carbs: carbs),
-            servingUnits: try servingUnits
-                .sorted { $0.position < $1.position }
-                .map { try $0.toDomain() },
             createdAt: createdAt,
-        )
-    }
-}
-
-extension ServingUnitRecord {
-    func toDomain() throws -> ServingUnit {
-        guard let conversionUnit = ServingConversionUnit(rawValue: conversionUnitRaw) else {
-            throw RecordMappingError.invalidEnum(type: "ServingConversionUnit", value: conversionUnitRaw)
-        }
-
-        return ServingUnit(
-            id: id,
-            productVersionID: productVersionID,
-            position: position,
-            name: name,
-            conversionAmount: conversionAmount,
-            conversionUnit: conversionUnit,
         )
     }
 }

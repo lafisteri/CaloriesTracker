@@ -71,7 +71,6 @@ final class ProductService {
             baseUnit: draft.baseUnit,
             baseAmount: draft.baseAmount,
             nutrition: draft.nutrition,
-            servingUnits: [],
             createdAt: now,
         )
         let product = Product(
@@ -108,16 +107,6 @@ final class ProductService {
 
         if versionedFieldsChanged {
             let versionID = UUID()
-            let servingUnits = details.currentVersion.servingUnits.map { oldUnit in
-                ServingUnit(
-                    id: UUID(),
-                    productVersionID: versionID,
-                    position: oldUnit.position,
-                    name: oldUnit.name,
-                    conversionAmount: oldUnit.conversionAmount,
-                    conversionUnit: oldUnit.conversionUnit,
-                )
-            }
             let nextVersion = ProductVersion(
                 id: versionID,
                 productID: details.product.id,
@@ -126,7 +115,6 @@ final class ProductService {
                 baseUnit: draft.baseUnit,
                 baseAmount: draft.baseAmount,
                 nutrition: draft.nutrition,
-                servingUnits: servingUnits,
                 createdAt: now,
             )
             let updatedProduct = Product(

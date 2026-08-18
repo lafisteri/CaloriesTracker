@@ -85,15 +85,7 @@ final class ProductListViewModel {
     }
 
     private func productUnitLabel(for token: String, version: ProductVersion) -> String? {
-        if token == version.baseUnit.rawValue {
-            return version.baseUnit.russianLabel
-        }
-        guard let servingUnitID = UUID(uuidString: String(token.dropFirst("serving:".count))),
-              token.hasPrefix("serving:")
-        else {
-            return nil
-        }
-        return version.servingUnits.first(where: { $0.id == servingUnitID })?.name
+        token == version.baseUnit.rawValue ? version.baseUnit.russianLabel : nil
     }
 }
 

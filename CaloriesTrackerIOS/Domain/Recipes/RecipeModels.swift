@@ -52,18 +52,5 @@ struct RecipeDraft: Hashable, Sendable {
 
 enum RecipeDiaryUnit: String, CaseIterable, Hashable, Codable, Sendable {
     case grams = "g"
-    case serving = "piece"
-
-    /// Accepts the short-lived Phase 4 tokens so an already saved local entry
-    /// remains editable after the canonical token format is restored.
-    static func resolve(_ token: String) -> Self? {
-        switch token {
-        case grams.rawValue, "recipe:g":
-            .grams
-        case serving.rawValue, "recipe:serving":
-            .serving
-        default:
-            nil
-        }
-    }
+    case serving
 }

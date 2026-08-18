@@ -74,14 +74,10 @@ final class SwiftDataProductRepository: ProductRepository {
         let productRecord = makeRecord(product)
         let versionRecord = makeRecord(initialVersion)
         versionRecord.product = productRecord
-        versionRecord.servingUnits = initialVersion.servingUnits.map(makeRecord)
 
         do {
             modelContext.insert(productRecord)
             modelContext.insert(versionRecord)
-            for servingUnit in versionRecord.servingUnits {
-                modelContext.insert(servingUnit)
-            }
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -129,7 +125,6 @@ final class SwiftDataProductRepository: ProductRepository {
 
         let versionRecord = makeRecord(version)
         versionRecord.product = productRecord
-        versionRecord.servingUnits = version.servingUnits.map(makeRecord)
 
         productRecord.name = product.name
         productRecord.barcode = product.barcode
@@ -139,9 +134,6 @@ final class SwiftDataProductRepository: ProductRepository {
 
         do {
             modelContext.insert(versionRecord)
-            for servingUnit in versionRecord.servingUnits {
-                modelContext.insert(servingUnit)
-            }
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -209,16 +201,6 @@ final class SwiftDataProductRepository: ProductRepository {
         )
     }
 
-    private func makeRecord(_ servingUnit: ServingUnit) -> ServingUnitRecord {
-        ServingUnitRecord(
-            id: servingUnit.id,
-            productVersionID: servingUnit.productVersionID,
-            position: servingUnit.position,
-            name: servingUnit.name,
-            conversionAmount: servingUnit.conversionAmount,
-            conversionUnitRaw: servingUnit.conversionUnit.rawValue,
-        )
-    }
 }
 
 private enum ProductRepositoryError: LocalizedError {

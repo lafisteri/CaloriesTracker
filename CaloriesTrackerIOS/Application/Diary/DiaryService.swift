@@ -19,7 +19,6 @@ struct DiaryDayReadModel: Hashable, Sendable {
 struct DiaryUnitOption: Identifiable, Hashable, Sendable {
     enum Kind: Hashable, Sendable {
         case base(ProductBaseUnit)
-        case serving(name: String)
         case recipeGrams
         case recipeServing
     }
@@ -426,15 +425,12 @@ final class DiaryService {
             )
         case let .recipe(version):
             let options = recipeUnitOptions(for: version)
-            let resolvedInitialToken = initialUnitToken.flatMap { token in
-                RecipeDiaryUnit.resolve(token)?.rawValue ?? token
-            }
             return DiaryAmountSource(
                 sourceName: sourceName ?? source.sourceName,
                 calculationSource: source.calculationSource,
                 unitOptions: options,
                 initialAmount: initialAmount,
-                initialUnitToken: resolvedInitialToken ?? options.first?.token ?? "",
+                initialUnitToken: initialUnitToken ?? options.first?.token ?? "",
             )
         }
     }
@@ -443,10 +439,7 @@ final class DiaryService {
         if options.contains(where: { $0.token == preferredToken }) {
             return preferredToken
         }
-        guard let recipeUnit = RecipeDiaryUnit.resolve(preferredToken) else {
-            return nil
-        }
-        return options.first(where: { $0.token == recipeUnit.rawValue })?.token
+        return nil
     }
 
     private func isMoreRecent(_ candidate: DiaryEntry, than existing: DiaryEntry) -> Bool {
@@ -486,16 +479,7 @@ final class DiaryService {
     }
 
     private func productUnitOptions(for version: ProductVersion) -> [DiaryUnitOption] {
-        let baseOption = DiaryUnitOption(token: version.baseUnit.rawValue, kind: .base(version.baseUnit))
-        let servingOptions = version.servingUnits
-            .sorted { $0.position < $1.position }
-            .map { unit in
-                DiaryUnitOption(
-                    token: "serving:\(unit.id.uuidString)",
-                    kind: .serving(name: unit.name),
-                )
-            }
-        return [baseOption] + servingOptions
+        [DiaryUnitOption(token: version.baseUnit.rawValue, kind: .base(version.baseUnit))]
     }
 
     private func recipeUnitOptions(for version: RecipeVersion) -> [DiaryUnitOption] {
@@ -518,23 +502,10 @@ final class DiaryService {
             throw DiaryServiceError.invalidAmount
         }
 
-        if unitToken == version.baseUnit.rawValue {
-            return amount
-        }
-
-        let prefix = "serving:"
-        guard unitToken.hasPrefix(prefix),
-              let servingID = UUID(uuidString: String(unitToken.dropFirst(prefix.count))),
-              let servingUnit = version.servingUnits.first(where: { $0.id == servingID })
-        else {
+        guard unitToken == version.baseUnit.rawValue else {
             throw DiaryServiceError.invalidUnit
         }
-
-        return try UnitConverter.baseAmount(
-            from: amount,
-            servingUnit: servingUnit,
-            expectedBaseUnit: version.baseUnit,
-        )
+        return amount
     }
 
     private func validatePositiveAmount(_ amount: Double) throws {

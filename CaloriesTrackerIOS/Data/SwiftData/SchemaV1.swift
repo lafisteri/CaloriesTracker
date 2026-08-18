@@ -9,7 +9,6 @@ enum CaloriesTrackerSchemaV1: VersionedSchema {
         [
             ProductRecord.self,
             ProductVersionRecord.self,
-            ServingUnitRecord.self,
             RecipeRecord.self,
             RecipeVersionRecord.self,
             RecipeIngredientRecord.self,

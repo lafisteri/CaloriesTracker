@@ -49,9 +49,6 @@ final class ProductVersionRecord {
 
     var product: ProductRecord?
 
-    @Relationship(deleteRule: .cascade, inverse: \ServingUnitRecord.productVersion)
-    var servingUnits: [ServingUnitRecord] = []
-
     init(
         id: UUID,
         productID: UUID,
@@ -76,34 +73,6 @@ final class ProductVersionRecord {
         self.fat = fat
         self.carbs = carbs
         self.createdAt = createdAt
-    }
-}
-
-@Model
-final class ServingUnitRecord {
-    @Attribute(.unique) var id: UUID
-    var productVersionID: UUID
-    var position: Int
-    var name: String
-    var conversionAmount: Double
-    var conversionUnitRaw: String
-
-    var productVersion: ProductVersionRecord?
-
-    init(
-        id: UUID,
-        productVersionID: UUID,
-        position: Int,
-        name: String,
-        conversionAmount: Double,
-        conversionUnitRaw: String,
-    ) {
-        self.id = id
-        self.productVersionID = productVersionID
-        self.position = position
-        self.name = name
-        self.conversionAmount = conversionAmount
-        self.conversionUnitRaw = conversionUnitRaw
     }
 }
 

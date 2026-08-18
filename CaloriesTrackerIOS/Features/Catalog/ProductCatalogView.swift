@@ -359,8 +359,6 @@ extension ProductBaseUnit {
     var russianLabel: String {
         switch self {
         case .g: "г"
-        case .ml: "мл"
-        case .piece: "шт"
         case .serving: "порция"
         }
     }

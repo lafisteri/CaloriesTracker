@@ -505,7 +505,7 @@ func diaryNumber(_ value: Double) -> String {
 }
 
 func diaryUnitLabel(for token: String, sourceType: SourceType) -> String {
-    if sourceType == .recipe, let recipeUnit = RecipeDiaryUnit.resolve(token) {
+    if sourceType == .recipe, let recipeUnit = RecipeDiaryUnit(rawValue: token) {
         switch recipeUnit {
         case .grams:
             return "г"
@@ -516,7 +516,7 @@ func diaryUnitLabel(for token: String, sourceType: SourceType) -> String {
     if let baseUnit = ProductBaseUnit(rawValue: token) {
         return baseUnit.russianLabel
     }
-    return "порция"
+    return "—"
 }
 
 struct DiaryInlineErrorView: View {

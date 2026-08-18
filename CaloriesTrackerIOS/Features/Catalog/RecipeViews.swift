@@ -279,7 +279,7 @@ struct RecipeDetailView: View {
                     ForEach(details.ingredients) { item in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(item.productName)
-                            Text("\(formattedNumber(item.ingredient.amount)) \(recipeIngredientUnitLabel(item.ingredient.unitToken, version: item.productVersion)) · v\(item.productVersion.versionNumber)")
+                            Text("\(formattedNumber(item.ingredient.amount)) \(recipeIngredientUnitLabel(item.ingredient.unitToken)) · v\(item.productVersion.versionNumber)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -953,28 +953,13 @@ private func recipeIngredientOptionLabel(_ option: RecipeIngredientUnitOption) -
     switch option.kind {
     case let .base(unit):
         unit.russianLabel
-    case let .serving(name):
-        name
     }
 }
 
 private func recipeIngredientTokenLabel(_ token: String) -> String {
-    if let baseUnit = ProductBaseUnit(rawValue: token) {
-        return baseUnit.russianLabel
-    }
-    return "порция"
+    ProductBaseUnit(rawValue: token)?.russianLabel ?? "—"
 }
 
-private func recipeIngredientUnitLabel(_ token: String, version: ProductVersion) -> String {
-    if let baseUnit = ProductBaseUnit(rawValue: token) {
-        return baseUnit.russianLabel
-    }
-    let prefix = "serving:"
-    guard token.hasPrefix(prefix),
-          let identifier = UUID(uuidString: String(token.dropFirst(prefix.count))),
-          let unit = version.servingUnits.first(where: { $0.id == identifier })
-    else {
-        return "порция"
-    }
-    return unit.name
+private func recipeIngredientUnitLabel(_ token: String) -> String {
+    ProductBaseUnit(rawValue: token)?.russianLabel ?? "—"
 }

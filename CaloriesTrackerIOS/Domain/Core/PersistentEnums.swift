@@ -23,13 +23,5 @@ enum SourceType: String, Codable, Sendable {
 
 enum ProductBaseUnit: String, CaseIterable, Codable, Sendable {
     case g
-    case ml
-    case piece
     case serving
-}
-
-enum ServingConversionUnit: String, CaseIterable, Codable, Sendable {
-    case g
-    case ml
-    case piece
 }

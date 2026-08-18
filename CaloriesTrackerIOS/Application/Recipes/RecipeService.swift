@@ -12,7 +12,6 @@ struct RecipeListItem: Identifiable, Hashable, Sendable {
 struct RecipeIngredientUnitOption: Identifiable, Hashable, Sendable {
     enum Kind: Hashable, Sendable {
         case base(ProductBaseUnit)
-        case serving(name: String)
     }
 
     let token: String
@@ -460,7 +459,7 @@ final class RecipeService {
         }
 
         let outputAmount: Double
-        switch RecipeDiaryUnit.resolve(unitToken) {
+        switch RecipeDiaryUnit(rawValue: unitToken) {
         case .grams:
             guard let cookedWeight = source.version.cookedWeight, cookedWeight.isFinite, cookedWeight > 0 else {
                 throw RecipeServiceError.unavailableCompositionUnit
@@ -637,24 +636,11 @@ final class RecipeService {
     }
 
     private func unitOptions(for version: ProductVersion) -> [RecipeIngredientUnitOption] {
-        let baseOption = RecipeIngredientUnitOption(token: version.baseUnit.rawValue, kind: .base(version.baseUnit))
-        let servingOptions = version.servingUnits
-            .sorted { $0.position < $1.position }
-            .map { unit in
-                RecipeIngredientUnitOption(
-                    token: "serving:\(unit.id.uuidString)",
-                    kind: .serving(name: unit.name),
-                )
-            }
-        return [baseOption] + servingOptions
+        [RecipeIngredientUnitOption(token: version.baseUnit.rawValue, kind: .base(version.baseUnit))]
     }
 
     private func unitToken(_ token: String, isCompatibleWith version: ProductVersion) -> Bool {
         token == version.baseUnit.rawValue
-            || (token.hasPrefix("serving:")
-                && UUID(uuidString: String(token.dropFirst("serving:".count))).map { servingID in
-                    version.servingUnits.contains { $0.id == servingID }
-                } == true)
     }
 }
 

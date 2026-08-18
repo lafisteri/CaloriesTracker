@@ -77,7 +77,7 @@ final class RecipeListViewModel {
         guard let usageDefault = usageDefaults[source],
               usageDefault.amount.isFinite,
               usageDefault.amount > 0,
-              let recipeUnit = RecipeDiaryUnit.resolve(usageDefault.unitToken),
+              let recipeUnit = RecipeDiaryUnit(rawValue: usageDefault.unitToken),
               let compatibleUnit = availableUnits.first(where: { $0.token == recipeUnit.rawValue })
         else {
             return fallback
@@ -538,8 +538,6 @@ func recipeErrorMessage(_ error: Error, fallback: String) -> String {
     case let error as RecipeServiceError:
         error.errorDescription ?? fallback
     case let error as RecipeCalculatorError:
-        error.errorDescription ?? fallback
-    case let error as UnitConverterError:
         error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
         error.errorDescription ?? fallback
