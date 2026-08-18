@@ -15,7 +15,7 @@ struct DiaryAmountView: View {
     var body: some View {
         @Bindable var model = model
 
-        ZStack {
+        VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if model.isLoading && model.source == nil {
@@ -43,21 +43,7 @@ struct DiaryAmountView: View {
                 .padding(.top, 16)
                 .padding(.bottom)
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(model.source?.sourceName ?? "")
-        .navigationBarTitleDisplayMode(.inline)
-        .disabled(model.isLoading || model.isSaving)
-        .toolbar {
-            if case let .create(context, _) = model.mode, let productID {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Редактировать") {
-                        router.todayPath.append(.productEditorForDiarySelection(productID: productID, context: context))
-                    }
-                }
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+
             if let source = model.source {
                 HStack(spacing: 8) {
                     TextField("", text: $model.amountText)
@@ -75,17 +61,11 @@ struct DiaryAmountView: View {
                         }
                         .accessibilityLabel("Количество")
 
-                    Picker("Единица", selection: $model.selectedUnitToken) {
-                        ForEach(source.unitOptions) { option in
-                            Text(unitLabel(option)).tag(option.token)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(minWidth: 64)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Text(selectedUnitLabel(for: source))
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 64, alignment: .leading)
+                        .accessibilityLabel("Единица: \(selectedUnitLabel(for: source))")
 
                     Button(model.isSaving ? "…" : model.actionTitle) {
                         Task {
@@ -105,6 +85,19 @@ struct DiaryAmountView: View {
                 .background(.bar)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle(model.source?.sourceName ?? "")
+        .navigationBarTitleDisplayMode(.inline)
+        .disabled(model.isLoading || model.isSaving)
+        .toolbar {
+            if case let .create(context, _) = model.mode, let productID {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Редактировать") {
+                        router.todayPath.append(.productEditorForDiarySelection(productID: productID, context: context))
+                    }
+                }
+            }
+        }
         .task {
             await model.load()
             if model.source != nil {
@@ -112,9 +105,6 @@ struct DiaryAmountView: View {
             }
         }
         .onChange(of: model.amountText) { _, _ in
-            model.refreshPreview()
-        }
-        .onChange(of: model.selectedUnitToken) { _, _ in
             model.refreshPreview()
         }
     }
@@ -181,6 +171,13 @@ struct DiaryAmountView: View {
         case .recipeServing:
             "порция"
         }
+    }
+
+    private func selectedUnitLabel(for source: DiaryAmountSource) -> String {
+        guard let option = source.unitOptions.first(where: { $0.token == model.selectedUnitToken }) else {
+            return model.selectedUnitToken
+        }
+        return unitLabel(option)
     }
 
     private var productID: UUID? {
