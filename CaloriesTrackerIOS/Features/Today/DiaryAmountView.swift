@@ -21,9 +21,6 @@ struct DiaryAmountView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 160)
                 } else if let source = model.source {
-                    Text(source.sourceName)
-                        .font(.title2.weight(.semibold))
-
                     nutritionPreview
 
                     if let previewErrorMessage = model.previewErrorMessage {
@@ -41,9 +38,11 @@ struct DiaryAmountView: View {
                     DiaryInlineErrorView(message: errorMessage)
                 }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom)
         }
-        .navigationTitle("")
+        .navigationTitle(model.source?.sourceName ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
@@ -57,11 +56,21 @@ struct DiaryAmountView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if let source = model.source {
-                HStack(spacing: 10) {
-                    TextField("Количество", text: $model.amountText)
+                HStack(spacing: 8) {
+                    TextField("", text: $model.amountText)
                         .keyboardType(.decimalPad)
-                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .font(.body.weight(.semibold))
                         .focused($amountIsFocused)
+                        .frame(width: 64)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(amountIsFocused ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 1)
+                        }
+                        .accessibilityLabel("Количество")
 
                     Picker("Единица", selection: $model.selectedUnitToken) {
                         ForEach(source.unitOptions) { option in
@@ -70,6 +79,10 @@ struct DiaryAmountView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
+                    .frame(minWidth: 64)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                     Button(model.isSaving ? "…" : model.actionTitle) {
                         Task {
@@ -80,6 +93,8 @@ struct DiaryAmountView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .disabled(model.isLoading || model.isSaving)
                 }
                 .padding(.horizontal)
@@ -104,14 +119,45 @@ struct DiaryAmountView: View {
     @ViewBuilder
     private var nutritionPreview: some View {
         let preview = model.preview ?? .zero
-        VStack(alignment: .leading, spacing: 6) {
-            Text("КБЖУ")
-                .font(.headline)
-            Text("\(diaryNumber(preview.calories)) ккал")
-                .font(.title3.weight(.semibold))
-            Text("Б \(diaryNumber(preview.protein)) · Ж \(diaryNumber(preview.fat)) · У \(diaryNumber(preview.carbs))")
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Калории")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(diaryNumber(preview.calories))
+                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text("ккал")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                macroValue(title: "Белки", value: preview.protein)
+                macroValue(title: "Жиры", value: preview.fat)
+                macroValue(title: "Углеводы", value: preview.carbs)
+            }
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func macroValue(title: String, value: Double) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(diaryNumber(value)) г")
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func focusAndSelectAmount() {
