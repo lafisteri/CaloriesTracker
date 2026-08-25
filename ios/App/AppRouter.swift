@@ -1,9 +1,12 @@
 import Observation
+import OSLog
 import SwiftUI
 
 @MainActor
 @Observable
 final class AppRouter {
+    private static let logger = Logger(subsystem: "com.caloriestracker.ios", category: "Navigation")
+
     var selectedTab: AppTab = .today
     var statisticsPath: [StatisticsRoute] = []
     var todayPath: [TodayRoute] = []
@@ -15,6 +18,28 @@ final class AppRouter {
             return
         }
         todayPath = []
+    }
+
+    func popToday(ifTopIs expectedRoute: TodayRoute) {
+        guard todayPath.last == expectedRoute else {
+            Self.logSkippedPop(path: "today")
+            return
+        }
+        todayPath.removeLast()
+    }
+
+    func popCatalog(ifTopIs expectedRoute: CatalogRoute) {
+        guard catalogPath.last == expectedRoute else {
+            Self.logSkippedPop(path: "catalog")
+            return
+        }
+        catalogPath.removeLast()
+    }
+
+    private static func logSkippedPop(path: String) {
+        #if DEBUG
+        logger.debug("navigation_pop_skipped path=\(path, privacy: .public) reason=unexpected_top_route")
+        #endif
     }
 }
 

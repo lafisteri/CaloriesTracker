@@ -115,7 +115,7 @@ struct ProductCatalogRootView: View {
                             router: router,
                             productService: productService,
                             onSaved: {
-                                router.catalogPath.removeLast()
+                                router.popCatalog(ifTopIs: .productEditor(id))
                             },
                         )
                     } else {

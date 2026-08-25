@@ -167,13 +167,15 @@ struct TodayRootView: View {
                         }
                     },
                 )
-            case let .productEditorForDiarySelection(productID, _):
+            case let .productEditorForDiarySelection(productID, context):
                 ProductEditorView(
                     productID: productID,
                     router: router,
                     productService: productService,
                     onSaved: {
-                        router.todayPath.removeLast()
+                        router.popToday(
+                            ifTopIs: .productEditorForDiarySelection(productID: productID, context: context),
+                        )
                     },
                     onDismissed: {
                         router.amountFocusRestorationRevision += 1
@@ -185,7 +187,7 @@ struct TodayRootView: View {
                     router: router,
                     productService: productService,
                     onSaved: {
-                        router.todayPath.removeLast()
+                        router.popToday(ifTopIs: .productEditorForEntryAmount(productID: productID))
                     },
                     onDismissed: {
                         router.amountFocusRestorationRevision += 1
