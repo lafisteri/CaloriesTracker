@@ -71,7 +71,7 @@ final class RecipeListViewModel {
             return nil
         }
         let fallback = FoodSelectionAmountDefault(
-            amount: 100,
+            amount: FoodAmountDefaults.fallbackAmount(for: fallbackUnit.token),
             unitToken: fallbackUnit.token,
             unitLabel: fallbackUnit.label,
         )
@@ -449,8 +449,9 @@ final class RecipeIngredientAmountViewModel {
             amountText = recipeNumericString(selectionDefault.amount)
             selectedUnitToken = selectionDefault.unitToken
         } else {
-            amountText = source.initialAmount.map(recipeNumericString) ?? recipeNumericString(100)
             selectedUnitToken = source.initialUnitToken
+            amountText = source.initialAmount.map(recipeNumericString)
+                ?? recipeNumericString(FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
         }
     }
 
@@ -527,8 +528,8 @@ final class RecipeCompositionAmountViewModel {
             amountText = recipeNumericString(selectionDefault.amount)
             selectedUnitToken = selectionDefault.unitToken
         } else {
-            amountText = recipeNumericString(100)
             selectedUnitToken = source.outputUnits.first?.token ?? ""
+            amountText = recipeNumericString(FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
         }
     }
 

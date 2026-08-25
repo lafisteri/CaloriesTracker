@@ -68,7 +68,7 @@ final class ProductListViewModel {
 
     func selectionDefault(for item: ProductListItem) -> FoodSelectionAmountDefault {
         let fallback = FoodSelectionAmountDefault(
-            amount: 100,
+            amount: FoodAmountDefaults.fallbackAmount(for: item.currentVersion.baseUnit.rawValue),
             unitToken: item.currentVersion.baseUnit.rawValue,
             unitLabel: item.currentVersion.baseUnit.russianLabel,
         )

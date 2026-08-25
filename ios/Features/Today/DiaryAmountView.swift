@@ -30,6 +30,8 @@ struct DiaryAmountView: View {
             unavailableTitle: "Источник недоступен",
             unavailableSystemImage: "fork.knife",
             amountText: $model.amountText,
+            selectedUnitToken: $model.selectedUnitToken,
+            unitOptions: availableUnitOptions,
             amountIsFocused: amountIsFocused,
             amountFocus: isAmountFocusEnabled ? $amountIsFocused : nil,
             actionTitle: model.actionTitle,
@@ -45,15 +47,7 @@ struct DiaryAmountView: View {
                     }
                 }
             },
-        ) {
-            if let source = model.source {
-                Text(selectedUnitLabel(for: source))
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 64, alignment: .leading)
-                    .accessibilityLabel("Единица: \(selectedUnitLabel(for: source))")
-            }
-        }
+        )
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
             if let productID {
@@ -107,6 +101,9 @@ struct DiaryAmountView: View {
             Self.logger.notice("focus=amount_changed previous=\(previousFocus) current=\(currentFocus)")
         }
         .onChange(of: model.amountText) { _, _ in
+            model.refreshPreview()
+        }
+        .onChange(of: model.selectedUnitToken) { _, _ in
             model.refreshPreview()
         }
     }
@@ -189,11 +186,13 @@ struct DiaryAmountView: View {
         }
     }
 
-    private func selectedUnitLabel(for source: DiaryAmountSource) -> String {
-        guard let option = source.unitOptions.first(where: { $0.token == model.selectedUnitToken }) else {
-            return model.selectedUnitToken
+    private var availableUnitOptions: [AmountUnitOption] {
+        guard let source = model.source else {
+            return []
         }
-        return unitLabel(option)
+        return source.unitOptions.map { option in
+            AmountUnitOption(token: option.token, label: unitLabel(option))
+        }
     }
 
     private var productID: UUID? {
@@ -215,7 +214,16 @@ struct DiaryAmountView: View {
     }
 }
 
-struct AmountEditorView<UnitContent: View>: View {
+struct AmountUnitOption: Identifiable, Hashable, Sendable {
+    let token: String
+    let label: String
+
+    var id: String {
+        token
+    }
+}
+
+struct AmountEditorView: View {
     let title: String
     let contextDescription: String?
     let isLoading: Bool
@@ -226,13 +234,14 @@ struct AmountEditorView<UnitContent: View>: View {
     let unavailableTitle: String
     let unavailableSystemImage: String
     @Binding private var amountText: String
+    @Binding private var selectedUnitToken: String
+    let unitOptions: [AmountUnitOption]
     let amountIsFocused: Bool
     let amountFocus: FocusState<Bool>.Binding?
     let autoFocusAmount: Bool
     let actionTitle: String
     let isSaving: Bool
     let onConfirm: () -> Void
-    private let unitContent: UnitContent
 
     init(
         title: String,
@@ -245,13 +254,14 @@ struct AmountEditorView<UnitContent: View>: View {
         unavailableTitle: String,
         unavailableSystemImage: String,
         amountText: Binding<String>,
+        selectedUnitToken: Binding<String>,
+        unitOptions: [AmountUnitOption],
         amountIsFocused: Bool,
         amountFocus: FocusState<Bool>.Binding?,
         autoFocusAmount: Bool = false,
         actionTitle: String,
         isSaving: Bool,
         onConfirm: @escaping () -> Void,
-        @ViewBuilder unitContent: () -> UnitContent,
     ) {
         self.title = title
         self.contextDescription = contextDescription
@@ -263,13 +273,14 @@ struct AmountEditorView<UnitContent: View>: View {
         self.unavailableTitle = unavailableTitle
         self.unavailableSystemImage = unavailableSystemImage
         _amountText = amountText
+        _selectedUnitToken = selectedUnitToken
+        self.unitOptions = unitOptions
         self.amountIsFocused = amountIsFocused
         self.amountFocus = amountFocus
         self.autoFocusAmount = autoFocusAmount
         self.actionTitle = actionTitle
         self.isSaving = isSaving
         self.onConfirm = onConfirm
-        self.unitContent = unitContent()
     }
 
     var body: some View {
@@ -309,7 +320,7 @@ struct AmountEditorView<UnitContent: View>: View {
             if isAvailable {
                 HStack(spacing: 8) {
                     amountTextField
-                    unitContent
+                    unitControl
 
                     Button(action: onConfirm) {
                         Group {
@@ -368,6 +379,54 @@ struct AmountEditorView<UnitContent: View>: View {
                     .stroke(amountIsFocused ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 1)
             }
             .accessibilityLabel("Количество")
+    }
+
+    @ViewBuilder
+    private var unitControl: some View {
+        switch unitOptions.count {
+        case 0:
+            EmptyView()
+        case 1:
+            Text(unitOptions[0].label)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 64, alignment: .leading)
+                .accessibilityLabel("Единица: \(unitOptions[0].label)")
+        default:
+            Menu {
+                ForEach(unitOptions) { option in
+                    Button {
+                        selectedUnitToken = option.token
+                    } label: {
+                        if selectedUnitToken == option.token {
+                            Label(option.label, systemImage: "checkmark")
+                        } else {
+                            Text(option.label)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(selectedUnitLabel)
+                        .font(.body.weight(.medium))
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                }
+                .foregroundStyle(.primary)
+                .frame(minWidth: 64, minHeight: 44)
+                .padding(.horizontal, 8)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous),
+                )
+            }
+            .accessibilityLabel("Единица: \(selectedUnitLabel)")
+            .accessibilityHint("Выберите единицу")
+        }
+    }
+
+    private var selectedUnitLabel: String {
+        unitOptions.first(where: { $0.token == selectedUnitToken })?.label ?? selectedUnitToken
     }
 }
 

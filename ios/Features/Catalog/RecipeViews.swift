@@ -867,6 +867,10 @@ private struct RecipeIngredientAmountView: View {
             unavailableTitle: "Продукт недоступен",
             unavailableSystemImage: "shippingbox",
             amountText: $model.amountText,
+            selectedUnitToken: $model.selectedUnitToken,
+            unitOptions: source.unitOptions.map { option in
+                AmountUnitOption(token: option.token, label: recipeIngredientOptionLabel(option))
+            },
             amountIsFocused: amountIsFocused,
             amountFocus: $amountIsFocused,
             autoFocusAmount: true,
@@ -878,19 +882,14 @@ private struct RecipeIngredientAmountView: View {
                     onComplete(draft, source.productName)
                 }
             },
-        ) {
-            if let option = source.unitOptions.first(where: { $0.token == model.selectedUnitToken }) {
-                Text(recipeIngredientOptionLabel(option))
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 64, alignment: .leading)
-                    .accessibilityLabel("Единица: \(recipeIngredientOptionLabel(option))")
-            }
-        }
+        )
         .onAppear {
             model.refreshPreview()
         }
         .onChange(of: model.amountText) { _, _ in
+            model.refreshPreview()
+        }
+        .onChange(of: model.selectedUnitToken) { _, _ in
             model.refreshPreview()
         }
     }
@@ -933,6 +932,10 @@ private struct RecipeCompositionAmountView: View {
             unavailableTitle: "Рецепт недоступен",
             unavailableSystemImage: "book.closed",
             amountText: $model.amountText,
+            selectedUnitToken: $model.selectedUnitToken,
+            unitOptions: source.outputUnits.map { option in
+                AmountUnitOption(token: option.token, label: option.label)
+            },
             amountIsFocused: amountIsFocused,
             amountFocus: $amountIsFocused,
             autoFocusAmount: true,
@@ -944,19 +947,14 @@ private struct RecipeCompositionAmountView: View {
                     onComplete(drafts)
                 }
             },
-        ) {
-            if let option = source.outputUnits.first(where: { $0.token == model.selectedUnitToken }) {
-                Text(option.label)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 64, alignment: .leading)
-                    .accessibilityLabel("Единица: \(option.label)")
-            }
-        }
+        )
         .onAppear {
             model.refreshPreview()
         }
         .onChange(of: model.amountText) { _, _ in
+            model.refreshPreview()
+        }
+        .onChange(of: model.selectedUnitToken) { _, _ in
             model.refreshPreview()
         }
     }

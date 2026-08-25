@@ -220,11 +220,13 @@ final class DiaryService {
             initialAmount: nil,
             initialUnitToken: nil,
         )
-        let amount = preferredAmount.isFinite && preferredAmount > 0 ? preferredAmount : 100
         let unitToken = compatibleUnitToken(
             preferredUnitToken,
             options: amountSource.unitOptions,
         ) ?? amountSource.initialUnitToken
+        let amount = preferredAmount.isFinite && preferredAmount > 0
+            ? preferredAmount
+            : FoodAmountDefaults.fallbackAmount(for: unitToken)
 
         try await create(
             context: context,

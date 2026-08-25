@@ -174,8 +174,8 @@ final class AmountViewModel {
                     amountText = numericString(selectionDefault.amount)
                     selectedUnitToken = selectionDefault.unitToken
                 } else {
-                    amountText = numericString(100)
                     selectedUnitToken = source.initialUnitToken
+                    amountText = numericString(FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
                 }
             case .edit:
                 amountText = source.initialAmount.map(numericString) ?? ""

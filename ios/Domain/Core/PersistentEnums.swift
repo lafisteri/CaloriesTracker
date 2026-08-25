@@ -25,3 +25,9 @@ enum ProductBaseUnit: String, CaseIterable, Codable, Sendable {
     case g
     case serving
 }
+
+enum FoodAmountDefaults {
+    static func fallbackAmount(for unitToken: String) -> Double {
+        unitToken == ProductBaseUnit.serving.rawValue ? 1 : 100
+    }
+}
