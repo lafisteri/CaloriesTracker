@@ -13,10 +13,7 @@ final class AppRouter {
     var catalogPath: [CatalogRoute] = []
     var amountFocusRestorationRevision = 0
 
-    func resetTodaySelectionNavigation() {
-        guard todayPath.contains(where: \.isDiarySelectionRoute) else {
-            return
-        }
+    func resetTodayNavigationWhenLeavingTab() {
         todayPath = []
     }
 
@@ -58,16 +55,6 @@ enum TodayRoute: Hashable {
     case productDetails(productID: UUID, context: DiaryContext)
     case recipeDetails(UUID)
 
-    var isDiarySelectionRoute: Bool {
-        switch self {
-        case .catalogSelection, .amount, .productEditorForDiarySelection, .recipeEditor, .productDetails, .recipeDetails:
-            true
-        case let .productEditor(context, _):
-            context != nil
-        case .entryEditor, .productEditorForEntryAmount:
-            false
-        }
-    }
 }
 
 enum CatalogRoute: Hashable {

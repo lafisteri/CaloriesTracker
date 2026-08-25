@@ -55,7 +55,7 @@ struct RootApplicationView: View {
             guard previousTab == .today, selectedTab != .today else {
                 return
             }
-            router.resetTodaySelectionNavigation()
+            router.resetTodayNavigationWhenLeavingTab()
         }
     }
 }
