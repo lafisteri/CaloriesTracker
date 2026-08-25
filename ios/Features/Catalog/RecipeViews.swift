@@ -492,14 +492,6 @@ struct RecipeEditorView: View {
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isLoading || model.isSaving)
             }
-            if !isIngredientSelectionPending && !showsIngredientSelection {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Готово") {
-                        focusedField = nil
-                    }
-                }
-            }
         }
         .task {
             await model.loadForEditing()
