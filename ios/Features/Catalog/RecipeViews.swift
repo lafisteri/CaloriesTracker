@@ -58,6 +58,7 @@ struct RecipeListView: View {
                     case let .selection(context):
                         if let selectionDisplay = model.selectionDisplay(for: item) {
                             let defaultValue = selectionDisplay.defaultValue
+                            let source = FoodSourceReference(sourceType: .recipe, sourceID: item.recipe.id)
                             HStack(spacing: 12) {
                                 Button {
                                     onSelect(item.recipe.id, defaultValue)
@@ -73,19 +74,18 @@ struct RecipeListView: View {
                                 .foregroundStyle(.primary)
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 
-                                if quickAddingRecipeID == item.recipe.id {
+                                if isQuickAdding(source: source, context: context) {
                                     ProgressView()
                                         .frame(minWidth: 44, minHeight: 44)
                                 } else {
                                     Button {
-                                        Task {
-                                            quickAddingRecipeID = item.recipe.id
-                                            defer { quickAddingRecipeID = nil }
-                                            do {
-                                                try await context.onQuickAddRecipe(item.recipe.id, defaultValue)
-                                            } catch {
-                                                model.errorMessage = error.localizedDescription
-                                            }
+                                        Task { @MainActor in
+                                            await quickAdd(
+                                                source: source,
+                                                recipeID: item.recipe.id,
+                                                defaultValue: defaultValue,
+                                                context: context,
+                                            )
                                         }
                                     } label: {
                                         Image(systemName: "plus.circle.fill")
@@ -94,6 +94,7 @@ struct RecipeListView: View {
                                     .buttonStyle(.borderless)
                                     .frame(minWidth: 44, minHeight: 44)
                                     .accessibilityLabel("Добавить \(item.recipe.name)")
+                                    .disabled(context.quickAddState?.isInProgress == true)
                                 }
                             }
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -146,6 +147,40 @@ struct RecipeListView: View {
                 await model.load(matching: query)
             }
         }
+    }
+
+    @MainActor
+    private func quickAdd(
+        source: FoodSourceReference,
+        recipeID: UUID,
+        defaultValue: FoodSelectionAmountDefault,
+        context: FoodSelectionContext,
+    ) async {
+        let quickAddState = context.quickAddState
+        if let quickAddState {
+            guard quickAddState.begin(for: source) else {
+                return
+            }
+        } else {
+            quickAddingRecipeID = recipeID
+        }
+        defer {
+            if let quickAddState {
+                quickAddState.finish(for: source)
+            } else {
+                quickAddingRecipeID = nil
+            }
+        }
+
+        do {
+            try await context.onQuickAddRecipe(recipeID, defaultValue)
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func isQuickAdding(source: FoodSourceReference, context: FoodSelectionContext) -> Bool {
+        context.quickAddState?.activeSource == source || quickAddingRecipeID == source.sourceID
     }
 }
 

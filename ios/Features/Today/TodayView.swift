@@ -9,6 +9,7 @@ struct TodayRootView: View {
 
     @State private var model: TodayViewModel
     @State private var draggedEntryID: UUID?
+    @State private var quickAddState = CatalogQuickAddState()
 
     init(
         router: AppRouter,
@@ -215,6 +216,7 @@ struct TodayRootView: View {
 
     private func foodSelectionContext(for context: DiaryContext) -> FoodSelectionContext {
         FoodSelectionContext(
+            quickAddState: quickAddState,
             onSelectProduct: { productID, selectionDefault in
                 router.todayPath.append(
                     .amount(

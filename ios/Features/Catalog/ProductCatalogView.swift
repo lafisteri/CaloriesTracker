@@ -1,12 +1,57 @@
+import Observation
 import SwiftUI
 
+@MainActor
+@Observable
+final class CatalogQuickAddState {
+    private(set) var activeSource: FoodSourceReference?
+
+    var isInProgress: Bool {
+        activeSource != nil
+    }
+
+    func begin(for source: FoodSourceReference) -> Bool {
+        guard activeSource == nil else {
+            return false
+        }
+        activeSource = source
+        return true
+    }
+
+    func finish(for source: FoodSourceReference) {
+        guard activeSource == source else {
+            return
+        }
+        activeSource = nil
+    }
+}
+
 struct FoodSelectionContext {
+    let quickAddState: CatalogQuickAddState?
     let onSelectProduct: @MainActor (UUID, FoodSelectionAmountDefault?) -> Void
     let onSelectRecipe: @MainActor (UUID, FoodSelectionAmountDefault?) -> Void
     let onQuickAddProduct: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
     let onQuickAddRecipe: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
     let onCreateProduct: @MainActor () -> Void
     let onCreateRecipe: @MainActor () -> Void
+
+    init(
+        quickAddState: CatalogQuickAddState? = nil,
+        onSelectProduct: @escaping @MainActor (UUID, FoodSelectionAmountDefault?) -> Void,
+        onSelectRecipe: @escaping @MainActor (UUID, FoodSelectionAmountDefault?) -> Void,
+        onQuickAddProduct: @escaping @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void,
+        onQuickAddRecipe: @escaping @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void,
+        onCreateProduct: @escaping @MainActor () -> Void,
+        onCreateRecipe: @escaping @MainActor () -> Void,
+    ) {
+        self.quickAddState = quickAddState
+        self.onSelectProduct = onSelectProduct
+        self.onSelectRecipe = onSelectRecipe
+        self.onQuickAddProduct = onQuickAddProduct
+        self.onQuickAddRecipe = onQuickAddRecipe
+        self.onCreateProduct = onCreateProduct
+        self.onCreateRecipe = onCreateRecipe
+    }
 }
 
 enum CatalogMode {
@@ -231,6 +276,7 @@ private struct ProductListView: View {
                     case let .selection(context):
                         let selectionDisplay = model.selectionDisplay(for: item)
                         let defaultValue = selectionDisplay.defaultValue
+                        let source = FoodSourceReference(sourceType: .product, sourceID: item.product.id)
                         HStack(spacing: 12) {
                             Button {
                                 onSelect(item.product.id, defaultValue)
@@ -247,19 +293,18 @@ private struct ProductListView: View {
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .accessibilityLabel("Открыть \(item.product.name)")
 
-                            if quickAddingProductID == item.product.id {
+                            if isQuickAdding(source: source, context: context) {
                                 ProgressView()
                                     .frame(minWidth: 44, minHeight: 44)
                             } else {
                                 Button {
-                                    Task {
-                                        quickAddingProductID = item.product.id
-                                        defer { quickAddingProductID = nil }
-                                        do {
-                                            try await context.onQuickAddProduct(item.product.id, defaultValue)
-                                        } catch {
-                                            model.errorMessage = error.localizedDescription
-                                        }
+                                    Task { @MainActor in
+                                        await quickAdd(
+                                            source: source,
+                                            productID: item.product.id,
+                                            defaultValue: defaultValue,
+                                            context: context,
+                                        )
                                     }
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
@@ -268,6 +313,7 @@ private struct ProductListView: View {
                                 .buttonStyle(.borderless)
                                 .frame(minWidth: 44, minHeight: 44)
                                 .accessibilityLabel("Добавить \(item.product.name)")
+                                .disabled(context.quickAddState?.isInProgress == true)
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -305,6 +351,40 @@ private struct ProductListView: View {
                 await model.load(matching: newValue)
             }
         }
+    }
+
+    @MainActor
+    private func quickAdd(
+        source: FoodSourceReference,
+        productID: UUID,
+        defaultValue: FoodSelectionAmountDefault,
+        context: FoodSelectionContext,
+    ) async {
+        let quickAddState = context.quickAddState
+        if let quickAddState {
+            guard quickAddState.begin(for: source) else {
+                return
+            }
+        } else {
+            quickAddingProductID = productID
+        }
+        defer {
+            if let quickAddState {
+                quickAddState.finish(for: source)
+            } else {
+                quickAddingProductID = nil
+            }
+        }
+
+        do {
+            try await context.onQuickAddProduct(productID, defaultValue)
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func isQuickAdding(source: FoodSourceReference, context: FoodSelectionContext) -> Bool {
+        context.quickAddState?.activeSource == source || quickAddingProductID == source.sourceID
     }
 }
 
