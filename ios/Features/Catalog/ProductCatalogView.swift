@@ -229,13 +229,14 @@ private struct ProductListView: View {
                             .accessibilityLabel("Удалить")
                         }
                     case let .selection(context):
-                        let defaultValue = model.selectionDefault(for: item)
+                        let selectionDisplay = model.selectionDisplay(for: item)
+                        let defaultValue = selectionDisplay.defaultValue
                         HStack(spacing: 12) {
                             Button {
                                 onSelect(item.product.id)
                             } label: {
                                 HStack(spacing: 0) {
-                                    ProductListRow(item: item, selectionDefault: defaultValue)
+                                    ProductListRow(item: item, selectionDisplay: selectionDisplay)
                                     Spacer(minLength: 0)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -309,11 +310,11 @@ private struct ProductListView: View {
 
 private struct ProductListRow: View {
     let item: ProductListItem
-    let selectionDefault: FoodSelectionAmountDefault?
+    let selectionDisplay: FoodSelectionDisplay?
 
-    init(item: ProductListItem, selectionDefault: FoodSelectionAmountDefault? = nil) {
+    init(item: ProductListItem, selectionDisplay: FoodSelectionDisplay? = nil) {
         self.item = item
-        self.selectionDefault = selectionDefault
+        self.selectionDisplay = selectionDisplay
     }
 
     var body: some View {
@@ -322,8 +323,12 @@ private struct ProductListRow: View {
                 .font(.body.weight(.medium))
 
             Group {
-                if let selectionDefault {
-                    Text("\(formattedNumber(selectionDefault.amount)) \(selectionDefault.unitLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
+                if let selectionDisplay {
+                    if let nutrition = selectionDisplay.nutrition {
+                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · \(formattedNumber(nutrition.calories)) ккал")
+                    } else {
+                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · КБЖУ недоступно")
+                    }
                 } else {
                     Text("\(formattedNumber(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
                 }

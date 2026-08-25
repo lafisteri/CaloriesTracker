@@ -21,6 +21,7 @@ final class RecipeListViewModel {
     private(set) var recipes: [RecipeListItem] = []
     private(set) var isLoading = false
     private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
+    private var selectionDisplays: [UUID: FoodSelectionDisplay] = [:]
     var errorMessage: String?
 
     init(recipeService: RecipeService, diaryService: DiaryService? = nil) {
@@ -45,6 +46,7 @@ final class RecipeListViewModel {
             } else {
                 usageDefaults = [:]
             }
+            refreshSelectionDisplays(for: items)
         } catch {
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить рецепты.")
         }
@@ -88,6 +90,61 @@ final class RecipeListViewModel {
             unitToken: compatibleUnit.token,
             unitLabel: compatibleUnit.label,
         )
+    }
+
+    func selectionDisplay(for item: RecipeListItem) -> FoodSelectionDisplay? {
+        guard let defaultValue = selectionDefault(for: item) else {
+            return nil
+        }
+
+        return selectionDisplays[item.id] ?? FoodSelectionDisplay(
+            defaultValue: defaultValue,
+            nutrition: nil,
+        )
+    }
+
+    private func refreshSelectionDisplays(for items: [RecipeListItem]) {
+        guard let diaryService else {
+            selectionDisplays = [:]
+            return
+        }
+
+        var displays: [UUID: FoodSelectionDisplay] = [:]
+        var calculationErrorMessage: String?
+
+        for item in items {
+            guard let defaultValue = selectionDefault(for: item) else {
+                continue
+            }
+
+            let nutrition: Nutrition?
+
+            do {
+                nutrition = try diaryService.preview(
+                    calculationSource: .recipe(item.currentVersion),
+                    amount: defaultValue.amount,
+                    unitToken: defaultValue.unitToken,
+                )
+            } catch {
+                nutrition = nil
+                if calculationErrorMessage == nil {
+                    calculationErrorMessage = recipeErrorMessage(
+                        error,
+                        fallback: "Не удалось рассчитать КБЖУ.",
+                    )
+                }
+            }
+
+            displays[item.id] = FoodSelectionDisplay(
+                defaultValue: defaultValue,
+                nutrition: nutrition,
+            )
+        }
+
+        selectionDisplays = displays
+        if let calculationErrorMessage {
+            errorMessage = calculationErrorMessage
+        }
     }
 
     private func recipeUnits(for version: RecipeVersion) -> [(token: String, label: String)] {

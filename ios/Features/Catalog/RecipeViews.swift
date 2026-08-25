@@ -56,13 +56,14 @@ struct RecipeListView: View {
                             .accessibilityLabel("Удалить")
                         }
                     case let .selection(context):
-                        if let defaultValue = model.selectionDefault(for: item) {
+                        if let selectionDisplay = model.selectionDisplay(for: item) {
+                            let defaultValue = selectionDisplay.defaultValue
                             HStack(spacing: 12) {
                                 Button {
                                     onSelect(item.recipe.id)
                                 } label: {
                                     HStack(spacing: 0) {
-                                        RecipeListRow(item: item, selectionDefault: defaultValue)
+                                        RecipeListRow(item: item, selectionDisplay: selectionDisplay)
                                         Spacer(minLength: 0)
                                     }
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -150,11 +151,11 @@ struct RecipeListView: View {
 
 private struct RecipeListRow: View {
     let item: RecipeListItem
-    let selectionDefault: FoodSelectionAmountDefault?
+    let selectionDisplay: FoodSelectionDisplay?
 
-    init(item: RecipeListItem, selectionDefault: FoodSelectionAmountDefault? = nil) {
+    init(item: RecipeListItem, selectionDisplay: FoodSelectionDisplay? = nil) {
         self.item = item
-        self.selectionDefault = selectionDefault
+        self.selectionDisplay = selectionDisplay
     }
 
     var body: some View {
@@ -162,8 +163,12 @@ private struct RecipeListRow: View {
             Text(item.recipe.name)
                 .font(.body.weight(.medium))
             Group {
-                if let selectionDefault {
-                    Text("\(formattedNumber(selectionDefault.amount)) \(selectionDefault.unitLabel) · \(formattedNumber(item.currentVersion.totalNutrition.calories)) ккал")
+                if let selectionDisplay {
+                    if let nutrition = selectionDisplay.nutrition {
+                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · \(formattedNumber(nutrition.calories)) ккал")
+                    } else {
+                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · КБЖУ недоступно")
+                    }
                 } else {
                     Text(recipeOutputSummary(for: item.currentVersion))
                 }

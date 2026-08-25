@@ -186,6 +186,17 @@ final class DiaryService {
         try preview(source: source.calculationSource, amount: amount, unitToken: unitToken)
     }
 
+    /// Calculates nutrition from an already-resolved immutable source version.
+    /// This is used by selection UI that already has the current version and
+    /// must match the Amount preview without resolving the source again.
+    func preview(
+        calculationSource: DiaryAmountCalculationSource,
+        amount: Double,
+        unitToken: String,
+    ) throws -> Nutrition {
+        try preview(source: calculationSource, amount: amount, unitToken: unitToken)
+    }
+
     func create(_ command: CreateDiaryEntryCommand) async throws {
         try validatePositiveAmount(command.amount)
         let source = try await currentSource(for: command.source)

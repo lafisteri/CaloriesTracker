@@ -7,6 +7,11 @@ struct FoodSelectionAmountDefault: Hashable, Sendable {
     let unitLabel: String
 }
 
+struct FoodSelectionDisplay: Hashable, Sendable {
+    let defaultValue: FoodSelectionAmountDefault
+    let nutrition: Nutrition?
+}
+
 @MainActor
 @Observable
 final class ProductListViewModel {
@@ -17,6 +22,7 @@ final class ProductListViewModel {
     private(set) var products: [ProductListItem] = []
     private(set) var isLoading = false
     private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
+    private var selectionDisplays: [UUID: FoodSelectionDisplay] = [:]
     var errorMessage: String?
 
     init(productService: ProductService, diaryService: DiaryService? = nil) {
@@ -41,6 +47,7 @@ final class ProductListViewModel {
             } else {
                 usageDefaults = [:]
             }
+            refreshSelectionDisplays(for: items)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -82,6 +89,51 @@ final class ProductListViewModel {
             unitToken: usageDefault.unitToken,
             unitLabel: unitLabel,
         )
+    }
+
+    func selectionDisplay(for item: ProductListItem) -> FoodSelectionDisplay {
+        selectionDisplays[item.id] ?? FoodSelectionDisplay(
+            defaultValue: selectionDefault(for: item),
+            nutrition: nil,
+        )
+    }
+
+    private func refreshSelectionDisplays(for items: [ProductListItem]) {
+        guard let diaryService else {
+            selectionDisplays = [:]
+            return
+        }
+
+        var displays: [UUID: FoodSelectionDisplay] = [:]
+        var calculationErrorMessage: String?
+
+        for item in items {
+            let defaultValue = selectionDefault(for: item)
+            let nutrition: Nutrition?
+
+            do {
+                nutrition = try diaryService.preview(
+                    calculationSource: .product(item.currentVersion),
+                    amount: defaultValue.amount,
+                    unitToken: defaultValue.unitToken,
+                )
+            } catch {
+                nutrition = nil
+                if calculationErrorMessage == nil {
+                    calculationErrorMessage = error.localizedDescription
+                }
+            }
+
+            displays[item.id] = FoodSelectionDisplay(
+                defaultValue: defaultValue,
+                nutrition: nutrition,
+            )
+        }
+
+        selectionDisplays = displays
+        if let calculationErrorMessage {
+            errorMessage = calculationErrorMessage
+        }
     }
 
     private func productUnitLabel(for token: String, version: ProductVersion) -> String? {
