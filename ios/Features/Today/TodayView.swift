@@ -141,9 +141,9 @@ struct TodayRootView: View {
                     recipeService: recipeService,
                     diaryService: diaryService,
                 )
-            case let .amount(context, source):
+            case let .amount(context, source, selectionDefault):
                 DiaryAmountView(
-                    mode: .create(context: context, source: source),
+                    mode: .create(context: context, source: source, selectionDefault: selectionDefault),
                     router: router,
                     diaryService: diaryService,
                 )
@@ -215,19 +215,21 @@ struct TodayRootView: View {
 
     private func foodSelectionContext(for context: DiaryContext) -> FoodSelectionContext {
         FoodSelectionContext(
-            onSelectProduct: { productID in
+            onSelectProduct: { productID, selectionDefault in
                 router.todayPath.append(
                     .amount(
                         context: context,
                         source: FoodSourceReference(sourceType: .product, sourceID: productID),
+                        selectionDefault: selectionDefault,
                     ),
                 )
             },
-            onSelectRecipe: { recipeID in
+            onSelectRecipe: { recipeID, selectionDefault in
                 router.todayPath.append(
                     .amount(
                         context: context,
                         source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
+                        selectionDefault: selectionDefault,
                     ),
                 )
             },

@@ -118,7 +118,7 @@ final class TodayViewModel {
 }
 
 enum DiaryAmountEditorMode: Hashable, Sendable {
-    case create(context: DiaryContext, source: FoodSourceReference)
+    case create(context: DiaryContext, source: FoodSourceReference, selectionDefault: FoodSelectionAmountDefault?)
     case edit(entryID: UUID)
 }
 
@@ -156,7 +156,7 @@ final class AmountViewModel {
 
         do {
             switch mode {
-            case let .create(_, sourceReference):
+            case let .create(_, sourceReference, _):
                 source = try await diaryService.amountSource(for: sourceReference)
             case let .edit(entryID):
                 source = try await diaryService.amountSource(forEntryID: entryID)
@@ -166,12 +166,21 @@ final class AmountViewModel {
                 return
             }
             switch mode {
-            case .create:
-                amountText = numericString(100)
+            case let .create(_, _, selectionDefault):
+                if let selectionDefault,
+                   selectionDefault.amount.isFinite,
+                   selectionDefault.amount > 0,
+                   source.unitOptions.contains(where: { $0.token == selectionDefault.unitToken }) {
+                    amountText = numericString(selectionDefault.amount)
+                    selectedUnitToken = selectionDefault.unitToken
+                } else {
+                    amountText = numericString(100)
+                    selectedUnitToken = source.initialUnitToken
+                }
             case .edit:
                 amountText = source.initialAmount.map(numericString) ?? ""
+                selectedUnitToken = source.initialUnitToken
             }
-            selectedUnitToken = source.initialUnitToken
             refreshPreview()
         } catch {
             errorMessage = diaryErrorMessage(error, fallback: "Не удалось загрузить источник.")
@@ -218,7 +227,7 @@ final class AmountViewModel {
         isSaving = true
         do {
             switch mode {
-            case let .create(context, source):
+            case let .create(context, source, _):
                 try await diaryService.create(
                     CreateDiaryEntryCommand(
                         context: context,

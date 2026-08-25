@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RecipeListView: View {
-    let onSelect: (UUID) -> Void
+    let onSelect: (UUID, FoodSelectionAmountDefault?) -> Void
     let onAdd: () -> Void
     let mode: RecipeListMode
 
@@ -13,7 +13,7 @@ struct RecipeListView: View {
         recipeService: RecipeService,
         diaryService: DiaryService?,
         mode: RecipeListMode,
-        onSelect: @escaping (UUID) -> Void,
+        onSelect: @escaping (UUID, FoodSelectionAmountDefault?) -> Void,
         onAdd: @escaping () -> Void,
     ) {
         self.onSelect = onSelect
@@ -60,7 +60,7 @@ struct RecipeListView: View {
                             let defaultValue = selectionDisplay.defaultValue
                             HStack(spacing: 12) {
                                 Button {
-                                    onSelect(item.recipe.id)
+                                    onSelect(item.recipe.id, defaultValue)
                                 } label: {
                                     HStack(spacing: 0) {
                                         RecipeListRow(item: item, selectionDisplay: selectionDisplay)
@@ -99,7 +99,7 @@ struct RecipeListView: View {
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         } else {
                             Button {
-                                onSelect(item.recipe.id)
+                                onSelect(item.recipe.id, nil)
                             } label: {
                                 HStack(spacing: 0) {
                                     RecipeListRow(item: item)
@@ -477,11 +477,17 @@ struct RecipeEditorView: View {
             CatalogView(
                 mode: .selection(
                     FoodSelectionContext(
-                        onSelectProduct: { productID in
-                            selectedIngredientProduct = RecipeIngredientProductSelection(productID: productID)
+                        onSelectProduct: { productID, defaultValue in
+                            selectedIngredientProduct = RecipeIngredientProductSelection(
+                                productID: productID,
+                                defaultValue: defaultValue,
+                            )
                         },
-                        onSelectRecipe: { recipeID in
-                            selectedIngredientRecipe = RecipeIngredientRecipeSelection(recipeID: recipeID)
+                        onSelectRecipe: { recipeID, defaultValue in
+                            selectedIngredientRecipe = RecipeIngredientRecipeSelection(
+                                recipeID: recipeID,
+                                defaultValue: defaultValue,
+                            )
                         },
                         onQuickAddProduct: { productID, defaultValue in
                             try await quickAddIngredient(productID: productID, defaultValue: defaultValue)
@@ -505,6 +511,7 @@ struct RecipeEditorView: View {
             .navigationDestination(item: $selectedIngredientProduct) { selection in
                 RecipeIngredientAmountDestination(
                     productID: selection.productID,
+                    selectionDefault: selection.defaultValue,
                     recipeService: recipeService,
                 ) { draft, productName in
                     model.addIngredient(draft, productName: productName)
@@ -518,6 +525,7 @@ struct RecipeEditorView: View {
             .navigationDestination(item: $selectedIngredientRecipe) { selection in
                 RecipeIngredientRecipeAmountDestination(
                     recipeID: selection.recipeID,
+                    selectionDefault: selection.defaultValue,
                     recipeService: recipeService,
                 ) { drafts in
                     Task {
@@ -691,6 +699,7 @@ struct RecipeVersionHistoryView: View {
 
 private struct RecipeIngredientProductSelection: Hashable, Identifiable {
     let productID: UUID
+    let defaultValue: FoodSelectionAmountDefault?
 
     var id: UUID {
         productID
@@ -699,6 +708,7 @@ private struct RecipeIngredientProductSelection: Hashable, Identifiable {
 
 private struct RecipeIngredientRecipeSelection: Hashable, Identifiable {
     let recipeID: UUID
+    let defaultValue: FoodSelectionAmountDefault?
 
     var id: UUID {
         recipeID
@@ -707,6 +717,7 @@ private struct RecipeIngredientRecipeSelection: Hashable, Identifiable {
 
 private struct RecipeIngredientAmountDestination: View {
     let productID: UUID
+    let selectionDefault: FoodSelectionAmountDefault?
     let recipeService: RecipeService
     let onComplete: (RecipeIngredientDraft, String) -> Void
 
@@ -716,7 +727,12 @@ private struct RecipeIngredientAmountDestination: View {
     var body: some View {
         Group {
             if let source {
-                RecipeIngredientAmountView(source: source, recipeService: recipeService, onComplete: onComplete)
+                RecipeIngredientAmountView(
+                    source: source,
+                    selectionDefault: selectionDefault,
+                    recipeService: recipeService,
+                    onComplete: onComplete,
+                )
             } else if let errorMessage {
                 ContentUnavailableView(
                     "Продукт недоступен",
@@ -739,6 +755,7 @@ private struct RecipeIngredientAmountDestination: View {
 
 private struct RecipeIngredientRecipeAmountDestination: View {
     let recipeID: UUID
+    let selectionDefault: FoodSelectionAmountDefault?
     let recipeService: RecipeService
     let onComplete: ([RecipeIngredientDraft]) -> Void
 
@@ -748,7 +765,12 @@ private struct RecipeIngredientRecipeAmountDestination: View {
     var body: some View {
         Group {
             if let source {
-                RecipeCompositionAmountView(source: source, recipeService: recipeService, onComplete: onComplete)
+                RecipeCompositionAmountView(
+                    source: source,
+                    selectionDefault: selectionDefault,
+                    recipeService: recipeService,
+                    onComplete: onComplete,
+                )
             } else if let errorMessage {
                 ContentUnavailableView(
                     "Рецепт недоступен",
@@ -816,6 +838,7 @@ private struct RecipeIngredientAmountView: View {
     init(
         source: RecipeIngredientSource,
         replacing: RecipeIngredientDraft? = nil,
+        selectionDefault: FoodSelectionAmountDefault? = nil,
         recipeService: RecipeService,
         onComplete: @escaping (RecipeIngredientDraft, String) -> Void,
     ) {
@@ -825,6 +848,7 @@ private struct RecipeIngredientAmountView: View {
             initialValue: RecipeIngredientAmountViewModel(
                 source: source,
                 replacing: replacing,
+                selectionDefault: selectionDefault,
                 recipeService: recipeService,
             ),
         )
@@ -881,12 +905,19 @@ private struct RecipeCompositionAmountView: View {
 
     init(
         source: RecipeCompositionSource,
+        selectionDefault: FoodSelectionAmountDefault? = nil,
         recipeService: RecipeService,
         onComplete: @escaping ([RecipeIngredientDraft]) -> Void,
     ) {
         self.source = source
         self.onComplete = onComplete
-        _model = State(initialValue: RecipeCompositionAmountViewModel(source: source, recipeService: recipeService))
+        _model = State(
+            initialValue: RecipeCompositionAmountViewModel(
+                source: source,
+                selectionDefault: selectionDefault,
+                recipeService: recipeService,
+            ),
+        )
     }
 
     var body: some View {

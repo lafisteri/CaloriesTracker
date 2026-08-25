@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct FoodSelectionContext {
-    let onSelectProduct: @MainActor (UUID) -> Void
-    let onSelectRecipe: @MainActor (UUID) -> Void
+    let onSelectProduct: @MainActor (UUID, FoodSelectionAmountDefault?) -> Void
+    let onSelectRecipe: @MainActor (UUID, FoodSelectionAmountDefault?) -> Void
     let onQuickAddProduct: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
     let onQuickAddRecipe: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
     let onCreateProduct: @MainActor () -> Void
@@ -136,21 +136,21 @@ struct CatalogView: View {
         }
     }
 
-    private func selectProduct(_ productID: UUID) {
+    private func selectProduct(_ productID: UUID, selectionDefault: FoodSelectionAmountDefault?) {
         switch mode {
         case .management:
             router.catalogPath.append(.product(productID))
         case let .selection(context):
-            context.onSelectProduct(productID)
+            context.onSelectProduct(productID, selectionDefault)
         }
     }
 
-    private func selectRecipe(_ recipeID: UUID) {
+    private func selectRecipe(_ recipeID: UUID, selectionDefault: FoodSelectionAmountDefault?) {
         switch mode {
         case .management:
             router.catalogPath.append(.recipe(recipeID))
         case let .selection(context):
-            context.onSelectRecipe(recipeID)
+            context.onSelectRecipe(recipeID, selectionDefault)
         }
     }
 
@@ -174,7 +174,7 @@ struct CatalogView: View {
 }
 
 private struct ProductListView: View {
-    let onSelect: (UUID) -> Void
+    let onSelect: (UUID, FoodSelectionAmountDefault?) -> Void
     let onAdd: () -> Void
     let mode: ProductListMode
 
@@ -186,7 +186,7 @@ private struct ProductListView: View {
         productService: ProductService,
         diaryService: DiaryService?,
         mode: ProductListMode,
-        onSelect: @escaping (UUID) -> Void,
+        onSelect: @escaping (UUID, FoodSelectionAmountDefault?) -> Void,
         onAdd: @escaping () -> Void,
     ) {
         self.onSelect = onSelect
@@ -233,7 +233,7 @@ private struct ProductListView: View {
                         let defaultValue = selectionDisplay.defaultValue
                         HStack(spacing: 12) {
                             Button {
-                                onSelect(item.product.id)
+                                onSelect(item.product.id, defaultValue)
                             } label: {
                                 HStack(spacing: 0) {
                                     ProductListRow(item: item, selectionDisplay: selectionDisplay)

@@ -436,13 +436,22 @@ final class RecipeIngredientAmountViewModel {
     init(
         source: RecipeIngredientSource,
         replacing: RecipeIngredientDraft?,
+        selectionDefault: FoodSelectionAmountDefault?,
         recipeService: RecipeService,
     ) {
         self.source = source
         self.replacing = replacing
         self.recipeService = recipeService
-        amountText = source.initialAmount.map(recipeNumericString) ?? recipeNumericString(100)
-        selectedUnitToken = source.initialUnitToken
+        if let selectionDefault,
+           selectionDefault.amount.isFinite,
+           selectionDefault.amount > 0,
+           source.unitOptions.contains(where: { $0.token == selectionDefault.unitToken }) {
+            amountText = recipeNumericString(selectionDefault.amount)
+            selectedUnitToken = selectionDefault.unitToken
+        } else {
+            amountText = source.initialAmount.map(recipeNumericString) ?? recipeNumericString(100)
+            selectedUnitToken = source.initialUnitToken
+        }
     }
 
     func refreshPreview() {
@@ -504,11 +513,23 @@ final class RecipeCompositionAmountViewModel {
     private(set) var previewErrorMessage: String?
     var errorMessage: String?
 
-    init(source: RecipeCompositionSource, recipeService: RecipeService) {
+    init(
+        source: RecipeCompositionSource,
+        selectionDefault: FoodSelectionAmountDefault?,
+        recipeService: RecipeService,
+    ) {
         self.source = source
         self.recipeService = recipeService
-        amountText = recipeNumericString(100)
-        selectedUnitToken = source.outputUnits.first?.token ?? ""
+        if let selectionDefault,
+           selectionDefault.amount.isFinite,
+           selectionDefault.amount > 0,
+           source.outputUnits.contains(where: { $0.token == selectionDefault.unitToken }) {
+            amountText = recipeNumericString(selectionDefault.amount)
+            selectedUnitToken = selectionDefault.unitToken
+        } else {
+            amountText = recipeNumericString(100)
+            selectedUnitToken = source.outputUnits.first?.token ?? ""
+        }
     }
 
     func refreshPreview() {

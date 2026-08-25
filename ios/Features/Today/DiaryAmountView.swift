@@ -169,7 +169,7 @@ struct DiaryAmountView: View {
         }
 
         switch (model.mode, route) {
-        case let (.create(context, source), .amount(routeContext, routeSource)):
+        case let (.create(context, source, _), .amount(routeContext, routeSource, _)):
             return context == routeContext && source == routeSource
         case let (.edit(entryID), .entryEditor(routeEntryID)):
             return entryID == routeEntryID
@@ -207,7 +207,7 @@ struct DiaryAmountView: View {
 
     private func productEditorRoute(for productID: UUID) -> TodayRoute {
         switch model.mode {
-        case let .create(context, _):
+        case let .create(context, _, _):
             return .productEditorForDiarySelection(productID: productID, context: context)
         case .edit:
             return .productEditorForEntryAmount(productID: productID)
