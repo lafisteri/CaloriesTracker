@@ -73,6 +73,19 @@ final class TodayViewModel {
         await load()
     }
 
+    func quickAdd(
+        context: DiaryContext,
+        source: FoodSourceReference,
+        defaultValue: FoodSelectionAmountDefault,
+    ) async throws {
+        try await diaryService.quickAdd(
+            context: context,
+            source: source,
+            preferredAmount: defaultValue.amount,
+            preferredUnitToken: defaultValue.unitToken,
+        )
+    }
+
     func delete(entryID: UUID) async {
         errorMessage = nil
 

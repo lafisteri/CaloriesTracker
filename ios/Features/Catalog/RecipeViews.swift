@@ -532,10 +532,12 @@ struct RecipeEditorView: View {
                             )
                         },
                         onQuickAddProduct: { productID, defaultValue in
-                            try await quickAddIngredient(productID: productID, defaultValue: defaultValue)
+                            try await model.quickAddIngredient(productID: productID, defaultValue: defaultValue)
+                            showsIngredientSelection = false
                         },
                         onQuickAddRecipe: { recipeID, defaultValue in
-                            try await quickAddRecipeComposition(recipeID: recipeID, defaultValue: defaultValue)
+                            try await model.quickAddRecipeComposition(recipeID: recipeID, defaultValue: defaultValue)
+                            showsIngredientSelection = false
                         },
                         onCreateProduct: {
                             showsIngredientProductCreation = true
@@ -635,36 +637,6 @@ struct RecipeEditorView: View {
         showsIngredientSelection = true
     }
 
-    @MainActor
-    private func quickAddIngredient(
-        productID: UUID,
-        defaultValue: FoodSelectionAmountDefault,
-    ) async throws {
-        let source = try await recipeService.ingredientSource(forProductID: productID)
-        let draft = try recipeService.makeIngredientDraft(
-            source: source,
-            amount: defaultValue.amount,
-            unitToken: defaultValue.unitToken,
-        )
-        model.addIngredient(draft, productName: source.productName)
-        await model.refreshCompositionPreview()
-        showsIngredientSelection = false
-    }
-
-    @MainActor
-    private func quickAddRecipeComposition(
-        recipeID: UUID,
-        defaultValue: FoodSelectionAmountDefault,
-    ) async throws {
-        let source = try await recipeService.compositionSource(forRecipeID: recipeID)
-        let drafts = try recipeService.makeIngredientDrafts(
-            from: source,
-            amount: defaultValue.amount,
-            unitToken: defaultValue.unitToken,
-        )
-        try await model.appendIngredients(drafts)
-        showsIngredientSelection = false
-    }
 }
 
 private struct RecipeIngredientListEntryRow: View {

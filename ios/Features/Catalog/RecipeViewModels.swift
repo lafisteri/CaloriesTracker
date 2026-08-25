@@ -312,6 +312,33 @@ final class RecipeEditorViewModel {
         invalidateComposition()
     }
 
+    func quickAddIngredient(
+        productID: UUID,
+        defaultValue: FoodSelectionAmountDefault,
+    ) async throws {
+        let source = try await recipeService.ingredientSource(forProductID: productID)
+        let draft = try recipeService.makeIngredientDraft(
+            source: source,
+            amount: defaultValue.amount,
+            unitToken: defaultValue.unitToken,
+        )
+        addIngredient(draft, productName: source.productName)
+        await refreshCompositionPreview()
+    }
+
+    func quickAddRecipeComposition(
+        recipeID: UUID,
+        defaultValue: FoodSelectionAmountDefault,
+    ) async throws {
+        let source = try await recipeService.compositionSource(forRecipeID: recipeID)
+        let drafts = try recipeService.makeIngredientDrafts(
+            from: source,
+            amount: defaultValue.amount,
+            unitToken: defaultValue.unitToken,
+        )
+        try await appendIngredients(drafts)
+    }
+
     @discardableResult
     func addIngredients(_ drafts: [RecipeIngredientDraft]) async -> Bool {
         do {

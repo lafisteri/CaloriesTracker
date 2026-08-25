@@ -250,20 +250,18 @@ struct TodayRootView: View {
                 )
             },
             onQuickAddProduct: { productID, defaultValue in
-                try await diaryService.quickAdd(
+                try await model.quickAdd(
                     context: context,
                     source: FoodSourceReference(sourceType: .product, sourceID: productID),
-                    preferredAmount: defaultValue.amount,
-                    preferredUnitToken: defaultValue.unitToken,
+                    defaultValue: defaultValue,
                 )
                 router.todayPath = []
             },
             onQuickAddRecipe: { recipeID, defaultValue in
-                try await diaryService.quickAdd(
+                try await model.quickAdd(
                     context: context,
                     source: FoodSourceReference(sourceType: .recipe, sourceID: recipeID),
-                    preferredAmount: defaultValue.amount,
-                    preferredUnitToken: defaultValue.unitToken,
+                    defaultValue: defaultValue,
                 )
                 router.todayPath = []
             },
