@@ -363,6 +363,7 @@ struct RecipeEditorView: View {
 
     @State private var model: RecipeEditorViewModel
     @State private var showsIngredientSelection = false
+    @State private var ingredientQuickAddState = CatalogQuickAddState()
     @State private var selectedIngredientProduct: RecipeIngredientProductSelection?
     @State private var selectedIngredientRecipe: RecipeIngredientRecipeSelection?
     @State private var showsIngredientProductCreation = false
@@ -517,6 +518,7 @@ struct RecipeEditorView: View {
             CatalogView(
                 mode: .selection(
                     FoodSelectionContext(
+                        quickAddState: ingredientQuickAddState,
                         onSelectProduct: { productID, defaultValue in
                             selectedIngredientProduct = RecipeIngredientProductSelection(
                                 productID: productID,
