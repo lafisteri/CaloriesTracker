@@ -4,6 +4,7 @@ import Foundation
 protocol ProductRepository: Sendable {
     func activeProducts(matching query: String) async throws -> [Product]
     func product(id: UUID, includingDeleted: Bool) async throws -> Product?
+    func products(ids: Set<UUID>, includingDeleted: Bool) async throws -> [Product]
     func product(withBarcode barcode: String) async throws -> Product?
     func version(id: UUID) async throws -> ProductVersion?
     func versions(ids: Set<UUID>) async throws -> [ProductVersion]

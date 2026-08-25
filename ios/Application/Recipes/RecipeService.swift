@@ -76,6 +76,11 @@ struct RecipeDetails: Hashable, Sendable {
     let outdatedIngredientCount: Int
 }
 
+private struct ResolvedRecipeIngredients: Sendable {
+    let readModels: [RecipeIngredientReadModel]
+    let outdatedIngredientCount: Int
+}
+
 @MainActor
 final class RecipeService {
     private let recipeRepository: any RecipeRepository
@@ -113,18 +118,17 @@ final class RecipeService {
             return nil
         }
         let version = try await currentVersion(for: recipe)
-        let ingredients = try await ingredientReadModels(for: version)
-        let outdatedIngredientCount = try await outdatedIngredientCount(for: version)
+        let resolvedIngredients = try await resolvedIngredients(for: version)
         let nutritionPer100Grams = try RecipeCalculator.nutritionPer100Grams(for: version)
         let nutritionPerServing = try RecipeCalculator.nutritionPerServing(for: version)
 
         return RecipeDetails(
             recipe: recipe,
             currentVersion: version,
-            ingredients: ingredients,
+            ingredients: resolvedIngredients.readModels,
             nutritionPer100Grams: nutritionPer100Grams,
             nutritionPerServing: nutritionPerServing,
-            outdatedIngredientCount: outdatedIngredientCount,
+            outdatedIngredientCount: resolvedIngredients.outdatedIngredientCount,
         )
     }
 
@@ -488,38 +492,43 @@ final class RecipeService {
         return factor
     }
 
-    private func ingredientReadModels(for version: RecipeVersion) async throws -> [RecipeIngredientReadModel] {
-        var result: [RecipeIngredientReadModel] = []
-        for ingredient in version.ingredients.sorted(by: { $0.position < $1.position }) {
-            guard let productVersion = try await productRepository.version(id: ingredient.productVersionID),
-                  productVersion.productID == ingredient.productID
-            else {
-                throw RecipeServiceError.pinnedProductVersionNotFound
-            }
-            let productName = try await productRepository.product(id: ingredient.productID, includingDeleted: true)?.name
-                ?? "Удалённый продукт"
-            result.append(
-                RecipeIngredientReadModel(
-                    ingredient: ingredient,
-                    productName: productName,
-                    productVersion: productVersion,
-                ),
-            )
-        }
-        return result
-    }
+    private func resolvedIngredients(for version: RecipeVersion) async throws -> ResolvedRecipeIngredients {
+        let pinnedVersionIDs = Set(version.ingredients.map(\.productVersionID))
+        let productVersions = try await productRepository.versions(ids: pinnedVersionIDs)
+        let productVersionsByID = Dictionary(uniqueKeysWithValues: productVersions.map { ($0.id, $0) })
 
-    private func outdatedIngredientCount(for version: RecipeVersion) async throws -> Int {
-        var count = 0
-        for ingredient in version.ingredients {
-            guard let product = try await productRepository.product(id: ingredient.productID, includingDeleted: false) else {
-                continue
+        let productIDs = Set(version.ingredients.map(\.productID))
+        let products = try await productRepository.products(ids: productIDs, includingDeleted: true)
+        let productsByID = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
+
+        let readModels = try version.ingredients
+            .sorted(by: { $0.position < $1.position })
+            .map { ingredient in
+                guard let productVersion = productVersionsByID[ingredient.productVersionID],
+                      productVersion.productID == ingredient.productID
+                else {
+                    throw RecipeServiceError.pinnedProductVersionNotFound
+                }
+                return RecipeIngredientReadModel(
+                    ingredient: ingredient,
+                    productName: productsByID[ingredient.productID]?.name ?? "Удалённый продукт",
+                    productVersion: productVersion,
+                )
+            }
+
+        let outdatedIngredientCount = version.ingredients.reduce(into: 0) { count, ingredient in
+            guard let product = productsByID[ingredient.productID], product.deletedAt == nil else {
+                return
             }
             if product.currentVersionID != ingredient.productVersionID {
                 count += 1
             }
         }
-        return count
+
+        return ResolvedRecipeIngredients(
+            readModels: readModels,
+            outdatedIngredientCount: outdatedIngredientCount,
+        )
     }
 
     private func calculation(for drafts: [RecipeIngredientDraft]) async throws -> RecipeCalculation {

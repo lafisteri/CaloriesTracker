@@ -41,6 +41,21 @@ final class SwiftDataProductRepository: ProductRepository {
         return includingDeleted || product.deletedAt == nil ? product : nil
     }
 
+    func products(ids: Set<UUID>, includingDeleted: Bool) async throws -> [Product] {
+        guard !ids.isEmpty else {
+            return []
+        }
+        let productIDs = Array(ids)
+        let predicate: Predicate<ProductRecord>
+        if includingDeleted {
+            predicate = #Predicate { productIDs.contains($0.id) }
+        } else {
+            predicate = #Predicate { productIDs.contains($0.id) && $0.deletedAt == nil }
+        }
+        let descriptor = FetchDescriptor<ProductRecord>(predicate: predicate)
+        return try modelContext.fetch(descriptor).map { $0.toDomain() }
+    }
+
     func product(withBarcode barcode: String) async throws -> Product? {
         try modelContext
             .fetch(FetchDescriptor<ProductRecord>())
