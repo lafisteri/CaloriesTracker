@@ -284,61 +284,40 @@ struct AmountEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if isLoading && !isAvailable {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, minHeight: 160)
-                    } else if isAvailable {
-                        if let contextDescription {
-                            Text(contextDescription)
-                                .foregroundStyle(.secondary)
-                        }
-                        AmountNutritionPreview(nutrition: preview ?? .zero)
-
-                        if let previewErrorMessage {
-                            DiaryInlineErrorView(message: previewErrorMessage)
-                        }
-                    } else {
-                        ContentUnavailableView(
-                            unavailableTitle,
-                            systemImage: unavailableSystemImage,
-                            description: errorMessage.map(Text.init),
-                        )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if isLoading && !isAvailable {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 160)
+                } else if isAvailable {
+                    if let contextDescription {
+                        Text(contextDescription)
+                            .foregroundStyle(.secondary)
                     }
+                    AmountNutritionPreview(nutrition: preview ?? .zero)
 
-                    if let errorMessage, isAvailable {
-                        DiaryInlineErrorView(message: errorMessage)
+                    if let previewErrorMessage {
+                        DiaryInlineErrorView(message: previewErrorMessage)
                     }
+                } else {
+                    ContentUnavailableView(
+                        unavailableTitle,
+                        systemImage: unavailableSystemImage,
+                        description: errorMessage.map(Text.init),
+                    )
                 }
-                .padding(.horizontal)
-                .padding(.top, 16)
-                .padding(.bottom)
+
+                if let errorMessage, isAvailable {
+                    DiaryInlineErrorView(message: errorMessage)
+                }
             }
-
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if isAvailable {
-                HStack(spacing: 8) {
-                    amountTextField
-                    unitControl
-
-                    Button(action: onConfirm) {
-                        Group {
-                            if isSaving {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                        .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityLabel(actionTitle)
-                    .disabled(isLoading || isSaving)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(.bar)
+                actionBar
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -353,6 +332,31 @@ struct AmountEditorView: View {
             await Task.yield()
             UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
         }
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 8) {
+            amountTextField
+            unitControl
+
+            Button(action: onConfirm) {
+                Group {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "checkmark")
+                    }
+                }
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityLabel(actionTitle)
+            .disabled(isLoading || isSaving)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     @ViewBuilder
