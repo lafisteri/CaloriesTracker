@@ -312,6 +312,11 @@ final class RecipeEditorViewModel {
         invalidateComposition()
     }
 
+    func appendIngredient(_ draft: RecipeIngredientDraft, productName: String) async {
+        addIngredient(draft, productName: productName)
+        await refreshCompositionPreview()
+    }
+
     func quickAddIngredient(
         productID: UUID,
         defaultValue: FoodSelectionAmountDefault,
@@ -322,8 +327,7 @@ final class RecipeEditorViewModel {
             amount: defaultValue.amount,
             unitToken: defaultValue.unitToken,
         )
-        addIngredient(draft, productName: source.productName)
-        await refreshCompositionPreview()
+        await appendIngredient(draft, productName: source.productName)
     }
 
     func quickAddRecipeComposition(

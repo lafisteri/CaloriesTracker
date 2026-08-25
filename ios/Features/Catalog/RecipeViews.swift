@@ -558,12 +558,9 @@ struct RecipeEditorView: View {
                     selectionDefault: selection.defaultValue,
                     recipeService: recipeService,
                 ) { draft, productName in
-                    model.addIngredient(draft, productName: productName)
+                    await model.appendIngredient(draft, productName: productName)
                     selectedIngredientProduct = nil
                     showsIngredientSelection = false
-                    Task {
-                        await model.refreshCompositionPreview()
-                    }
                 }
             }
             .navigationDestination(item: $selectedIngredientRecipe) { selection in
@@ -754,7 +751,7 @@ private struct RecipeIngredientAmountDestination: View {
     let productID: UUID
     let selectionDefault: FoodSelectionAmountDefault?
     let recipeService: RecipeService
-    let onComplete: (RecipeIngredientDraft, String) -> Void
+    let onComplete: @MainActor (RecipeIngredientDraft, String) async -> Void
 
     @State private var source: RecipeIngredientSource?
     @State private var errorMessage: String?
@@ -829,7 +826,7 @@ private struct RecipeIngredientRecipeAmountDestination: View {
 private struct ExistingRecipeIngredientAmountDestination: View {
     let draft: RecipeIngredientDraft
     let recipeService: RecipeService
-    let onComplete: (RecipeIngredientDraft, String) -> Void
+    let onComplete: @MainActor (RecipeIngredientDraft, String) async -> Void
 
     @State private var source: RecipeIngredientSource?
     @State private var errorMessage: String?
@@ -865,9 +862,10 @@ private struct ExistingRecipeIngredientAmountDestination: View {
 
 private struct RecipeIngredientAmountView: View {
     let source: RecipeIngredientSource
-    let onComplete: (RecipeIngredientDraft, String) -> Void
+    let onComplete: @MainActor (RecipeIngredientDraft, String) async -> Void
 
     @State private var model: RecipeIngredientAmountViewModel
+    @State private var isCompleting = false
     @FocusState private var amountIsFocused: Bool
 
     init(
@@ -875,7 +873,7 @@ private struct RecipeIngredientAmountView: View {
         replacing: RecipeIngredientDraft? = nil,
         selectionDefault: FoodSelectionAmountDefault? = nil,
         recipeService: RecipeService,
-        onComplete: @escaping (RecipeIngredientDraft, String) -> Void,
+        onComplete: @escaping @MainActor (RecipeIngredientDraft, String) async -> Void,
     ) {
         self.source = source
         self.onComplete = onComplete
@@ -910,11 +908,16 @@ private struct RecipeIngredientAmountView: View {
             amountFocus: $amountIsFocused,
             autoFocusAmount: true,
             actionTitle: "Добавить",
-            isSaving: false,
+            isSaving: isCompleting,
             onConfirm: {
-                if let draft = model.makeDraft() {
-                    amountIsFocused = false
-                    onComplete(draft, source.productName)
+                guard !isCompleting, let draft = model.makeDraft() else {
+                    return
+                }
+
+                amountIsFocused = false
+                isCompleting = true
+                Task { @MainActor in
+                    await onComplete(draft, source.productName)
                 }
             },
         )
