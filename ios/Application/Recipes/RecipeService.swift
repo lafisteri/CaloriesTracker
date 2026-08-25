@@ -76,6 +76,12 @@ struct RecipeDetails: Hashable, Sendable {
     let outdatedIngredientCount: Int
 }
 
+struct RecipeEditorData: Hashable, Sendable {
+    let draft: RecipeDraft
+    let ingredients: [RecipeIngredientReadModel]
+    let composition: RecipeCalculation
+}
+
 private struct ResolvedRecipeIngredients: Sendable {
     let readModels: [RecipeIngredientReadModel]
     let outdatedIngredientCount: Int
@@ -132,12 +138,12 @@ final class RecipeService {
         )
     }
 
-    func draft(for recipeID: UUID) async throws -> RecipeDraft? {
+    func editorData(for recipeID: UUID) async throws -> RecipeEditorData? {
         guard let details = try await details(id: recipeID) else {
             return nil
         }
 
-        return RecipeDraft(
+        let draft = RecipeDraft(
             name: details.recipe.name,
             ingredients: details.currentVersion.ingredients.map { ingredient in
                 RecipeIngredientDraft(
@@ -150,6 +156,22 @@ final class RecipeService {
             },
             cookedWeight: details.currentVersion.cookedWeight,
             servingsCount: details.currentVersion.servingsCount,
+        )
+        let composition = try RecipeCalculator.calculate(
+            ingredients: details.ingredients.map { item in
+                RecipeIngredientCalculationInput(
+                    draftID: item.ingredient.id,
+                    productVersion: item.productVersion,
+                    amount: item.ingredient.amount,
+                    unitToken: item.ingredient.unitToken,
+                )
+            },
+        )
+
+        return RecipeEditorData(
+            draft: draft,
+            ingredients: details.ingredients,
+            composition: composition,
         )
     }
 
@@ -294,9 +316,21 @@ final class RecipeService {
         ).totalNutrition
     }
 
-    func preview(_ draft: RecipeDraft) async throws -> RecipeCalculation {
-        try validate(draft)
-        return try await calculation(for: draft.ingredients)
+    func previewComposition(for ingredients: [RecipeIngredientDraft]) async throws -> RecipeCalculation {
+        try await calculation(for: ingredients)
+    }
+
+    func outputPreview(
+        totalNutrition: Nutrition,
+        cookedWeight: Double?,
+        servingsCount: Double?,
+    ) throws -> RecipeOutputPreview {
+        try validateOutputs(cookedWeight: cookedWeight, servingsCount: servingsCount)
+        return try RecipeCalculator.outputPreview(
+            totalNutrition: totalNutrition,
+            cookedWeight: cookedWeight,
+            servingsCount: servingsCount,
+        )
     }
 
     @discardableResult
@@ -536,9 +570,13 @@ final class RecipeService {
             throw RecipeServiceError.duplicateIngredient
         }
 
+        let versionIDs = Set(drafts.map(\.productVersionID))
+        let versions = try await productRepository.versions(ids: versionIDs)
+        let versionsByID = Dictionary(uniqueKeysWithValues: versions.map { ($0.id, $0) })
+
         var inputs: [RecipeIngredientCalculationInput] = []
         for draft in drafts {
-            guard let version = try await productRepository.version(id: draft.productVersionID),
+            guard let version = versionsByID[draft.productVersionID],
                   version.productID == draft.productID
             else {
                 throw RecipeServiceError.pinnedProductVersionNotFound
@@ -628,17 +666,21 @@ final class RecipeService {
         guard !draft.ingredients.isEmpty else {
             throw RecipeServiceError.noIngredients
         }
-        if let cookedWeight = draft.cookedWeight {
+        try validateOutputs(cookedWeight: draft.cookedWeight, servingsCount: draft.servingsCount)
+    }
+
+    private func validateOutputs(cookedWeight: Double?, servingsCount: Double?) throws {
+        if let cookedWeight {
             guard cookedWeight.isFinite, cookedWeight > 0 else {
                 throw RecipeServiceError.invalidCookedWeight
             }
         }
-        if let servingsCount = draft.servingsCount {
+        if let servingsCount {
             guard servingsCount.isFinite, servingsCount > 0 else {
                 throw RecipeServiceError.invalidServingsCount
             }
         }
-        guard draft.cookedWeight != nil || draft.servingsCount != nil else {
+        guard cookedWeight != nil || servingsCount != nil else {
             throw RecipeServiceError.outputRequired
         }
     }

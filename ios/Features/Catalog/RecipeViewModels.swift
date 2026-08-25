@@ -245,11 +245,16 @@ final class RecipeEditorViewModel {
         }
     }
     private(set) var ingredients: [RecipeIngredientEditorItem] = []
-    private(set) var preview: Nutrition?
+    private(set) var preview: RecipeOutputPreview?
     private(set) var previewErrorMessage: String?
     private(set) var isLoading = false
     private(set) var isSaving = false
     var errorMessage: String?
+    private var composition: RecipeCalculation?
+    private var compositionErrorMessage: String?
+    private var compositionRevision = 0
+    private var compositionRequestID = 0
+    private var isRefreshingComposition = false
 
     init(recipeID: UUID?, recipeService: RecipeService) {
         self.recipeID = recipeID
@@ -265,15 +270,36 @@ final class RecipeEditorViewModel {
         errorMessage = nil
 
         do {
-            guard let draft = try await recipeService.draft(for: recipeID) else {
+            guard let editorData = try await recipeService.editorData(for: recipeID) else {
                 throw RecipeServiceError.recipeNotFound
             }
+            compositionRevision &+= 1
+            composition = editorData.composition
+            compositionErrorMessage = nil
+            isRefreshingComposition = false
+
+            let draft = editorData.draft
             name = draft.name
             cookedWeightText = draft.cookedWeight.map(recipeNumericString) ?? ""
             servingsCountText = draft.servingsCount.map(recipeNumericString) ?? ""
             outputUnit = draft.cookedWeight == nil && draft.servingsCount != nil ? .serving : .grams
-            try await setIngredients(from: draft.ingredients)
-            await refreshPreview()
+            let nutritionByDraftID = Dictionary(
+                uniqueKeysWithValues: editorData.composition.ingredientCalculations.map { ($0.draftID, $0.nutrition) },
+            )
+            ingredients = editorData.ingredients.map { item in
+                RecipeIngredientEditorItem(
+                    draft: RecipeIngredientDraft(
+                        id: item.ingredient.id,
+                        productID: item.ingredient.productID,
+                        productVersionID: item.ingredient.productVersionID,
+                        amount: item.ingredient.amount,
+                        unitToken: item.ingredient.unitToken,
+                    ),
+                    productName: item.productName,
+                    nutrition: nutritionByDraftID[item.ingredient.id],
+                )
+            }
+            refreshOutputPreview()
         } catch {
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить рецепт.")
         }
@@ -283,6 +309,7 @@ final class RecipeEditorViewModel {
 
     func addIngredient(_ draft: RecipeIngredientDraft, productName: String) {
         ingredients.append(RecipeIngredientEditorItem(draft: draft, productName: productName, nutrition: nil))
+        invalidateComposition()
     }
 
     @discardableResult
@@ -303,7 +330,8 @@ final class RecipeEditorViewModel {
             newItems.append(RecipeIngredientEditorItem(draft: draft, productName: source.productName, nutrition: nil))
         }
         ingredients.append(contentsOf: newItems)
-        await refreshPreview()
+        invalidateComposition()
+        await refreshCompositionPreview()
     }
 
     func replaceIngredient(_ draft: RecipeIngredientDraft, productName: String) {
@@ -311,34 +339,74 @@ final class RecipeEditorViewModel {
             return
         }
         ingredients[index] = RecipeIngredientEditorItem(draft: draft, productName: productName, nutrition: nil)
+        invalidateComposition()
     }
 
     func removeIngredients(at offsets: IndexSet) {
         ingredients.remove(atOffsets: offsets)
+        invalidateComposition()
     }
 
     func removeIngredient(id: UUID) {
         ingredients.removeAll { $0.id == id }
+        invalidateComposition()
     }
 
     func draft(for item: RecipeIngredientEditorItem) -> RecipeIngredientDraft {
         item.draft
     }
 
-    func refreshPreview() async {
+    func refreshCompositionPreview() async {
+        let revision = compositionRevision
+        compositionRequestID &+= 1
+        let requestID = compositionRequestID
+        isRefreshingComposition = true
+        let drafts = ingredients.map(\.draft)
+
         do {
-            let calculation = try await recipeService.preview(makeDraft())
-            let nutritionByDraftID = Dictionary(
-                uniqueKeysWithValues: calculation.ingredientCalculations.map { ($0.draftID, $0.nutrition) },
-            )
-            ingredients = ingredients.map { item in
-                RecipeIngredientEditorItem(
-                    draft: item.draft,
-                    productName: item.productName,
-                    nutrition: nutritionByDraftID[item.draft.id],
-                )
+            let calculation = try await recipeService.previewComposition(for: drafts)
+            guard compositionRevision == revision, compositionRequestID == requestID else {
+                return
             }
-            preview = calculation.totalNutrition
+            composition = calculation
+            compositionErrorMessage = nil
+            isRefreshingComposition = false
+            refreshOutputPreview()
+        } catch {
+            guard compositionRevision == revision, compositionRequestID == requestID else {
+                return
+            }
+            composition = nil
+            compositionErrorMessage = recipeErrorMessage(error, fallback: "Не удалось рассчитать КБЖУ.")
+            isRefreshingComposition = false
+            preview = nil
+            previewErrorMessage = compositionErrorMessage
+        }
+    }
+
+    func refreshOutputPreview() {
+        do {
+            let draft = try makeDraft()
+            guard let composition else {
+                if let compositionErrorMessage {
+                    preview = nil
+                    previewErrorMessage = compositionErrorMessage
+                } else if !isRefreshingComposition {
+                    preview = nil
+                    previewErrorMessage = recipeErrorMessage(
+                        RecipeServiceError.noIngredients,
+                        fallback: "Не удалось рассчитать КБЖУ.",
+                    )
+                }
+                return
+            }
+
+            preview = try recipeService.outputPreview(
+                totalNutrition: composition.totalNutrition,
+                cookedWeight: draft.cookedWeight,
+                servingsCount: draft.servingsCount,
+            )
+            applyIngredientNutrition(from: composition)
             previewErrorMessage = nil
         } catch {
             preview = nil
@@ -367,13 +435,24 @@ final class RecipeEditorViewModel {
         }
     }
 
-    private func setIngredients(from drafts: [RecipeIngredientDraft]) async throws {
-        var loaded: [RecipeIngredientEditorItem] = []
-        for draft in drafts {
-            let source = try await recipeService.ingredientSource(for: draft)
-            loaded.append(RecipeIngredientEditorItem(draft: draft, productName: source.productName, nutrition: nil))
+    private func invalidateComposition() {
+        compositionRevision &+= 1
+        composition = nil
+        compositionErrorMessage = nil
+        isRefreshingComposition = false
+    }
+
+    private func applyIngredientNutrition(from calculation: RecipeCalculation) {
+        let nutritionByDraftID = Dictionary(
+            uniqueKeysWithValues: calculation.ingredientCalculations.map { ($0.draftID, $0.nutrition) },
+        )
+        ingredients = ingredients.map { item in
+            RecipeIngredientEditorItem(
+                draft: item.draft,
+                productName: item.productName,
+                nutrition: nutritionByDraftID[item.draft.id],
+            )
         }
-        ingredients = loaded
     }
 
     private func makeDraft() throws -> RecipeDraft {

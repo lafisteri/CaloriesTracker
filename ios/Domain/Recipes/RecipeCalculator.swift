@@ -18,6 +18,12 @@ struct RecipeCalculation: Hashable, Sendable {
     let ingredientCalculations: [RecipeIngredientCalculation]
 }
 
+struct RecipeOutputPreview: Hashable, Sendable {
+    let totalNutrition: Nutrition
+    let nutritionPer100Grams: Nutrition?
+    let nutritionPerServing: Nutrition?
+}
+
 enum RecipeCalculatorError: LocalizedError {
     case noIngredients
     case invalidAmount
@@ -80,23 +86,51 @@ enum RecipeCalculator {
     }
 
     static func nutritionPer100Grams(for version: RecipeVersion) throws -> Nutrition? {
-        guard let cookedWeight = version.cookedWeight else {
-            return nil
-        }
-        guard cookedWeight.isFinite, cookedWeight > 0 else {
-            throw RecipeCalculatorError.invalidCookedWeight
-        }
-        return version.totalNutrition.scaled(by: 100 / cookedWeight)
+        try outputPreview(
+            totalNutrition: version.totalNutrition,
+            cookedWeight: version.cookedWeight,
+            servingsCount: nil,
+        ).nutritionPer100Grams
     }
 
     static func nutritionPerServing(for version: RecipeVersion) throws -> Nutrition? {
-        guard let servingsCount = version.servingsCount else {
-            return nil
+        try outputPreview(
+            totalNutrition: version.totalNutrition,
+            cookedWeight: nil,
+            servingsCount: version.servingsCount,
+        ).nutritionPerServing
+    }
+
+    static func outputPreview(
+        totalNutrition: Nutrition,
+        cookedWeight: Double?,
+        servingsCount: Double?,
+    ) throws -> RecipeOutputPreview {
+        let nutritionPer100Grams: Nutrition?
+        if let cookedWeight {
+            guard cookedWeight.isFinite, cookedWeight > 0 else {
+                throw RecipeCalculatorError.invalidCookedWeight
+            }
+            nutritionPer100Grams = totalNutrition.scaled(by: 100 / cookedWeight)
+        } else {
+            nutritionPer100Grams = nil
         }
-        guard servingsCount.isFinite, servingsCount > 0 else {
-            throw RecipeCalculatorError.invalidServingsCount
+
+        let nutritionPerServing: Nutrition?
+        if let servingsCount {
+            guard servingsCount.isFinite, servingsCount > 0 else {
+                throw RecipeCalculatorError.invalidServingsCount
+            }
+            nutritionPerServing = totalNutrition.scaled(by: 1 / servingsCount)
+        } else {
+            nutritionPerServing = nil
         }
-        return version.totalNutrition.scaled(by: 1 / servingsCount)
+
+        return RecipeOutputPreview(
+            totalNutrition: totalNutrition,
+            nutritionPer100Grams: nutritionPer100Grams,
+            nutritionPerServing: nutritionPerServing,
+        )
     }
 
     static func diaryNutrition(

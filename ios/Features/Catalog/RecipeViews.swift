@@ -415,7 +415,7 @@ struct RecipeEditorView: View {
 
                 FoodCompositionSection(
                     title: "Ингредиенты",
-                    nutrition: model.preview ?? .zero,
+                    nutrition: model.preview?.totalNutrition ?? .zero,
                 ) {
                     ForEach(model.ingredients) { item in
                         RecipeIngredientListEntryRow(
@@ -426,7 +426,7 @@ struct RecipeEditorView: View {
                             onDelete: {
                                 model.removeIngredient(id: item.id)
                                 Task {
-                                    await model.refreshPreview()
+                                    await model.refreshCompositionPreview()
                                 }
                             },
                         )
@@ -443,7 +443,7 @@ struct RecipeEditorView: View {
 
                 Section("Пищевая ценность") {
                     if let preview = model.preview {
-                        RecipeNutritionRows(nutrition: preview)
+                        RecipeNutritionRows(nutrition: preview.totalNutrition)
                     } else {
                         Text("Добавьте ингредиенты и укажите выход рецепта.")
                             .foregroundStyle(.secondary)
@@ -499,14 +499,10 @@ struct RecipeEditorView: View {
             await model.loadForEditing()
         }
         .onChange(of: model.cookedWeightText) { _, _ in
-            Task {
-                await model.refreshPreview()
-            }
+            model.refreshOutputPreview()
         }
         .onChange(of: model.servingsCountText) { _, _ in
-            Task {
-                await model.refreshPreview()
-            }
+            model.refreshOutputPreview()
         }
         .navigationDestination(isPresented: $showsIngredientSelection) {
             CatalogView(
@@ -553,7 +549,7 @@ struct RecipeEditorView: View {
                     selectedIngredientProduct = nil
                     showsIngredientSelection = false
                     Task {
-                        await model.refreshPreview()
+                        await model.refreshCompositionPreview()
                     }
                 }
             }
@@ -602,7 +598,7 @@ struct RecipeEditorView: View {
                 model.replaceIngredient(draft, productName: productName)
                 editingIngredient = nil
                 Task {
-                    await model.refreshPreview()
+                    await model.refreshCompositionPreview()
                 }
             }
         }
@@ -620,7 +616,7 @@ struct RecipeEditorView: View {
             unitToken: defaultValue.unitToken,
         )
         model.addIngredient(draft, productName: source.productName)
-        await model.refreshPreview()
+        await model.refreshCompositionPreview()
         showsIngredientSelection = false
     }
 
