@@ -451,22 +451,35 @@ final class SwiftDataDiaryRepository: DiaryRepository {
     }
 
     func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry? {
-        let descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.id == id })
+        let predicate: Predicate<DiaryEntryRecord>
+        if includingDeleted {
+            predicate = #Predicate { $0.id == id }
+        } else {
+            predicate = #Predicate { $0.id == id && $0.deletedAt == nil }
+        }
+        var descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: predicate)
+        descriptor.fetchLimit = 1
+
         guard let entry = try modelContext.fetch(descriptor).first.map({ try $0.toDomain() }) else {
             return nil
         }
 
-        return includingDeleted || entry.deletedAt == nil ? entry : nil
+        return entry
     }
 
     func entries(on day: LocalDay) async throws -> [DiaryEntry] {
         let dayKey = day.rawValue
-        let descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.dayKey == dayKey })
+        let descriptor = FetchDescriptor<DiaryEntryRecord>(
+            predicate: #Predicate { $0.dayKey == dayKey && $0.deletedAt == nil },
+            sortBy: [
+                SortDescriptor(\DiaryEntryRecord.mealTypeRaw),
+                SortDescriptor(\DiaryEntryRecord.sortOrder),
+            ],
+        )
 
         return try modelContext
             .fetch(descriptor)
             .map { try $0.toDomain() }
-            .filter { $0.deletedAt == nil }
             .sorted { lhs, rhs in
                 if lhs.mealType.rawValue != rhs.mealType.rawValue {
                     return lhs.mealType.rawValue < rhs.mealType.rawValue
@@ -479,15 +492,23 @@ final class SwiftDataDiaryRepository: DiaryRepository {
     }
 
     func entries(in days: [LocalDay]) async throws -> [DiaryEntry] {
-        let dayKeys = Set(days.map(\.rawValue))
+        let dayKeys = Array(Set(days.map(\.rawValue)))
         guard !dayKeys.isEmpty else {
             return []
         }
 
+        let descriptor = FetchDescriptor<DiaryEntryRecord>(
+            predicate: #Predicate { $0.deletedAt == nil && dayKeys.contains($0.dayKey) },
+            sortBy: [
+                SortDescriptor(\DiaryEntryRecord.dayKey),
+                SortDescriptor(\DiaryEntryRecord.mealTypeRaw),
+                SortDescriptor(\DiaryEntryRecord.sortOrder),
+            ],
+        )
+
         return try modelContext
-            .fetch(FetchDescriptor<DiaryEntryRecord>())
+            .fetch(descriptor)
             .map { try $0.toDomain() }
-            .filter { $0.deletedAt == nil && dayKeys.contains($0.day.rawValue) }
             .sorted { lhs, rhs in
                 if lhs.day != rhs.day {
                     return lhs.day < rhs.day
@@ -507,12 +528,16 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         guard !sourceSet.isEmpty else {
             return []
         }
+        let sourceIDs = Array(Set(sources.map(\.sourceID)))
+        let descriptor = FetchDescriptor<DiaryEntryRecord>(
+            predicate: #Predicate { $0.deletedAt == nil && sourceIDs.contains($0.sourceID) },
+        )
 
         return try modelContext
-            .fetch(FetchDescriptor<DiaryEntryRecord>())
+            .fetch(descriptor)
             .map { try $0.toDomain() }
             .filter { entry in
-                entry.deletedAt == nil && sourceSet.contains(
+                sourceSet.contains(
                     FoodSourceReference(sourceType: entry.sourceType, sourceID: entry.sourceID),
                 )
             }
@@ -614,7 +639,8 @@ final class SwiftDataDiaryRepository: DiaryRepository {
     }
 
     private func entryRecord(id: UUID) throws -> DiaryEntryRecord? {
-        let descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.id == id })
+        var descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first
     }
 
