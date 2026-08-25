@@ -414,7 +414,7 @@ struct AmountEditorView: View {
     }
 
     private var styledAmountTextField: some View {
-        TextField("", text: $amountText)
+        TextField("", text: EditableDecimal.binding($amountText))
             .keyboardType(.decimalPad)
             .multilineTextAlignment(.trailing)
             .font(.body.weight(.semibold))

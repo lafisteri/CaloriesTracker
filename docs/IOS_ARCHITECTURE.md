@@ -157,6 +157,12 @@ then allows only the still-current Amount route to restore numeric focus on
 return. This is an intentional lifecycle compatibility mechanism, not a way to
 focus a stale route.
 
+Manual editable decimal values accept at most two fractional digits; `.` and `,`
+are both valid separators. Their serializer and parser are deliberately separate
+from read-only display formatting. This constraint applies only to user-entered
+text: nutrition, recipe, diary, statistics and goal calculations retain their
+calculation precision.
+
 ### Recipe Editor keyboard transition
 
 Recipe Editor coordinates presentation of Ingredient Catalog locally:

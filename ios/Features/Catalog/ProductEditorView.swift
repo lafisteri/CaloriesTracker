@@ -130,7 +130,7 @@ struct ProductEditorView: View {
     }
 
     private func decimalField(_ title: String, text: Binding<String>, field: EditorField) -> some View {
-        TextField(title, text: text)
+        TextField(title, text: EditableDecimal.binding(text))
             .keyboardType(.decimalPad)
             .focused($focusedField, equals: field)
     }

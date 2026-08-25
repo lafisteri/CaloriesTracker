@@ -280,8 +280,8 @@ final class RecipeEditorViewModel {
 
             let draft = editorData.draft
             name = draft.name
-            cookedWeightText = draft.cookedWeight.map(recipeNumericString) ?? ""
-            servingsCountText = draft.servingsCount.map(recipeNumericString) ?? ""
+            cookedWeightText = draft.cookedWeight.map { EditableDecimal.string(from: $0) } ?? ""
+            servingsCountText = draft.servingsCount.map { EditableDecimal.string(from: $0) } ?? ""
             outputUnit = draft.cookedWeight == nil && draft.servingsCount != nil ? .serving : .grams
             let nutritionByDraftID = Dictionary(
                 uniqueKeysWithValues: editorData.composition.ingredientCalculations.map { ($0.draftID, $0.nutrition) },
@@ -525,12 +525,12 @@ final class RecipeIngredientAmountViewModel {
            selectionDefault.amount.isFinite,
            selectionDefault.amount > 0,
            source.unitOptions.contains(where: { $0.token == selectionDefault.unitToken }) {
-            amountText = recipeNumericString(selectionDefault.amount)
+            amountText = EditableDecimal.string(from: selectionDefault.amount)
             selectedUnitToken = selectionDefault.unitToken
         } else {
             selectedUnitToken = source.initialUnitToken
-            amountText = source.initialAmount.map(recipeNumericString)
-                ?? recipeNumericString(FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
+            amountText = source.initialAmount.map { EditableDecimal.string(from: $0) }
+                ?? EditableDecimal.string(from: FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
         }
     }
 
@@ -541,7 +541,7 @@ final class RecipeIngredientAmountViewModel {
             previewErrorMessage = nil
             return
         }
-        guard let amount = recipeNumericValue(trimmed), amount > 0 else {
+        guard let amount = EditableDecimal.value(from: trimmed), amount > 0 else {
             preview = nil
             previewErrorMessage = "Количество должно быть больше нуля."
             return
@@ -562,7 +562,7 @@ final class RecipeIngredientAmountViewModel {
 
     func makeDraft() -> RecipeIngredientDraft? {
         errorMessage = nil
-        guard let amount = recipeNumericValue(amountText), amount > 0 else {
+        guard let amount = EditableDecimal.value(from: amountText), amount > 0 else {
             errorMessage = "Количество должно быть больше нуля."
             return nil
         }
@@ -604,11 +604,11 @@ final class RecipeCompositionAmountViewModel {
            selectionDefault.amount.isFinite,
            selectionDefault.amount > 0,
            source.outputUnits.contains(where: { $0.token == selectionDefault.unitToken }) {
-            amountText = recipeNumericString(selectionDefault.amount)
+            amountText = EditableDecimal.string(from: selectionDefault.amount)
             selectedUnitToken = selectionDefault.unitToken
         } else {
             selectedUnitToken = source.outputUnits.first?.token ?? ""
-            amountText = recipeNumericString(FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
+            amountText = EditableDecimal.string(from: FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
         }
     }
 
@@ -619,7 +619,7 @@ final class RecipeCompositionAmountViewModel {
             previewErrorMessage = nil
             return
         }
-        guard let amount = recipeNumericValue(trimmed), amount > 0 else {
+        guard let amount = EditableDecimal.value(from: trimmed), amount > 0 else {
             preview = nil
             previewErrorMessage = "Количество должно быть больше нуля."
             return
@@ -640,7 +640,7 @@ final class RecipeCompositionAmountViewModel {
 
     func makeDrafts() -> [RecipeIngredientDraft]? {
         errorMessage = nil
-        guard let amount = recipeNumericValue(amountText), amount > 0 else {
+        guard let amount = EditableDecimal.value(from: amountText), amount > 0 else {
             errorMessage = "Количество должно быть больше нуля."
             return nil
         }
@@ -658,23 +658,12 @@ final class RecipeCompositionAmountViewModel {
     }
 }
 
-func recipeNumericString(_ value: Double) -> String {
-    value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 3)))
-}
-
-func recipeNumericValue(_ text: String) -> Double? {
-    let normalized = text
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .replacingOccurrences(of: ",", with: ".")
-    return Double(normalized)?.isFinite == true ? Double(normalized) : nil
-}
-
 private func recipeOptionalNumber(_ text: String, field: String) throws -> Double? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
         return nil
     }
-    guard let value = recipeNumericValue(trimmed) else {
+    guard let value = EditableDecimal.value(from: trimmed) else {
         throw RecipeEditorError.invalidNumber(field: field)
     }
     return value

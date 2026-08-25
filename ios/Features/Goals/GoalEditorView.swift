@@ -27,13 +27,13 @@ struct GoalEditorView: View {
 
             ForEach(model.days.indices, id: \.self) { index in
                 Section(model.days[index].weekday.russianLabel) {
-                    TextField("Калории", text: $model.days[index].caloriesText)
+                    TextField("Калории", text: EditableDecimal.binding($model.days[index].caloriesText))
                         .keyboardType(.decimalPad)
-                    TextField("Белки", text: $model.days[index].proteinText)
+                    TextField("Белки", text: EditableDecimal.binding($model.days[index].proteinText))
                         .keyboardType(.decimalPad)
-                    TextField("Жиры", text: $model.days[index].fatText)
+                    TextField("Жиры", text: EditableDecimal.binding($model.days[index].fatText))
                         .keyboardType(.decimalPad)
-                    TextField("Углеводы", text: $model.days[index].carbsText)
+                    TextField("Углеводы", text: EditableDecimal.binding($model.days[index].carbsText))
                         .keyboardType(.decimalPad)
                 }
             }

@@ -177,14 +177,14 @@ final class AmountViewModel {
                    selectionDefault.amount.isFinite,
                    selectionDefault.amount > 0,
                    source.unitOptions.contains(where: { $0.token == selectionDefault.unitToken }) {
-                    amountText = numericString(selectionDefault.amount)
+                    amountText = EditableDecimal.string(from: selectionDefault.amount)
                     selectedUnitToken = selectionDefault.unitToken
                 } else {
                     selectedUnitToken = source.initialUnitToken
-                    amountText = numericString(FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
+                    amountText = EditableDecimal.string(from: FoodAmountDefaults.fallbackAmount(for: selectedUnitToken))
                 }
             case .edit:
-                amountText = source.initialAmount.map(numericString) ?? ""
+                amountText = source.initialAmount.map { EditableDecimal.string(from: $0) } ?? ""
                 selectedUnitToken = source.initialUnitToken
             }
             refreshPreview()
@@ -221,7 +221,7 @@ final class AmountViewModel {
                 try await diaryService.rebaseEntryToCurrentProduct(entryID: entryID)
                 let refreshedSource = try await diaryService.amountSource(forEntryID: entryID)
                 source = refreshedSource
-                amountText = refreshedSource.initialAmount.map(numericString) ?? ""
+                amountText = refreshedSource.initialAmount.map { EditableDecimal.string(from: $0) } ?? ""
                 selectedUnitToken = refreshedSource.initialUnitToken
             }
 
@@ -244,7 +244,7 @@ final class AmountViewModel {
             previewErrorMessage = nil
             return
         }
-        guard let amount = numericValue(from: trimmedAmount), amount > 0 else {
+        guard let amount = EditableDecimal.value(from: trimmedAmount), amount > 0 else {
             preview = nil
             previewErrorMessage = "Количество должно быть больше нуля."
             return
@@ -312,20 +312,13 @@ final class AmountViewModel {
             errorMessage = "Введите количество."
             return nil
         }
-        guard let amount = numericValue(from: trimmedAmount), amount > 0 else {
+        guard let amount = EditableDecimal.value(from: trimmedAmount), amount > 0 else {
             errorMessage = "Количество должно быть больше нуля."
             return nil
         }
         return amount
     }
 
-    private func numericValue(from text: String) -> Double? {
-        Double(text.replacingOccurrences(of: ",", with: "."))
-    }
-
-    private func numericString(_ value: Double) -> String {
-        value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 3)))
-    }
 }
 
 private func diaryErrorMessage(_ error: Error, fallback: String) -> String {

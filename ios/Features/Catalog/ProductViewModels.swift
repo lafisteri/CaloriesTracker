@@ -222,11 +222,11 @@ final class ProductEditorViewModel {
             name = details.product.name
             barcode = details.product.barcode ?? ""
             baseUnit = details.currentVersion.baseUnit
-            baseAmount = numericString(details.currentVersion.baseAmount)
-            calories = numericString(details.currentVersion.nutrition.calories)
-            protein = numericString(details.currentVersion.nutrition.protein)
-            fat = numericString(details.currentVersion.nutrition.fat)
-            carbs = numericString(details.currentVersion.nutrition.carbs)
+            baseAmount = EditableDecimal.string(from: details.currentVersion.baseAmount)
+            calories = EditableDecimal.string(from: details.currentVersion.nutrition.calories)
+            protein = EditableDecimal.string(from: details.currentVersion.nutrition.protein)
+            fat = EditableDecimal.string(from: details.currentVersion.nutrition.fat)
+            carbs = EditableDecimal.string(from: details.currentVersion.nutrition.carbs)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -273,17 +273,10 @@ final class ProductEditorViewModel {
     }
 
     private func numericValue(_ text: String, field: String) throws -> Double {
-        let normalized = text
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: ",", with: ".")
-        guard !normalized.isEmpty, let value = Double(normalized), value.isFinite else {
+        guard let value = EditableDecimal.value(from: text) else {
             throw ProductEditorError.invalidNumber(field: field)
         }
         return value
-    }
-
-    private func numericString(_ value: Double) -> String {
-        value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 3)))
     }
 }
 

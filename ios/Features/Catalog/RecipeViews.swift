@@ -412,7 +412,7 @@ struct RecipeEditorView: View {
                         }
                     }
 
-                    TextField("Количество", text: $model.outputAmountText)
+                    TextField("Количество", text: EditableDecimal.binding($model.outputAmountText))
                         .keyboardType(.decimalPad)
                         .focused($focusedField, equals: .outputAmount)
                 }

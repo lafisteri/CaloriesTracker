@@ -87,8 +87,7 @@ final class GoalEditorViewModel {
             throw GoalEditorError.fieldRequired(field: field, weekday: weekday)
         }
 
-        let normalized = value.replacingOccurrences(of: ",", with: ".")
-        guard let number = Double(normalized), number.isFinite, number >= 0 else {
+        guard let number = EditableDecimal.value(from: value), number >= 0 else {
             throw GoalEditorError.invalidValue(field: field, weekday: weekday)
         }
 
