@@ -91,14 +91,21 @@ final class RecipeService {
 
     func recipes(matching query: String) async throws -> [RecipeListItem] {
         let recipes = try await recipeRepository.activeRecipes(matching: query)
-        var items: [RecipeListItem] = []
-
-        for recipe in recipes {
-            let version = try await currentVersion(for: recipe)
-            items.append(RecipeListItem(recipe: recipe, currentVersion: version))
+        guard !recipes.isEmpty else {
+            return []
         }
+        let versionIDs = Set(recipes.map(\.currentVersionID))
+        let versions = try await recipeRepository.versions(ids: versionIDs)
+        let versionsByID = Dictionary(uniqueKeysWithValues: versions.map { ($0.id, $0) })
 
-        return items
+        return try recipes.map { recipe in
+            guard let version = versionsByID[recipe.currentVersionID],
+                  version.recipeID == recipe.id
+            else {
+                throw RecipeServiceError.currentRecipeVersionNotFound
+            }
+            return RecipeListItem(recipe: recipe, currentVersion: version)
+        }
     }
 
     func details(id: UUID) async throws -> RecipeDetails? {

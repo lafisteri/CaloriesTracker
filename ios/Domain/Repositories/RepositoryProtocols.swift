@@ -6,6 +6,7 @@ protocol ProductRepository: Sendable {
     func product(id: UUID, includingDeleted: Bool) async throws -> Product?
     func product(withBarcode barcode: String) async throws -> Product?
     func version(id: UUID) async throws -> ProductVersion?
+    func versions(ids: Set<UUID>) async throws -> [ProductVersion]
     func versions(for productID: UUID) async throws -> [ProductVersion]
     func create(_ product: Product, initialVersion: ProductVersion) async throws
     func saveLogicalMetadata(_ product: Product) async throws
@@ -18,6 +19,7 @@ protocol RecipeRepository: Sendable {
     func activeRecipes(matching query: String) async throws -> [Recipe]
     func recipe(id: UUID, includingDeleted: Bool) async throws -> Recipe?
     func version(id: UUID) async throws -> RecipeVersion?
+    func versions(ids: Set<UUID>) async throws -> [RecipeVersion]
     func versions(for recipeID: UUID) async throws -> [RecipeVersion]
     func create(_ recipe: Recipe, initialVersion: RecipeVersion) async throws
     func saveLogicalMetadata(_ recipe: Recipe) async throws

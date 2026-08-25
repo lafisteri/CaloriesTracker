@@ -24,16 +24,19 @@ final class ProductService {
 
     func products(matching query: String) async throws -> [ProductListItem] {
         let products = try await repository.activeProducts(matching: query)
-        var items: [ProductListItem] = []
+        guard !products.isEmpty else {
+            return []
+        }
+        let versionIDs = Set(products.map(\.currentVersionID))
+        let versions = try await repository.versions(ids: versionIDs)
+        let versionsByID = Dictionary(uniqueKeysWithValues: versions.map { ($0.id, $0) })
 
-        for product in products {
-            guard let currentVersion = try await repository.version(id: product.currentVersionID) else {
+        return try products.map { product in
+            guard let currentVersion = versionsByID[product.currentVersionID] else {
                 throw ProductServiceError.currentVersionNotFound
             }
-            items.append(ProductListItem(product: product, currentVersion: currentVersion))
+            return ProductListItem(product: product, currentVersion: currentVersion)
         }
-
-        return items
     }
 
     func details(id: UUID) async throws -> ProductDetails? {

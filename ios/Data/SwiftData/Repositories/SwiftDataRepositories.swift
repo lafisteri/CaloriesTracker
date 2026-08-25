@@ -53,6 +53,17 @@ final class SwiftDataProductRepository: ProductRepository {
         return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
     }
 
+    func versions(ids: Set<UUID>) async throws -> [ProductVersion] {
+        guard !ids.isEmpty else {
+            return []
+        }
+        let versionIDs = Array(ids)
+        let descriptor = FetchDescriptor<ProductVersionRecord>(
+            predicate: #Predicate { versionIDs.contains($0.id) },
+        )
+        return try modelContext.fetch(descriptor).map { try $0.toDomain() }
+    }
+
     func versions(for productID: UUID) async throws -> [ProductVersion] {
         try modelContext
             .fetch(FetchDescriptor<ProductVersionRecord>())
@@ -261,6 +272,17 @@ final class SwiftDataRecipeRepository: RecipeRepository {
     func version(id: UUID) async throws -> RecipeVersion? {
         let descriptor = FetchDescriptor<RecipeVersionRecord>(predicate: #Predicate { $0.id == id })
         return try modelContext.fetch(descriptor).first?.toDomain()
+    }
+
+    func versions(ids: Set<UUID>) async throws -> [RecipeVersion] {
+        guard !ids.isEmpty else {
+            return []
+        }
+        let versionIDs = Array(ids)
+        let descriptor = FetchDescriptor<RecipeVersionRecord>(
+            predicate: #Predicate { versionIDs.contains($0.id) },
+        )
+        return try modelContext.fetch(descriptor).map { $0.toDomain() }
     }
 
     func versions(for recipeID: UUID) async throws -> [RecipeVersion] {
