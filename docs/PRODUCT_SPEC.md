@@ -1,89 +1,76 @@
 # PRODUCT_SPEC
 
-**Status:** Current product specification
-**Last updated:** 2026-08-17
+**Status:** Current native iOS product specification
+**Last updated:** 2026-08-25
 
-**Product direction:** shared product behaviour for the web/PWA client and the native iOS client. Platform-specific implementation details belong in the corresponding architecture document.
-
-This document describes the current intended behavior of the application. If it conflicts with older phase prompts or historical planning notes, this document is the source of truth for product behavior. The current code remains the source for implementation details.
+This document describes accepted user-visible behaviour of the native iOS
+application. `IOS_ARCHITECTURE.md` describes implementation constraints; older
+web/PWA documents and historical prompts are not a source of current behaviour.
 
 ## 1. Product overview
 
-КБЖУ — personal, local-first PWA для учёта калорий, белков, жиров и углеводов. Приложение ориентировано прежде всего на iPhone, устанавливается на Home Screen и не требует регистрации.
+КБЖУ — personal, local-first iOS-приложение для учёта калорий, белков, жиров и
+углеводов. Пользователь самостоятельно ведёт базу продуктов и рецептов;
+внешняя база питания, аккаунт и синхронизация не требуются для текущего
+сценария.
 
 Основной ежедневный сценарий:
 
 ```text
 Открыть приложение
 → Сегодня
-→ добавить еду
-→ выбрать продукт или рецепт
+→ Добавить
+→ выбрать Product или Recipe
 → указать количество
 → сохранить
 ```
 
-Пользователь самостоятельно ведёт базу продуктов. Приложение не использует внешнюю базу питания и не меняет исторические данные задним числом.
-
 ## 2. Product principles
 
-- Mobile-first и iPhone/PWA-first интерфейс.
-- Local-first хранение и работа без аккаунта.
-- Offline-capable после первого успешного запуска.
-- Собственная, управляемая пользователем база продуктов и рецептов.
-- Минимум действий в ежедневном food logging flow.
-- Версионирование nutritional data.
-- Исторические данные не должны незаметно изменяться.
-- Понятный, спокойный интерфейс без геймификации и лишних функций.
+- Нативный, local-first интерфейс для iPhone.
+- Собственная управляемая пользователем база продуктов и рецептов.
+- Минимум действий в ежедневном food-logging flow.
+- Версионирование пищевой ценности и состава.
+- Исторические записи не изменяются незаметно.
+- Спокойный интерфейс без геймификации и лишних функций.
 
 ## 3. Navigation and information architecture
 
-Постоянная нижняя навигация содержит только часто используемые разделы:
+Нижняя навигация содержит три раздела:
 
 ```text
-Статистика   → /dashboard
-Сегодня      → /
-Продукты     → /products
+Статистика
+Сегодня
+Продукты
 ```
 
-`/` открывает Diary для текущей локальной даты. `/?date=YYYY-MM-DD` открывает Diary выбранной даты. PWA manifest использует `/` как `start_url`, поэтому запуск с Home Screen сразу открывает дневник.
+При запуске открывается **Сегодня**. Goals открываются вторичным действием из
+Статистики, а не отдельной вкладкой. Внутренние переходы являются нативными
+экранами, а не URL-маршрутами.
 
-Маршрут `/today` сохранён как compatibility redirect на `/dashboard`. Неизвестные маршруты перенаправляются на `/`.
-
-`/goals` остаётся доступным маршрутом, но не занимает постоянное место в bottom navigation. Основной вход в настройки целей — secondary action **«Настроить цели»** на экране «Статистика».
-
-Внутри приложения нет глобальной branding-надписи **«+КБЖУ»**: заголовки показывают только полезный контекст текущего экрана.
-
-Bottom navigation сохраняется в Diary add flow:
-
-```text
-/
-/?date=YYYY-MM-DD
-/add/:date/:meal
-/add/:date/:meal/product/:productId
-/add/:date/:meal/recipe/:recipeId
-```
-
-На Diary, Diary add flow и edit DiaryEntry активен пункт **«Сегодня»**. Scanner штрихкода, а также создание и редактирование рецепта остаются focused full-screen сценариями без bottom navigation.
+У **Сегодня** есть специальное правило: если пользователь уходит с вкладки с
+открытым дочерним flow (выбор еды, Amount, редактор и т. п.), при возвращении
+он видит корневой экран Today. Выбранная `LocalDay` при этом остаётся выбранной;
+сбрасывается только transient-навигация.
 
 ## 4. Today and diary
 
-
-В нижней навигации **«Сегодня»** означает дневник, а не статистику.
-
-Обычный переход на `/` открывает текущую локальную дату. Diary date deep links поддерживаются через `/?date=YYYY-MM-DD`; внутри дневника можно перейти на прошлую или будущую дату и вернуться к сегодняшней.
+**Сегодня** — дневник выбранного локального календарного дня. Пользователь
+может перейти на прошлый или будущий день и вернуться к сегодняшнему.
 
 Дневник содержит:
 
 - навигацию по датам;
-- компактную сводку **«За день»** с calories, целью calories при наличии и Б/Ж/У;
-- четыре группы: Завтрак, Обед, Ужин и Перекусы;
-- итоги каждого приёма пищи;
-- записи дневника;
-- действие **«Добавить»** для каждого meal type.
+- компактную сводку **«За день»**: calories, цель calories при наличии и Б/Ж/У;
+- четыре секции: Завтрак, Обед, Ужин и Перекусы;
+- итог calories каждого приёма пищи;
+- записи дневника и действие **«Добавить»** в каждой секции.
 
-Сводка не является большой hero-card. Meal cards используют одинаковый compact padding со всех четырёх сторон, а между соседними DiaryEntry нет divider. Пустые секции приёмов пищи остаются компактными, содержат действие добавления и не показывают технические drop-placeholder тексты вроде **«Перетащите запись сюда»**. Отдельной глобальной empty-state плашки для пустого дня нет.
+Пустой приём пищи остаётся компактным: он содержит действие добавления, но не
+показывает технический текст для drop target. Отдельная глобальная empty-state
+плашка для пустого дня не нужна.
 
-Каждая DiaryEntry в meal card показывает только:
+Каждая строка `DiaryEntry` показывает только:
 
 ```text
 source name
@@ -91,445 +78,282 @@ amount + unit
 calories
 ```
 
-Белки, жиры и углеводы не дублируются в каждой строке; они остаются в дневной сводке, статистике и сохранённом nutrition snapshot.
+Белки, жиры и углеводы остаются в дневной сводке, статистике и сохранённом
+nutrition snapshot, но не повторяются в строке.
 
-Interaction contract для DiaryEntry:
+### Interactions with a DiaryEntry
 
 ```text
-tap                  → открыть Amount/Edit текущей DiaryEntry
-swipe справа налево  → открыть red trash action
-long press + drag    → reorder / move
-vertical swipe       → scroll
+tap                  → открыть Amount/Edit записи
+swipe справа налево  → показать destructive action с корзиной
+long press + drag    → изменить порядок или перенести в другой meal
+vertical swipe       → прокрутить список
 ```
 
-### Tap
+Tap открывает Amount/Edit с фактическими сохранёнными amount и unit. В этом
+режиме можно менять только amount и unit; дата и meal остаются прежними.
 
-Короткий tap открывает общий Amount/Edit UI для существующей DiaryEntry. В edit mode пользователь может менять только amount и unit. Используются фактические сохранённые `entry.amount`, `entry.unit` и `entry.sourceVersionId`; default create-значение не подставляется. Исторический пересчёт выполняется только через сохранённый `sourceVersionId`.
+Удаление требует явного tap по показанной корзине, выполняется без отдельного
+подтверждения и не удаляет Product, Recipe или историю версий. После него
+обновляются totals дня и meal.
 
-### Swipe delete
+Drag & drop не требует Edit mode, drag handles или меню перемещения. Оно
+поддерживает reorder внутри meal, перенос между meal того же дня, пустой meal и
+конкретную позицию вставки. Простое касание не должно начинать drag и не должно
+скрывать строку; во время drag не должно быть двух полноценных копий строки.
 
-Swipe справа налево раскрывает только destructive action с красным фоном и иконкой корзины. Visible text **«Удалить»** не нужен; accessibility label сохраняется.
+## 5. Food selection and Amount flow
 
-Swipe сам по себе не удаляет запись и никогда не открывает Product, Recipe, Amount/Add flow или другой экран. После достаточного swipe пользователь отпускает палец, destructive action остаётся доступным. Затем:
-
-```text
-tap trash     → soft delete конкретной DiaryEntry
-tap elsewhere → закрыть swipe action
-```
-
-Одновременно открыта максимум одна destructive action. Удаление не показывает browser confirmation и не затрагивает Product, Recipe или их versions. Meal/day totals обновляются, а удаление сохраняется локально.
-
-### Drag & Drop
-
-Long press начинает прямой drag & drop без `Edit` mode, без drag handles и без меню **«Переместить в»**.
-
-Пользователь может:
-
-- изменить порядок entries внутри текущего meal;
-- перенести entry в другой meal того же дня;
-- перенести entry в пустой meal;
-- выбрать конкретную insertion position.
-
-Во время реального drag пользователь не должен видеть две полноценные копии одной записи. Простое касание не активирует drag state и не скрывает row.
-
-Пользовательский порядок хранится в `DiaryEntry.sortOrder` и сохраняется после reload. При reorder меняются только `sortOrder` и `updatedAt`. При переносе между meals меняются только `mealType`, `sortOrder` и `updatedAt`: `date`, source/version reference, source-name snapshot, amount, unit и nutrition snapshots не изменяются.
-
-Конкретный SwiftUI container или gesture implementation не является product requirement. Требование продукта — надёжное разделение жестов на physical iPhone:
+Основной flow добавления еды в дневник:
 
 ```text
-tap             → edit DiaryEntry
-swipe left      → reveal trash
-long press+drag → reorder / move
-vertical swipe  → scroll
-```
-
-## 5. Food selection and amount flow
-
-
-Основной flow добавления еды:
-
-```text
-Diary
+Today
+→ Добавить в нужном meal
+→ Catalog in selection context
+→ Product или Recipe
+→ Amount
 → Добавить
-→ Catalog selection mode
-→ выбрать Product или Recipe
-→ Amount / Unit
-→ Добавить
-→ Diary
+→ Today
 ```
 
-Контекст даты и приёма пищи сохраняется на всём flow. После успешного добавления пользователь возвращается прямо в соответствующий дневник; completed Amount screen не должен появляться при обычном возврате назад.
+Контекст даты и meal сохраняется на всём flow. После успешного добавления
+завершённые Catalog и Amount не должны снова появляться по Back.
 
-### Shared Catalog: management и selection
+### Shared Catalog
 
-Food Selection не является отдельным урезанным списком. Используется тот же полноценный Catalog UI, что и в табе **«Продукты»**, но с другим tap behaviour.
+Один Catalog с сегментами **Продукты** и **Рецепты**, поиском и созданием
+источника используется в трёх контекстах:
 
-Catalog поддерживает typed contexts:
+| Контекст | Tap по полной строке | `+` |
+| --- | --- | --- |
+| Управление из вкладки «Продукты» | Открывает details | Не показывается |
+| Выбор для Today | Открывает Amount для DiaryEntry | Быстро добавляет запись в выбранный meal |
+| Выбор ингредиента Recipe | Открывает Amount для ingredient draft | Быстро добавляет ingredient draft |
+
+В selection context полная строка и `+` имеют разные действия. Quick-add
+добавляет источник без дополнительного Amount-экрана; пока операция идёт, в
+одном selection flow нельзя запустить вторую quick-add операцию.
+
+Создание Product или Recipe из Catalog сохраняет исходный context. В частности,
+создание Product во время выбора ингредиента возвращает к выбору ингредиента, а
+текущий черновик Recipe не теряется.
+
+Soft-deleted Product и Recipe не показываются в Catalog. При отсутствии данных
+экран объясняет, что нужно создать первый Product или Recipe, а основное
+действие создания остаётся в toolbar.
+
+### Defaults and consistency in selection
+
+Для выбранного источника Catalog использует совместимое последнее
+использованное amount/unit. Если такого значения нет или единица больше не
+доступна, применяется fallback:
 
 ```text
-management
-→ tap Product/Recipe → details
-
-selection(FoodSelectionContext)
-→ tap Product/Recipe → shared Amount
-→ tap + → quick-add the latest compatible amount (or the base fallback)
+г       → 100 г
+порция → 1 порция
 ```
 
-В обоих контекстах сохраняются:
+`Recipe.servingsCount` означает полный выход рецепта в порциях. Например,
+`servingsCount = 5` не делает default потребления равным пяти порциям: fallback
+по-прежнему равен одной порции.
 
-```text
-[ Сканировать ] [ Добавить / Создать рецепт ]
-[ Продукты ] [ Рецепты ]
-Search
-Content
-```
-
-До реализации native scanner action **«Сканировать»** может отсутствовать; fake/non-working scanner не показывается.
-
-В `diarySelection` пользователь видит те же Products/Recipes, tabs, search и creation flows, что и в management Catalog. Создание Product или Recipe из selection mode сохраняет исходный Diary context и возвращает пользователя в тот же selection flow, а не в root Catalog tab.
-
-Search обновляет результаты без отдельной кнопки, работает по Products и Recipes и имеет clear action. Soft-deleted sources не показываются.
-
-При пустой базе показывается:
-
-```text
-В базе пока нет продуктов
-Создайте первый продукт с помощью кнопки выше, чтобы добавить его в дневник.
-```
-
-Отдельной create CTA внутри empty state нет.
+В selection context сумма, отображённые amount/unit и calories в строке Catalog
+должны соответствовать initial amount/unit и preview в Amount, а quick-add
+должен сохранять то же значение.
 
 ### Amount and units
 
-Экран Amount для продуктов и рецептов показывает back navigation, название источника, всегда видимый live preview КБЖУ и CTA. Отдельный subtitle о meal type не показывается.
+Общий экран Amount показывает название источника, live preview calories и
+Б/Ж/У, поле количества, единицу и confirm action. Для новой записи дневника
+действие называется **«Добавить»**, для редактирования существующей записи —
+**«Сохранить»**.
 
-Последовательность экрана:
+- Для нового Amount flow поле количества получает focus, открывается numeric
+  keyboard, а initial text выделен для немедленной замены.
+- Custom keyboard toolbar **«Готово»** не показывается.
+- Нижние controls Amount остаются доступными над клавиатурой.
+- Для Product доступна ровно одна base unit, поэтому единица отображается
+  read-only.
+- Для Recipe доступны `г`, если указан cooked weight, и `порция`, если указано
+  servings count. При одной доступной единице она read-only; при двух доступен
+  компактный selector.
+- Ручная смена единицы не конвертирует уже введённое число. Например, `100 г`
+  после выбора порций остаётся числом `100` и означает `100 порций` до ручного
+  изменения пользователем.
 
-```text
-< < <
-source/product info
-nutrition preview
-[ amount ] [ unit ] [ Добавить / Сохранить ]
-```
-
-Amount, unit и CTA находятся в одной compact horizontal row; visible labels для amount и unit не показываются.
-
-#### Create DiaryEntry
-
-Для новой DiaryEntry:
-
-- amount по умолчанию равен `100`;
-- amount input получает initial focus;
-- текст `100` полностью выделен;
-- numeric keyboard открыт сразу;
-- пользователь может сразу ввести новое значение, не получая `100250`;
-- отдельная custom/system keyboard toolbar button **«Готово»** не показывается;
-- КБЖУ preview отображается сразу и не заменяется текстом **«Введите количество, чтобы увидеть КБЖУ»**.
-
-Во время временно невалидного ввода nutrition section остаётся на месте. UI может показать zero/last valid preview согласно реализации, но секция КБЖУ не исчезает.
-
-Для источников с единицей **«порция»** implementation может использовать более разумный default, если `100` нарушает фактическую unit semantics; такое исключение должно быть осознанным и единообразным.
-
-#### Edit DiaryEntry
-
-Create и edit используют общий Amount UI concept. Create завершает действие CTA **«Добавить»**, edit — **«Сохранить»**.
-
-При edit существующей DiaryEntry:
-
-- открывается фактический сохранённый amount, а не default `100`;
-- можно изменить только amount и unit;
-- meal type и date сохраняются;
-- calculation/preview используют сохранённый `sourceVersionId`, а не current source version;
-- отдельного delete action на Amount/Edit screen нет.
-
-Удаление остаётся действием Diary swipe-to-delete.
-
-Preview и сохраняемая DiaryEntry используют один расчётный путь.
+При редактировании существующей DiaryEntry initial amount/unit и расчёт берутся
+из сохранённой записи и её исторической версии источника, а не из текущего
+Product или Recipe.
 
 ## 6. Products
 
-Пользователь ведёт собственную базу продуктов. Доступны:
+Пользователь может создавать, искать по названию и barcode, просматривать,
+редактировать и удалять Products, а также просматривать историю версий.
+Barcode сейчас вводится вручную как строка; leading zeros сохраняются, а один
+код не должен принадлежать двум Products.
 
-- создание;
-- поиск по названию и штрихкоду;
-- просмотр;
-- редактирование;
-- soft delete;
-- штрихкод;
-- базовая пищевая ценность;
-- история версий.
+Product form содержит название, optional barcode, base unit (`г` или `порция`),
+base amount, calories, protein, fat и carbs. В новом Product числовые поля
+пусты до ввода и не трактуются как ноль.
 
-Products и Recipes доступны как отдельные вкладки общего Catalog на `/products`. Один и тот же Catalog UI используется в management и Diary selection contexts; различается tap/navigation behaviour, а Diary context сохраняется отдельно.
+Изменение versioned данных Product — base unit, base amount, calories, protein,
+fat или carbs — создаёт новую `ProductVersion`; старая версия остаётся в
+истории. Изменение только name или barcode обновляет logical metadata Product
+без создания новой версии. Barcode остаётся уникальным для Products, включая
+удалённые.
 
-На вкладке Products порядок действий:
+Новая DiaryEntry использует актуальную версию, а уже сохранённая DiaryEntry
+остаётся привязанной к использованной версии и собственному nutrition snapshot.
 
-```text
-[ Сканировать ] [ Добавить ]
-[ Продукты ] [ Рецепты ]
-Search
-Content
-```
-
-Верхнего page header **«Продукты»** нет. На вкладке Recipes action **«Создать рецепт»** занимает тот же quick-action area; tabs и Search остаются доступны ниже.
-
-Если Products отсутствуют, empty state показывает:
-
-```text
-Продуктов пока нет
-Добавьте первый продукт с помощью кнопки выше.
-```
-
-Если Recipes отсутствуют, empty state показывает:
-
-```text
-У вас пока нет рецептов
-Создайте первый рецепт с помощью кнопки выше.
-```
-
-Эти состояния не дублируют create CTA.
-
-### Product and ProductVersion
-
-`Product` — логическая сущность с именем, optional barcode и ссылкой на актуальную версию. Nutrition и units принадлежат `ProductVersion`.
-
-Изменение единицы, количества или калорий, Б/Ж/У создаёт новую `ProductVersion` (`v1`, `v2`, `v3` и далее). `currentVersionId` указывает на актуальную версию. Старые версии не редактируются и доступны в истории.
-
-Новая DiaryEntry использует текущую версию. Историческая DiaryEntry сохраняет ссылку на использованную версию и собственный nutrition snapshot.
-
-### Product form and save flow
-
-Product create/edit form содержит Name, Barcode, **«Единица»**, **«Количество»**, calories, protein, fat и carbs. Поле **«Единица»** — select ровно с двумя вариантами: **«г»** и **«порция»**; по умолчанию выбраны граммы. В create flow поля количества и nutrition изначально визуально пустые и пустое значение не трактуется как `0`; в edit flow реальный сохранённый `0` отображается как `0`. **«Пищевая ценность»** следует сразу за заголовком без дополнительного explanatory text.
-
-Обычное создание и редактирование завершаются переходом на `/products`. При создании через `/products/new?returnTo=...` сохраняется исходный Diary return flow и его date/mealType context. На edit screen secondary action **«Версии»** открывает существующую ProductVersion history; history не открывается автоматически после Save.
-
-В продуктовой модели нет дополнительных или пользовательских единиц. Допустимы только **«г»** и **«порция»**; другие unit tokens не имеют compatibility или migration path.
+Удаление Product выполняется без дополнительного confirmation dialog и убирает
+его из обычного Catalog, не разрушая исторические Recipe и DiaryEntry.
 
 ## 7. Recipes
 
-Recipes — реализованная часть продукта, а не future feature.
+Recipes — реализованная часть текущего продукта. Редактор Recipe позволяет
+задавать:
 
-Модель:
+- название;
+- список ингредиентов;
+- cooked weight;
+- servings count.
+
+Для сохранения требуются непустое название, хотя бы один ингредиент и хотя бы
+один положительный output: cooked weight или servings count.
 
 ```text
-Recipe
-→ RecipeVersion
-→ RecipeIngredient
-→ ProductVersion
+cookedWeight  → делает доступным output в граммах
+servingsCount → делает доступным output в порциях
+оба значения  → доступны обе единицы output
 ```
 
-Рецепт содержит название, ингредиенты, количество и единицу каждого ингредиента, optional cooked weight и optional servings count.
-
-Для сохранения рецепта нужны хотя бы один ингредиент и хотя бы один способ выдачи результата: cooked weight или servings count.
-
-### Recipe form and output
-
-Выход готового рецепта задаётся теми же полями, что и базовое количество продукта: **«Единица»** и **«Количество»**. В selector доступны только **«г»** и **«порция»**. Значение для `г` сохраняется как `cookedWeight`, для `порция` — как `servingsCount`.
-
-При переключении единицы редактируется соответствующее ей количество. Если у существующего рецепта уже указаны оба выхода, оба значения сохраняются и остаются доступны через selector.
-
-### Nutrition
-
-Total nutrition — сумма nutrition всех ингредиентов.
+Total nutrition — сумма ингредиентов. Показатели выхода рассчитываются как:
 
 ```text
-per 100 g = total / cookedWeight × 100
+per 100 г   = total / cookedWeight × 100
 per serving = total / servingsCount
 ```
 
-Если заданы оба значения, рецепт можно добавлять и по граммам, и по порциям. В списке и preview nutrition отображается в той же единице, к которой относится показатель.
+Изменение versioned данных Recipe создаёт новую `RecipeVersion`: это изменение
+ingredients, их порядка, ProductVersion, amount или unit, а также cooked weight
+или servings count. Изменение только name обновляет logical metadata Recipe без
+создания новой версии. Предыдущие RecipeVersion и исторические DiaryEntry не
+меняются.
 
-### Recipe versioning and pinned ingredients
+### Ingredients and flattening
 
-Изменение ингредиентов, их количества, единиц, pinned `ProductVersion`, cooked weight или servings count создаёт новую `RecipeVersion`. Старая версия остаётся неизменной.
-
-`RecipeIngredient` хранит конкретный `productVersionId`. Рецепт не переключается автоматически на `Product.currentVersionId`.
-
-### Recipe composition
-
-В выборе ингредиентов Recipe Catalog показывает и **Products**, и **Recipes**. Выбор Product добавляет один Product ingredient обычным способом. Выбор Recipe не создаёт вложенную связь `RecipeIngredient → Recipe` и не создаёт рекурсивную композицию.
-
-Пользователь указывает количество выбранного Recipe в доступной единице выхода:
+Из Recipe Editor действие **«Добавить»** открывает общий Catalog в ingredient
+selection context.
 
 ```text
-г        → selected amount / RecipeVersion.cookedWeight
-порция   → selected amount / RecipeVersion.servingsCount
+Product → Amount → один Product ingredient draft
+Recipe  → Amount → пропорционально развёрнутые Product ingredient drafts
 ```
 
-Полученный коэффициент применяется к количеству каждого Product ingredient выбранной текущей `RecipeVersion`. В редактируемый Recipe добавляются новые Product ingredients с теми же pinned `ProductVersion`, unit и пропорционально изменённым amount. Поэтому, например, 100 г соуса добавляет в пиццу пропорциональную часть его продуктов, а не динамическую ссылку на рецепт соуса.
+Выбор Recipe как ингредиента не создаёт вложенную сохранённую связь
+Recipe→Recipe. Его текущий состав разворачивается в Product ingredients с
+закреплёнными версиями продуктов. Поэтому последующее изменение рецепта-источника
+не меняет уже добавленный черновик или сохранённый Recipe.
 
-После flattening изменение рецепта-источника не меняет уже добавленный состав. Циклы Recipe→Recipe невозможны, потому что сохранённый `RecipeIngredient` по-прежнему ссылается только на `ProductVersion`.
-
-Если продукт получает новую версию, Recipe UI может показать **«Есть обновлённые ингредиенты»**. Пользователь может вручную применить актуальные совместимые версии; это создаёт новую `RecipeVersion`.
-
-Product и Recipe soft delete выполняются сразу, без browser confirmation dialogs. Historical versions и DiaryEntry при этом сохраняются; ошибки показываются inline в UI.
+Удаление Recipe выполняется без отдельного confirmation dialog и скрывает его
+из обычного Catalog, сохраняя данные, нужные для истории.
 
 ## 8. Barcode
 
-Barcode реализован как local-only инструмент:
-
-- сканирование камерой через нативный `BarcodeDetector`, когда он поддержан браузером;
-- ручной ввод кода;
-- точный поиск в локальной IndexedDB;
-- использование из Products и из Food Selection.
-
-Штрихкод — строка: leading zeros сохраняются. Он нормализуется для exact lookup и не должен дублироваться в базе, включая soft-deleted записи.
-
-Management flow:
-
-```text
-Products
-→ Scan
-→ known barcode
-→ Product details
-```
-
-Diary flow:
-
-```text
-Diary
-→ Food Selection
-→ Scan
-→ known barcode
-→ Amount
-→ Add
-→ Diary
-```
-
-Для known product используется current `ProductVersion`. Если barcode неизвестен, открывается создание продукта с заполненным кодом. При входе из Diary сохраняется исходный context даты и meal type.
-
-Внешние barcode/product APIs сейчас не используются.
+Нативного barcode scanner в текущей версии нет. Product поддерживает ручной
+ввод и поиск barcode; camera scanning, внешние barcode/product APIs и return
+flows scanner являются future work и не должны отображаться как доступная
+функция.
 
 ## 9. Goals
 
-Goals задаются пользователем вручную и доступны из **«Статистика → Настроить цели»**, а также по сохранённому маршруту `/goals`.
+Goals доступны из **«Статистика → Настроить цели»**. WeeklyGoal содержит семь
+DailyMacroGoal — calories, protein, fat и carbs для каждого дня недели. Значение
+одного дня можно применить ко всем дням.
 
-Модель цели:
-
-```text
-WeeklyGoal
-effectiveFrom
-7 × DailyMacroGoal
-```
-
-Для каждого дня недели задаются calories, protein, fat и carbs. Можно скопировать значения одного дня во все дни, затем изменить отдельные дни.
-
-Изменение создаёт новую immutable `WeeklyGoal`. Для исторической даты Diary и Statistics используют цель, актуальную на эту дату, а не сегодняшнюю цель.
+Изменение целей создаёт новую недельную цель, действующую с выбранного local
+day. Today и Statistics для исторической даты используют цель, действовавшую в
+эту дату, а не сегодняшнюю.
 
 ## 10. Statistics
 
-Dashboard в пользовательском интерфейсе называется **«Статистика»** и расположен на `/dashboard`. Он является вторичным аналитическим разделом, а не главным стартовым экраном. Отдельного верхнего page header **«Статистика»** нет.
-
-Statistics показывает выбранный день и соответствующую неделю:
-
-- недельные бары калорий;
-- недельный calorie balance;
-- недельное распределение Б/Ж/У.
-
-Отдельные верхние summary cards **«Калории»** и **«Макронутриенты»** не используются. Goals доступны через compact secondary action **«Настроить цели»**. Explanatory texts **«100% = цель дня»** и **«Доля энергии»** не отображаются.
-
-Weekly balance не считает будущие дни текущей недели как deficit. Для прошлой недели учитывается вся неделя.
+**Статистика** показывает выбранную неделю: bars calories по дням, weekly
+calorie balance и распределение энергии Б/Ж/У. Пользователь может перейти по
+неделям и вернуться к текущей.
 
 Проценты Б/Ж/У считаются по энергии:
 
 ```text
 Protein = grams × 4
-Fat = grams × 9
-Carbs = grams × 4
+Fat     = grams × 9
+Carbs   = grams × 4
 ```
 
-Проценты относятся к macro-derived energy. Calories в DiaryEntry остаются отдельным snapshot и могут незначительно отличаться от этой производной величины.
+Calories в DiaryEntry остаются отдельным snapshot и могут немного отличаться от
+macro-derived energy. Будущие дни текущей недели не считаются дефицитом в
+weekly balance.
 
 ## 11. Versioning and historical integrity
 
-Historical integrity — обязательное правило продукта.
+Historical integrity — обязательное правило продукта. DiaryEntry сохраняет:
 
-DiaryEntry хранит:
-
-- date, mealType и sortOrder;
-- sourceType, sourceId и sourceVersionId;
-- sourceName snapshot;
+- local day, meal и order;
+- source type, logical ID и version ID;
+- source name snapshot;
 - amount и unit;
 - snapshots calories, protein, fat и carbs.
 
-После изменения Product или Recipe прошлые DiaryEntry не пересчитываются автоматически. Например, запись Pizza v1 остаётся с nutrition Pizza v1 после появления Pizza v2.
+После изменения Product или Recipe ранее сохранённые DiaryEntry не
+пересчитываются автоматически. Даже при редактировании их amount/unit расчёт
+использует сохранённую версию источника.
 
-При редактировании исторической DiaryEntry расчёт выполняется через сохранённый `sourceVersionId`, а не через актуальную версию продукта или рецепта. Edit изменяет только amount и unit; существующие meal type и date сохраняются.
+Metadata-only rename также не переписывает `sourceName` snapshot: запись,
+сохранённая для «Молоко», сохраняет это историческое имя после переименования
+Product в «Молоко 2.5%».
 
-## 12. Storage and architecture
+## 12. Local storage
 
-Текущий stack:
+Текущие пользовательские данные хранятся локально в SwiftData на устройстве:
+Products, ProductVersions, Recipes, RecipeVersions, ingredients, DiaryEntries и
+weekly goals. Приложение не требует аккаунт для работы с этими данными.
 
-- React, TypeScript, Vite и React Router;
-- Tailwind CSS;
-- Dexie.js и IndexedDB;
-- React Hook Form и Zod для форм и валидации;
-- Zustand только для transient UI state;
-- vite-plugin-pwa и Workbox.
+## 13. Offline behaviour
 
-Пользовательские данные хранятся локально в IndexedDB: products, productVersions, recipes, recipeVersions, diaryEntries и weeklyGoals. Diary ordering также хранится локально через `sortOrder`; обновление схемы назначает существующим entries стабильный начальный порядок без изменения historical nutrition data.
-
-Архитектура разделяет UI, application services, domain rules, repository interfaces и Dexie implementations. UI не обращается к Dexie напрямую и не дублирует расчёты nutrition.
-
-## 13. Offline and PWA
-
-После первого успешного запуска приложение должно работать offline для локальных сценариев:
-
-- Diary и добавление существующей еды;
-- Products и Recipes;
-- Goals;
-- Statistics на локальных данных;
-- local barcode lookup и ручной barcode input.
-
-PWA поддерживает manifest, service worker, app shell cache, standalone mode, Home Screen installation, локальные icons и iPhone safe areas. Обновления service worker используют normal auto-update behavior. User data остаются в IndexedDB, а не в service worker cache.
-
-Intended deployment model — static Vite PWA, размещённое по HTTPS. Конкретный hosting provider не является product requirement.
+После успешного запуска приложение работает с локальными данными без сети для
+Today, Catalog, Recipe, Goals и Statistics. Это native iOS-приложение: PWA
+manifest, service worker, Home Screen installation и browser routes не являются
+частью текущего поведения.
 
 ## 14. UX rules
 
 - Основные food flows используют отдельные экраны, а не маленькие bottom sheet.
-- Controls должны быть touch-friendly, обычно с target не менее 44 px.
-- Sticky CTA учитывают safe area и не должны перекрывать поля.
-- Numeric fields используют подходящие input modes.
-- Клавиатура не должна мешать редактированию или сохранению.
+- Controls должны быть touch-friendly, обычно не меньше 44 pt.
+- Numeric fields используют numeric keyboard.
+- Клавиатура не должна перекрывать Amount controls или мешать сохранению.
 - Длинные названия не должны создавать horizontal scroll.
-- Bottom navigation предназначена только для частых разделов.
-- Основные tab screens используют compact top spacing с сохранением iPhone safe area.
-- Visible back navigation в focused flows унифицирована как **`< < <`** без contextual labels и отдельного divider; destination сохраняет текущий context.
-- Ошибки формулируются человеческим языком и не показывают технические исключения пользователю.
-- Do not use native browser alert/confirm/prompt dialogs in product UX.
-- Если primary creation action уже находится в quick-action area, empty state содержит только title и короткое объяснение без повторной CTA.
-- Diary selection использует тот же Catalog UI, что management mode, сохраняя DiaryContext и selection-specific tap behaviour.
-- Destructive swipe actions по всему приложению используют красную action с trash icon без visible text «Удалить»; accessibility label сохраняется.
-- Daily workflow остаётся компактным: без oversized inputs, redundant subtitles, repeated CTA и unnecessary empty-state cards.
+- Ошибки формулируются человеческим языком и не показывают технические
+  исключения.
+- Destructive actions используют красную корзину и не выполняются одним swipe.
 
 ## 15. Out of scope
 
-В текущий продукт не входят:
-
-- weight tracking;
-- water tracking;
-- exercise, activity или steps;
-- gamification, streaks и social features;
-- subscriptions и ads;
-- medical advice;
-- AI/photo food recognition;
-- external food database lookup;
-- authentication, sharing и recipe photos;
-- complex onboarding.
+В текущий продукт не входят weight tracking, water tracking, exercise/steps,
+gamification, social features, subscriptions, ads, medical advice, AI/photo
+food recognition, HealthKit, widgets, Watch и complex onboarding.
 
 ## 16. Future and deferred
 
-Следующие возможности не реализованы и не считаются принятым планом:
+Следующие возможности не реализованы и требуют отдельного product decision:
 
-- Export / Import JSON backup;
-- optional Supabase backup/sync;
-- optional external barcode/product lookup.
-
-К ним следует возвращаться только после подтверждённой пользовательской потребности.
+- camera barcode scanner;
+- export/import backup;
+- account, cloud backup или multi-device sync;
+- external barcode/product lookup;
+- web-data migration.
 
 ## 17. Document precedence
 
-For intended product behavior, precedence is:
+For intended product behaviour, precedence is:
 
 ```text
 Current PRODUCT_SPEC.md
@@ -539,4 +363,4 @@ older phase prompts
 historical planning notes
 ```
 
-Документ описывает продукт, а не историю разработки. Новые возможности не следует считать реализованными, пока они не добавлены в этот spec и в код.
+The document describes the product rather than development history.

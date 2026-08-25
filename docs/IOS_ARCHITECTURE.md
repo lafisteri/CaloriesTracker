@@ -1,774 +1,337 @@
 # Native iOS architecture and data design
 
-**Status:** Current native iOS architecture  
-**Scope:** architecture and intended native implementation constraints for the Swift / SwiftUI client. `PRODUCT_SPEC.md` remains the authority for user-visible product behaviour. The code is the source of truth for concrete implementation details.
+**Status:** Current native iOS architecture
+**Last updated:** 2026-08-25
+**Scope:** the Swift / SwiftUI application. PRODUCT_SPEC.md defines user-visible
+behaviour; this document defines technical boundaries and invariants.
 
-`PRODUCT_SPEC.md` is the authority for intended product behaviour. The existing React/Dexie application is the reference for rules, stored fields, and currently implemented behaviour.
+## Target platform
 
-## Target Platform
-
-| Concern | Decision |
+| Concern | Current decision |
 | --- | --- |
-| Language and UI | Swift 5.9+, SwiftUI; do not make UIKit the UI architecture. |
-| Minimum OS | **iOS 17.0**. |
-| Navigation | `TabView`, with one independent `NavigationStack` per tab. |
-| Local persistence | SwiftData, in a single local model container. |
-| Concurrency | `async`/`await`, `@MainActor` UI and SwiftData boundary; no Combine dependency. |
-| Device data | Local-first and usable offline; no sign-in in native v1. |
-| Native camera seam | A future SwiftUI wrapper around VisionKit/AVFoundation, isolated behind `BarcodeService`. |
+| UI | SwiftUI on iOS 17.0+. UIKit is used only for platform APIs. |
+| Navigation | TabView and one typed NavigationStack path per root tab. |
+| Local persistence | One SwiftData ModelContainer from a versioned schema. |
+| Concurrency | async/await; UI and SwiftData repositories are MainActor. |
+| Observation | Swift Observation is normal feature state. Combine is scoped to Recipe Editor keyboard lifecycle notifications. |
+| Data | Local-first, offline, no account and no implemented sync service. |
 
-The native application is a new client of the same product. The React application remains intact as the web/desktop reference and possible future Supabase client.
-
-## Current architecture understood
-
-The web application already follows the useful separation to retain:
-
-```text
-React feature/UI
-        ↓
-application services
-        ↓
-domain rules and repository protocols
-        ↓
-Dexie repository implementations
-        ↓
-IndexedDB
-```
-
-The stores are `products`, `productVersions`, `recipes`, `recipeVersions`, `diaryEntries`, and `weeklyGoals`. Product and recipe versions are append-only. A `DiaryEntry` stores a version reference plus its own nutrition and name snapshots. It therefore does not change if the referenced product or recipe later changes. The services centralise nutrition calculation, date-effective goals, product/recipe versioning, barcode lookup, and diary order.
-
-### Observed implementation/spec differences
-
-These are not changes requested in this phase. Native behaviour follows the spec where a difference exists.
-
-| Topic | Current web implementation | Current spec / native decision |
-| --- | --- | --- |
-| New product amount | The React form initialises `baseAmount` to `100`. | The spec requires visually empty amount and nutrition inputs on create. iOS should use an optional form field until validation, then require a positive amount. |
-| Diary update service | `UpdateDiaryEntryDraft` accepts `mealType`, and `DiaryService.updateEntry` can change it. The current edit UI happens to pass the existing meal. | The spec permits editing only amount and unit. iOS `updateEntryAmount` must not accept date or meal type; moving an entry is a separate `moveEntry` command. |
-| Meal raw value | React persists `snack`; the Phase 0 prompt calls the case `snacks`. | Use persisted raw value **`snack`** for import compatibility and the UI label `Перекусы`. It is an intentional compatibility choice, not a translated persistent value. |
-| Recipe ingredients | React stores ingredients as an array embedded in a `RecipeVersion` record. | iOS uses child SwiftData records and future Postgres rows. They remain owned by, and immutable with, their recipe version. |
-| Sync metadata | Dexie contains timestamps and soft deletes where appropriate, but no sync queue/state. | iOS v1 has no sync. A later local-only metadata store will record pending/synced/failed state without adding it to cloud domain rows. |
-
-The UI currently has no visible Recent section despite the service retaining recent-source helpers, so this is not a user-facing parity requirement.
+The active implementation is the native iOS client. Web/PWA architecture is not
+a native implementation dependency.
 
 ## Architecture
 
-```text
-SwiftUI Views
-    ↓ intents, loading/error state
-@MainActor ViewModels
+~~~text
+SwiftUI View
+    ↓ user intent and rendered state
+ViewModel / feature state
     ↓ commands and read models
-Application Services
+Application Service
     ↓ domain values, calculators, repository protocols
 Domain
     ↓
-Repository implementations
-    ↓                         ↓ (future)
-SwiftData local store       Supabase sync transport
-```
+SwiftData Repository
+    ↓
+SwiftData records / ModelContainer
+~~~
 
 ### Layer responsibilities
 
-- **SwiftUI Views** render state and send user intents. They do not fetch SwiftData directly, calculate nutrition, decide whether to create a version, or merge sync changes. `@Query` is deliberately not used in feature views because it would bypass the repository boundary.
-- **ViewModels** are `@Observable @MainActor` feature types. They own transient text input, loading, errors, selected tab/route, and call application services. They map domain errors to human language in the UI layer.
-- **Application Services** coordinate one user action and its transaction: validation, resolving the required version, calculation, version creation, persistence, and later marking sync metadata. They return immutable value-type read models/commands rather than SwiftData objects.
-- **Domain** contains `Nutrition`, `LocalDay`, persistent-ID-safe enums, unit resolution, nutrition and recipe calculation, validation rules, and repository protocols. It has no SwiftUI, SwiftData, VisionKit, or Supabase imports.
-- **Data** contains the SwiftData record classes, mapping to/from domain values, repository implementations, and (later) sync DTOs and a sync-state store.
+- **Views** render state and forward intent. They do not use Query,
+  ModelContext or persistence records directly, calculate nutrition, or decide
+  versioning.
+- **View models and feature state** own transient form, loading/error and
+  feature navigation state. They invoke services, not repositories.
+- **Application services** coordinate validation, version resolution,
+  calculation, snapshot creation, ordering and persistence.
+- **Domain** contains value types, LocalDay, persistent enums, calculators and
+  repository protocols. It has no SwiftUI or SwiftData imports.
+- **Data** contains records, mappers, repositories and migrations. Model
+  objects do not cross the repository boundary.
 
-This is deliberately one app target and a small number of folders, not separate Swift packages. Extraction into packages is unnecessary until a second client genuinely needs it.
+AppDependencies is the composition root: it creates one ModelContainer,
+repositories and services, then injects services into feature roots. The app
+intentionally remains one target rather than separate Swift packages.
 
-### Composition root and concurrency
+## Project structure
 
-`AppDependencies` is the one composition root. It creates one `ModelContainer`, the SwiftData repository implementations, pure calculators, and application services. Views receive a feature ViewModel with only the services it needs, normally through initializer injection or a scoped environment dependency.
-
-SwiftData's UI-owned `ModelContext` and all repository mutations are isolated to `@MainActor`. This is appropriate for a small, single-user, local app and avoids passing model objects across actors. Repository and service APIs are still `async throws`, so a caller never assumes synchronous disk access and a later remote implementation can satisfy the same ports. Domain values, commands, and read models are `Sendable` value types. Pure calculators are nonisolated.
-
-Network work in a future `SyncService` belongs in an actor. It passes `Codable` DTOs and IDs across actors, then asks the `@MainActor` local repository to apply a merge. No Combine is needed: SwiftUI observation plus structured concurrency is sufficient.
-
-## Project Structure
-
-```text
-ios/                                         # iOS application and Xcode project
-  App/
-    CaloriesTrackerApp.swift
-    AppDependencies.swift
-    AppRouter.swift
-    AppTab.swift
-    PersistenceConfiguration.swift
-
+~~~text
+ios/
+  App/                         # app entry point, dependencies, router and tabs
   Domain/
-    Core/
-      Nutrition.swift
-      LocalDay.swift
-      PersistentEnums.swift
-      DomainError.swift
-    Products/
-      Product.swift
-      ProductVersion.swift
-    Recipes/
-      Recipe.swift
-      RecipeVersion.swift
-      RecipeIngredient.swift
-      RecipeCalculator.swift
-    Diary/
-      DiaryEntry.swift
-      DiaryCommands.swift
-    Goals/
-      WeeklyGoal.swift
-      DailyMacroGoal.swift
-    Statistics/
-      Statistics.swift
-    Repositories/
-      ProductRepository.swift
-      RecipeRepository.swift
-      DiaryRepository.swift
-      GoalRepository.swift
-
+    Core/ Products/ Recipes/ Diary/ Goals/ Statistics/ Units/ Repositories/
   Application/
     Products/ProductService.swift
-    Products/BarcodeService.swift
     Recipes/RecipeService.swift
     Diary/DiaryService.swift
     Goals/GoalService.swift
     Statistics/StatisticsService.swift
-    Sync/SyncService.swift                  # protocol/placeholders only until sync phase
-
-  Data/
-    SwiftData/
-      SchemaV1.swift
-      Models/
-      Mappers/
-      SwiftDataProductRepository.swift
-      SwiftDataRecipeRepository.swift
-      SwiftDataDiaryRepository.swift
-      SwiftDataGoalRepository.swift
-    Sync/                                   # future DTOs, outbox metadata, transport
-
+  Data/SwiftData/
+    Models/ Mappers/ Repositories/ SchemaV1.swift MigrationPlan.swift
   Features/
-    Today/
-      TodayViewModel.swift
-      AmountViewModel.swift
-    Statistics/
-    Catalog/                                # shared Products/Recipes UI: management + Diary selection modes
-    Goals/
-    Barcode/
-
-  Shared/
-    UI/
-    Formatting/
-    Validation/
-```
-
-`Catalog` is one shared UI feature while Products and Recipes remain separate domain and service concerns. The same Catalog UI supports explicit contexts:
-
-```text
-management
-→ tap Product/Recipe → details
-
-selection(FoodSelectionContext)
-→ tap Product/Recipe → the shared Amount screen
-→ tap + → quick-add the latest compatible amount (or the base fallback)
-```
-
-Today and Recipe ingredient composition create the same `FoodSelectionContext`, so the Catalog, Products/Recipes tabs, search, full-row tap, default display, `+` quick-add, and toolbar actions are one implementation. Their callbacks preserve different persistence semantics: Today writes a `DiaryEntry`; Recipe composition adds pinned Product ingredient drafts (and flattens a selected Recipe). Shared UI does not mean shared persistence semantics.
-
-### UI reuse policy
-
-Reuse is the default for SwiftUI work. Before creating a new view, extend an existing shared view with an explicit context, binding, generic content, or action callback when the visual and interaction contract are the same. A new view is justified only when the UI contract itself is materially different; a different persistence action alone is not a reason to duplicate UI.
-
-The current shared UI implementations are:
-
-| Shared view | Reused by |
-| --- | --- |
-| `CatalogView` (including its Product and Recipe lists) | Products root tab in `management` mode; Today → Add; Recipe editor → Add ingredient, both in `selection(FoodSelectionContext)` mode. |
-| `AmountEditorView` | Diary entry create/edit; adding a Product ingredient to a Recipe; adding a Recipe's flattened composition to another Recipe; editing an existing Recipe ingredient. |
-| `FoodCompositionSection`, `FoodCompositionEntryRow`, `FoodCompositionAddRow` | Breakfast, Lunch, Dinner, Snacks, and the Recipe editor's Ingredients section. |
-
-When a new flow needs one of these interactions, it must use the listed shared view rather than a lookalike implementation. Context-specific code belongs in typed callbacks and view models, keeping navigation and persistence semantics separate from the reused UI.
+    Today/ Catalog/ Statistics/ Goals/
+~~~
 
 ## Navigation
 
-### Root tabs
+### Root tabs and paths
 
-The tab bar has three items in the current product order: **Статистика**, **Сегодня**, **Продукты**. `Сегодня` is selected on launch even though it is visually the middle tab.
+AppRouter owns the selected tab and three typed paths:
 
-```swift
-enum AppTab: Hashable {
-    case statistics
-    case today
-    case catalog
-}
-```
+~~~text
+Статистика → statisticsPath
+Сегодня    → todayPath
+Продукты   → catalogPath
+~~~
 
-Each tab owns an independent `NavigationPath`; switching tabs preserves its navigation state. Goals is a Statistics destination, not a tab.
+Goals is a Statistics destination. Catalog owns Product/Recipe details, editors
+and histories. Today owns selection, Amount and contextual editor routes.
+Routes carry IDs and explicit context, never URLs or captured SwiftData objects.
+DiaryContext carries LocalDay and MealType; FoodSourceReference carries
+SourceType and logical source ID.
 
-```text
-TabView(selection: selectedTab)
-├─ Statistics: NavigationStack(path: statisticsPath)
-├─ Today:      NavigationStack(path: todayPath)
-└─ Products:   NavigationStack(path: catalogPath)
-```
+Paths are independent with one intentional exception: leaving the Today tab
+clears todayPath. This discards unfinished transient flows so returning shows
+Today root. The selected LocalDay lives in TodayViewModel, independent of the
+path, and is not reset.
 
-### Typed destinations
+Completion callbacks use guarded router pop helpers: an async completion may pop
+only if its expected route is still at the top. This prevents stale callbacks
+from removing an unrelated screen.
 
-Routes are in-memory values, never internal URL strings. IDs and context are enough to re-fetch current domain data after an app state refresh.
+### Shared selection flow
 
-```swift
-struct DiaryContext: Hashable, Sendable {
-    let day: LocalDay
-    let meal: MealType
-}
+~~~text
+Today meal → Catalog(selection) → Amount → DiaryService.create/quickAdd → Today root
+Recipe Editor → Catalog(selection) → ingredient Amount → draft(s) → Recipe Editor
+~~~
 
-enum TodayRoute: Hashable {
-    case foodSelection(DiaryContext)
-    case amount(context: DiaryContext, source: FoodSourceReference)
-    case entryEditor(DiaryEntry.ID)
-    case productEditor(context: DiaryContext?, prefilledBarcode: String?)
-    case productDetails(Product.ID)
-    case recipeDetails(Recipe.ID)
-}
+A successful Today add clears completed selection/Amount routes. Recipe selection
+mutates only the Recipe Editor draft. Typed callbacks express that difference;
+they do not require separate Catalog screens.
 
-enum StatisticsRoute: Hashable { case goals }
+### Quick-add coordination
 
-enum CatalogRoute: Hashable {
-    case product(Product.ID)
-    case productEditor(Product.ID?)
-    case productVersionHistory(Product.ID)
-    case recipe(Recipe.ID)
-}
-```
+CatalogQuickAddState is scoped to one selection flow. Only one Product or
+Recipe quick-add command may be active in that flow. It is not a global app
+lock.
 
-`FoodSourceReference` is `{ sourceType, sourceID }`, not a captured SwiftData model. Adding food resolves the source's current version at the final `DiaryService.add…` command, so the source cannot be silently stale.
+## Shared UI boundaries
 
-The Today flow is therefore:
+### Catalog
 
-```text
-Today(day) → Catalog(selection: context) → Amount(context, product/recipe)
-           → DiaryService.add… → replace path with Today(day)
-```
+CatalogView has two explicit modes:
 
-The successful add removes the completed selection and amount routes, so Back does not reveal a completed form. Entry editing is pushed from Today and receives only an entry ID; it may save only its amount and unit. Reorder/meal moves invoke a distinct command from the diary list.
+~~~text
+management
+selection(FoodSelectionContext)
+~~~
 
-Barcode scanning and recipe create/edit are focused `fullScreenCover` flows above the relevant stack, so the tab bar is absent. Their input and completion are typed contexts/callbacks: a known barcode returns a product ID, an unknown barcode returns a prefilled barcode plus any originating `DiaryContext`. The scanner does not navigate directly to product UI.
+It shares Product/Recipe segments, search, row layout and creation action. The
+typed context determines semantics:
 
-External deep links are deferred. If introduced later, they map at the App boundary to `AppTab` plus typed route values; the feature navigation itself remains URL-free.
+| Mode | Full row | Quick-add |
+| --- | --- | --- |
+| Management | Open details | Not available |
+| Today selection | Open Diary Amount | Persist DiaryEntry |
+| Recipe ingredient selection | Open ingredient Amount | Add Product draft(s) |
 
-### Native UI principles
+Shared visual code must not acquire persistence knowledge. New flows with the
+same interaction contract add an explicit context/callback rather than
+duplicating Catalog.
 
+### Amount
 
-Use natural iOS components while preserving behaviour: `TabView`, `NavigationStack`, `List` where it provides reliable native row interactions, `Form` for editors, `TextField` with `.decimalPad`, `Picker` for units, `Toolbar`, and native `swipeActions` where the chosen container supports them.
+AmountEditorView is shared by Diary create/edit, Product ingredient amounts,
+flattened Recipe amounts and existing ingredient editing. It owns amount input,
+unit presentation, nutrition preview and keyboard-safe bottom action UI. The
+caller owns source resolution, validation, confirmation and navigation.
 
-Do **not** make a specific Today container (`List`, `ScrollView`, `LazyVStack`, etc.) an architectural invariant. The container is an implementation detail. The Today implementation must be chosen by actual runtime reliability on a physical iPhone and must support the complete interaction contract:
+A Product has one base-unit option. A Recipe exposes grams for cookedWeight,
+serving for servingsCount, or both. Unit switching only changes the selected
+unit; it does not convert the entered number.
 
-```text
-tap             → edit DiaryEntry
-swipe left      → reveal destructive trash action
-vertical swipe  → scroll
-long press+drag → reorder within meal / move between meals
-```
+Amount accepts an optional focus binding so a caller can suppress focus while a
+child Product editor is pushed. The router's amount-focus restoration revision
+then allows only the still-current Amount route to restore numeric focus on
+return. This is an intentional lifecycle compatibility mechanism, not a way to
+focus a stale route.
 
-The destructive swipe action must not navigate. After a successful reveal it remains actionable until the user taps trash or dismisses it by interacting elsewhere. Visible delete text is not required; retain an accessibility label.
+### Recipe Editor keyboard transition
 
-Direct drag & drop must not require `EditButton`, edit mode, drag handles or a **«Переместить в»** menu. It must support reorder, cross-meal move, insertion position and empty-meal drop while preserving historical fields. A simple touch must not activate drag state, and an active drag must not render a second full visible copy of the row.
+Recipe Editor coordinates presentation of Ingredient Catalog locally:
 
-Diary rows are intentionally compact and display only source name, amount/unit and calories. Protein/fat/carbs remain in the snapshot and aggregate UI but are not repeated in each row. Empty meals remain compact and must not expose technical drop-placeholder text.
+~~~text
+tap Add ingredient
+→ record pending presentation
+→ clear Recipe Editor FocusState
+→ if UIKit keyboard is visible, wait for keyboardDidHide
+→ present Catalog
+~~~
 
-`FoodCompositionSection` is the shared SwiftUI section for Breakfast, Lunch, Dinner, Snacks, and Recipe ingredients. It owns the title/total-calories header, compact food row, and Add row; each context supplies only its items and persistence actions. Diary-only drag/drop and recipe-only edit/delete behaviour wrap those shared visuals.
+FocusState becoming nil does not guarantee UIKit's hide animation has finished.
+The Editor therefore observes keyboardDidShowNotification and
+keyboardDidHideNotification only while it exists and only as lifecycle signals.
 
-The shared Catalog UI has explicit `management` and `selection(FoodSelectionContext)` modes. The selection context is used unchanged by both Today and Recipe composition; it differs only in the action callbacks. Today opens/saves Diary Amount, while Recipe composition opens the same Amount UI and adds pinned Product drafts (or flattens a selected Recipe's drafts).
+These notifications must not grow into keyboard frame/height handling, manual
+padding, safe-area compensation or global keyboard state. Recipe Editor
+intentionally has no custom keyboard toolbar because a hidden parent toolbar
+interfered with nested Amount keyboard lifecycle.
 
-For a new DiaryEntry Amount flow, the intended UX is immediate entry: default amount `100`, initial focus, selected text and an already-open numeric keyboard, with no custom keyboard **«Готово»** button. Nutrition preview remains visible at all times. Editing an existing DiaryEntry uses its saved amount and historic `sourceVersionID`.
+## Domain model and historical integrity
 
-Touch targets, keyboard avoidance, safe-area-aware primary actions, concise contextual titles, and human-readable validation errors are product requirements. The app should not reproduce web layout or browser controls pixel-for-pixel.
+### Identity and LocalDay
 
-## Domain Models
+All persistent domain identities are client-generated UUIDs. LocalDay is a
+validated Gregorian civil date encoded as zero-padded YYYY-MM-DD, not a
+timestamp.
 
-### Stable identifiers and values
+- DiaryEntry.day and WeeklyGoal.effectiveFrom persist this key.
+- Formatting and date-picker conversion use a local-noon Date that is never
+  persisted as the diary day.
+- createdAt, updatedAt and deletedAt are absolute Date instants.
 
-Every synchronisable entity has an app-generated `UUID` primary ID. No database-generated integer is a domain identity. Version IDs, ingredient IDs, serving-unit IDs, and child daily-goal IDs are UUIDs too, which makes an offline object valid before it reaches a server.
+This preserves the day across UTC conversion, daylight-saving changes and
+travel.
 
-```swift
-struct Nutrition: Hashable, Codable, Sendable {
-    var calories: Double
-    var protein: Double
-    var fat: Double
-    var carbs: Double
+### Versioned sources
 
-    static let zero = Self(calories: 0, protein: 0, fat: 0, carbs: 0)
-    func scaled(by factor: Double) -> Self { /* one four-field implementation */ }
-    func adding(_ other: Self) -> Self { /* one four-field implementation */ }
-}
-```
-
-`Nutrition` is the domain value type. SwiftData records store its four scalar values for sortable/queryable persistence and straightforward Postgres mapping. Views receive formatted `Nutrition` or read models but never repeat its formulas. Values are stored unrounded as `Double`; formatting rounds only for display.
-
-```swift
-enum MealType: String, Codable, CaseIterable, Sendable {
-    case breakfast, lunch, dinner, snack
-
-    var russianLabel: LocalizedStringResource { /* Завтрак, Обед, Ужин, Перекусы */ }
-}
-
-enum SourceType: String, Codable, Sendable { case product, recipe }
-enum ProductBaseUnit: String, Codable, CaseIterable, Sendable { case g, serving }
-```
-
-The raw values are persistence/API values only. UI labels live in localisation/formatting. The product model and product-editor selector support only `g` and `serving` (shown as «г» and «порция»); no compatibility or migration path accepts other unit tokens. `barcode` is an opaque `String?`; normalisation is trim-to-nil only, never numeric parsing, so leading zeros survive.
-
-### Products
-
-```text
+~~~text
 Product (logical identity)
-  id, name, barcode?, currentVersionID, createdAt, updatedAt, deletedAt?
-                │
-                └── ProductVersion (immutable)
-                    id, productID, versionNumber, baseUnit, baseAmount,
-                    Nutrition, createdAt
-```
+├── logical metadata: name, barcode
+└── current ProductVersion
+    └── immutable: base unit, base amount, calories, protein, fat, carbs
 
-`ProductVersion` additionally has a future-sync `basedOnVersionID?`: nil for v1, otherwise the version that was current when this version was authored. It does not affect nutrition and makes a concurrent-version conflict observable. A version's nutrition, base unit, and base amount are never edited.
-
-The persisted diary/ingredient token is always the selected base unit:
-
-| Situation | Persisted token |
-| --- | --- |
-| Product base unit | `g` or `serving` |
-| Recipe by cooked weight | `g` |
-| Recipe by servings | `serving` |
-
-`NutritionCalculator` takes a `ProductVersion`, a base-normalised amount, and returns `version.nutrition × normalizedAmount / baseAmount`. It rejects non-finite values, a non-positive base amount, or a negative amount. The service requires a strictly positive user-entered diary/ingredient amount even though the calculator itself can represent zero.
-
-### Recipes
-
-```text
 Recipe (logical identity)
-  id, name, currentVersionID, createdAt, updatedAt, deletedAt?
-                │
-                └── RecipeVersion (immutable)
-                    id, recipeID, versionNumber, totals, cookedWeight?, servingsCount?, createdAt
-                    └── RecipeIngredient[] (immutable children)
-                         productID + pinned productVersionID + amount + unit + normalizedAmount
-```
+├── logical metadata: name
+└── current RecipeVersion
+    ├── immutable: ingredients and their persisted order
+    ├── immutable: cookedWeight, servingsCount and derived total nutrition
+    └── RecipeIngredient (immutable child) → pinned ProductVersion
+~~~
 
-An ingredient resolves nutrition from its pinned `productVersionID`, never from `Product.currentVersionID`. `normalizedAmount` is stored as an audit/value convenience: it records the amount in the product version's base unit that was used when the recipe version was made. The service validates that the pinned product version belongs to `productID`.
+Product.currentVersionID and Recipe.currentVersionID select sources for new
+actions. Versions are append-only immutable values with basedOnVersionID
+lineage and display version number.
 
-A recipe can be selected while editing another recipe, but this is a UI composition operation rather than a persisted Recipe-to-Recipe relationship. The selected current `RecipeVersion` is scaled by the requested output amount (`grams / cookedWeight` or `servings / servingsCount`), then its Product ingredient drafts are copied with scaled amounts and the same pinned ProductVersion IDs. The resulting parent RecipeVersion still contains Product ingredients only, so recursion and cycles are impossible and later changes to the source recipe do not alter an existing parent version.
+A metadata-only save updates the logical Product or Recipe while retaining its
+currentVersionID. For Product this is name and barcode; for Recipe it is name.
+`saveLogicalMetadata` is therefore an intentional architecture path, not a way
+to mutate an existing version. A version append is required only when its owned
+versioned data changes: Product base unit/base amount/nutrition, or Recipe
+composition (including ingredient order, pin, amount and unit) or output.
 
-`RecipeCalculator` is the only recipe calculation path:
+A RecipeIngredient stores both logical Product ID and exact ProductVersionID.
+Recipe nutrition must resolve that pin, never Product.currentVersionID.
+Selecting a Recipe as an ingredient is flattened into Product ingredient
+drafts; persisted data has no nested Recipe→Recipe dependency.
 
-1. resolve every ingredient's unit against its pinned product version;
-2. calculate every ingredient's nutrition through `NutritionCalculator`;
-3. sum to immutable total nutrition;
-4. derive per-100-g nutrition as `total × 100 / cookedWeight` when supplied;
-5. derive per-serving nutrition as `total / servingsCount` when supplied.
+### Diary snapshots and soft delete
 
-A valid recipe has a non-empty name, at least one ingredient, and at least one of `cookedWeight` or `servingsCount`. The native recipe editor uses the same `Unit`/`Amount` controls as the product editor: `g` edits `cookedWeight`, while `serving` edits `servingsCount`. Both stored output values are retained when the user changes the active selector. Changing name alone updates the logical recipe's metadata; changing composition, pinned version, amount, unit, cooked weight, servings count, or derived totals appends a new recipe version.
+DiaryEntry stores source type, source ID, source version ID, source name,
+amount, unit, nutrition, day, meal and order. New entries resolve the selected
+source's current version once. Existing-entry edits resolve saved
+sourceVersionID, not a current source version.
 
-### Diary
+Move/reorder may change only meal, order and audit time. Product/Recipe edits
+must not rewrite historical DiaryEntry snapshots.
 
-```text
-DiaryEntry
-  id, localDay, mealType, sortOrder,
-  sourceType, sourceID, sourceVersionID, sourceName,
-  amount, unit,
-  Nutrition snapshot,
-  createdAt, updatedAt, deletedAt?
-```
+User-visible Product, Recipe and DiaryEntry deletion is soft. It removes active
+sources from Catalog but must not destroy versions/ingredients needed for
+historical Recipe and DiaryEntry resolution.
 
-`sourceName` and `Nutrition` are mandatory snapshots. `sourceType` disambiguates the two UUID namespaces. `sortOrder` is a finite integer-like `Int` scoped to `(localDay, mealType)` and is initially allocated with gaps (0, 100, 200 …); the move service normalises the affected meals in one write.
+## SwiftData persistence
 
-The key commands are intentionally narrow:
+CaloriesTrackerSchemaV1 is an explicit VersionedSchema. AppDependencies creates
+the container with CaloriesTrackerMigrationPlan. The plan currently contains
+only V1 and no stages; a future schema change must add a version and migration
+stage rather than discard user data.
 
-```swift
-struct CreateDiaryEntryCommand: Sendable {
-    let context: DiaryContext
-    let source: FoodSourceReference
-    let amount: Double
-    let unitToken: String
-}
-
-struct UpdateDiaryEntryAmountCommand: Sendable {
-    let entryID: UUID
-    let amount: Double
-    let unitToken: String
-}
-
-struct MoveDiaryEntryCommand: Sendable {
-    let entryID: UUID
-    let targetMeal: MealType
-    let targetIndex: Int
-}
-```
-
-There is no general DiaryEntry update command. In particular, amount editing loads exactly `entry.sourceVersionID`, resolves its unit there, recalculates its snapshot from that historic version, and preserves `localDay`, `mealType`, source IDs, source name, and sort order. Moving preserves source, amount, unit, and snapshot; it changes only `mealType`, `sortOrder`, and `updatedAt`.
-
-The Today UI maps gestures to these narrow commands rather than introducing a general mutable-entry API:
-
-```text
-tap
-→ UpdateDiaryEntryAmountCommand flow
-
-swipe trash
-→ soft delete
-
-long press + drop
-→ MoveDiaryEntryCommand
-```
-
-Reorder inside the same meal is the same move command with the existing `mealType` and a new `targetIndex`.
-
-### Goals and statistics
-
-`DailyMacroGoal` is a `Nutrition`-shaped value with the same four non-negative fields. `WeeklyGoal` is immutable and has `effectiveFrom: LocalDay` plus exactly seven weekday-specific daily goals (`monday` … `sunday`). A new setting is a new weekly-goal identity rather than an update to the previous record.
-
-`GoalService.goal(for:)` chooses the non-deleted/non-superseded weekly goal with greatest `effectiveFrom <= diary day`, then uses the weekday calculated from that `LocalDay`. No goal snapshot is copied into a diary entry; historical reporting remains correct because goals themselves are historical immutable records.
-
-Statistics has no persistent entity. `StatisticsService` aggregates non-deleted diary nutrition snapshots and resolves historical goals. It computes macro-energy proportions with `P × 4`, `F × 9`, and `C × 4`; diary calories remain their independent snapshot. A current week excludes future days from its calorie balance, while a completed past week uses all seven days.
-
-## Date Handling
-
-`Date` is not a diary day. A diary day is a local civil calendar date, represented in domain code as an opaque canonical `LocalDay` and persisted as its `yyyy-MM-dd` key.
-
-```swift
-struct LocalDay: RawRepresentable, Hashable, Comparable, Codable, Sendable {
-    let rawValue: String // validated, zero-padded Gregorian YYYY-MM-DD
-}
-```
-
-- `DiaryEntryRecord.dayKey` and `WeeklyGoalRecord.effectiveFromKey` store the raw key, never midnight `Date` values.
-- Parsing validates real Gregorian calendar components. Adding/subtracting a day and getting the weekday use `Calendar(identifier: .gregorian)` with `DateComponents(year:month:day:)`, not `ISO8601DateFormatter` or an implicit UTC conversion.
-- UI conversion to `Date` for a date picker/formatter is explicitly at local noon in the user's calendar, and conversion back immediately produces `LocalDay`. That presentation `Date` is never persisted as the diary day.
-- `createdAt`, `updatedAt`, `deletedAt`, and sync cursors are absolute `Date` instants. They map to UTC `timestamptz` in Postgres.
-
-Thus the stored key `2026-08-14` remains that calendar day regardless of device time zone, travel, daylight-saving changes, or server time zone.
-
-## SwiftData Models
-
-### General conventions
-
-Persistence classes have a `Record` suffix; domain values do not. Every record below has `@Attribute(.unique) var id: UUID`. Scalar enum values are persisted as `String` raw values (`mealTypeRaw`, `sourceTypeRaw`, `baseUnitRaw`) even though SwiftData can encode enums. This is explicit, migration-friendly, and maps directly to Postgres check constraints.
-
-`@Attribute(.unique)` is used for stable primary IDs and the one-device `WeeklyGoalRecord.effectiveFromKey`. SwiftData v1 should not depend on a composite unique constraint or a partial unique index. Repository validation enforces product barcode uniqueness, including soft-deleted products, before saving. Future Postgres supplies the stronger `(user_id, barcode) WHERE barcode IS NOT NULL` partial unique index.
-
-For the personal data volume expected in v1, use `FetchDescriptor` predicates/sorts rather than premature index work. If the deployed iOS 17 SDK supports the required stable index macro at implementation time, add only the indicated secondary indexes after measuring; correctness does not rely on them.
-
-### Record schema
-
-The following is the exact logical SwiftData schema (initialiser boilerplate omitted).
-
-| `@Model` | Stored fields | Unique / useful query keys |
-| --- | --- | --- |
-| `ProductRecord` | `id`, `name`, `barcode?`, `currentVersionID`, `createdAt`, `updatedAt`, `deletedAt?` | `id`; fetch active products by `deletedAt`, search name/barcode, resolve `currentVersionID`. |
-| `ProductVersionRecord` | `id`, `productID`, `basedOnVersionID?`, `versionNumber`, `baseUnitRaw`, `baseAmount`, `calories`, `protein`, `fat`, `carbs`, `createdAt` | `id`; `(productID, versionNumber)` is service-unique locally; fetch versions by product. |
-| `RecipeRecord` | `id`, `name`, `currentVersionID`, `createdAt`, `updatedAt`, `deletedAt?` | `id`; active/search by `deletedAt` and name. |
-| `RecipeVersionRecord` | `id`, `recipeID`, `basedOnVersionID?`, `versionNumber`, four `total…` values, `cookedWeight?`, `servingsCount?`, `createdAt` | `id`; `(recipeID, versionNumber)` service-unique locally; fetch versions by recipe. |
-| `RecipeIngredientRecord` | `id`, `recipeVersionID`, `position`, `productID`, `productVersionID`, `amount`, `unitToken`, `normalizedAmount` | `id`; fetch/relationship by recipe version, ordered by position. |
-| `DiaryEntryRecord` | `id`, `dayKey`, `mealTypeRaw`, `sortOrder`, `sourceTypeRaw`, `sourceID`, `sourceVersionID`, `sourceName`, `amount`, `unitToken`, `calories`, `protein`, `fat`, `carbs`, `createdAt`, `updatedAt`, `deletedAt?` | `id`; query active entries by `(dayKey, mealTypeRaw, sortOrder)`, reports by `dayKey`, and sync by `updatedAt`. |
-| `WeeklyGoalRecord` | `id`, `effectiveFromKey`, `createdAt` | `id`, `effectiveFromKey` (unique in a single local profile); fetch latest effective date. |
-| `DailyMacroGoalRecord` | `id`, `weeklyGoalID`, `weekdayRaw`, `position`, `calories`, `protein`, `fat`, `carbs` | `id`; service enforces one of seven weekdays per weekly goal. |
-
-All numeric values are finite; `baseAmount`, ingredient amounts, cooked weight, and servings count are positive where present. Nutrition and goals are non-negative. `sourceName`, unit tokens, and enum raws are non-empty valid values.
-
-## Relationships & Delete Rules
-
-Relationships improve local traversal but UUID foreign-key fields remain the authoritative cross-store identity. In particular, ingredient and diary version references are IDs rather than strong object references: a logical soft delete or a future import must never invalidate history.
-
-| Owner relationship | Inverse | Delete rule | Rationale |
-| --- | --- | --- | --- |
-| `ProductRecord.versions` ↔ optional `ProductVersionRecord.product` | Product version has `productID` too | `.nullify` | A physical product cleanup must not remove versions; ordinary user delete is soft only. |
-| `RecipeRecord.versions` ↔ optional `RecipeVersionRecord.recipe` | Recipe version has `recipeID` too | `.nullify` | Product-level soft/physical cleanup cannot erase recipe-version history. |
-| `RecipeVersionRecord.ingredients` ↔ optional `RecipeIngredientRecord.recipeVersion` | Ingredient has `recipeVersionID` too | `.cascade` | Ingredients are inseparable children of that version. A version is never user-deleted. |
-| `WeeklyGoalRecord.dailyGoals` ↔ optional `DailyMacroGoalRecord.weeklyGoal` | Child has `weeklyGoalID` too | `.cascade` | Exactly seven child records define one immutable goal. User-visible goal deletion is not in v1. |
-| Diary source IDs / ingredient product IDs | none | none | They are polymorphic/historical UUID references, deliberately not cascaded relationships. |
-
-No user action calls `ModelContext.delete` for Product, Recipe, ProductVersion, RecipeVersion, RecipeIngredient, or DiaryEntry. `ProductService.softDelete`, `RecipeService.softDelete`, and `DiaryService.softDelete` set `deletedAt` (and `updatedAt` for mutable logical/diary entities). A future technical cleanup may physically delete only data proven unreferenced and safely synced; it is not a normal product feature.
-
-### Seven child records for goals
-
-Use `DailyMacroGoalRecord` child records rather than a transformable/codable seven-element array or seven repeated columns.
-
-| Option | Result |
+| Record group | Purpose |
 | --- | --- |
-| Seven child records — **chosen** | Normalised, individually validateable, maps directly to `daily_macro_goals`, and can enforce weekday uniqueness in Postgres. Slightly more SwiftData mapping code. |
-| Codable array | Concise local storage but opaque to queries/migrations and awkward to sync or constrain in Postgres. |
-| Seven columns on `WeeklyGoal` | Simple local reads but repeats fields, makes weekday operations brittle, and does not map naturally to the requested cloud table. |
-
-The service creates all seven child records in the same save as the weekly-goal record and validates the exact fixed weekday set. They are never independently edited.
-
-## Repositories
-
-Repository protocols expose domain values/commands, not `@Model` objects and not `ModelContext`. The abbreviated signatures below show the required surface; feature-specific read models can be added without exposing persistence.
-
-```swift
-@MainActor
-protocol ProductRepository: Sendable {
-    func activeProducts(matching query: String) async throws -> [Product]
-    func product(id: UUID, includingDeleted: Bool) async throws -> Product?
-    func product(withBarcode barcode: String) async throws -> Product?
-    func version(id: UUID) async throws -> ProductVersion?
-    func versions(for productID: UUID) async throws -> [ProductVersion]
-    func create(_ product: Product, initialVersion: ProductVersion) async throws
-    func saveLogicalMetadata(_ product: Product) async throws
-    func append(_ version: ProductVersion, settingCurrentVersionOf product: Product) async throws
-    func softDeleteProduct(id: UUID, at: Date) async throws
-}
-
-@MainActor
-protocol RecipeRepository: Sendable {
-    func activeRecipes(matching query: String) async throws -> [Recipe]
-    func recipe(id: UUID, includingDeleted: Bool) async throws -> Recipe?
-    func version(id: UUID) async throws -> RecipeVersion?
-    func versions(for recipeID: UUID) async throws -> [RecipeVersion]
-    func create(_ recipe: Recipe, initialVersion: RecipeVersion) async throws
-    func saveLogicalMetadata(_ recipe: Recipe) async throws
-    func append(_ version: RecipeVersion, settingCurrentVersionOf recipe: Recipe) async throws
-    func softDeleteRecipe(id: UUID, at: Date) async throws
-}
-
-@MainActor
-protocol DiaryRepository: Sendable {
-    func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry?
-    func entries(on day: LocalDay) async throws -> [DiaryEntry]
-    func entries(in days: [LocalDay]) async throws -> [DiaryEntry]
-    func create(_ entry: DiaryEntry) async throws
-    func save(_ entry: DiaryEntry) async throws
-    func save(_ entries: [DiaryEntry]) async throws // move/reorder transaction
-    func softDeleteEntry(id: UUID, at: Date) async throws
-}
-
-@MainActor
-protocol GoalRepository: Sendable {
-    func goal(id: UUID) async throws -> WeeklyGoal?
-    func latestGoal() async throws -> WeeklyGoal?
-    func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal?
-    func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal]
-    func create(_ goal: WeeklyGoal) async throws
-}
-```
-
-`append(…, settingCurrentVersionOf:)`, `create(…, initialVersion:)`, diary reorders, and a later outbox mark are one local persistence transaction. The implementation validates a product/recipe version belongs to its logical parent, validates barcode uniqueness across active and deleted records, and never resolves a historic entry through a current version.
-
-## Services
-
-| Service | Responsibility | Must not own |
-| --- | --- | --- |
-| `ProductService` | Product search/details, draft validation, barcode uniqueness, create metadata, append a version only when versioned fields change, soft delete. | Diary snapshots or recipe totals. |
-| `RecipeService` | Resolve and pin product versions, calculate totals, create/version recipes, identify compatible newer ingredient versions. | Product mutation or diary writes. |
-| `DiaryService` | Day read model/totals, source selection, unit options, preview, create snapshot, historic amount edit, delete, and move/reorder. | Current-goal selection or statistics presentation. |
-| `GoalService` | Validate seven-day goal draft, append a goal, select goal effective for a local day. | Diary aggregation. |
-| `StatisticsService` | Aggregate persisted diary snapshots and historical goals for a day/week. | Persistent statistics cache or source recalculation. |
-| `BarcodeService` | Normalise local code, exact local lookup, and return a neutral lookup result. | Scanner presentation or navigation. |
-| `SyncService` (future) | Outbox/inbox, pull/push orchestration, merge, retry state. | UI state, nutrition calculations, or direct feature navigation. |
-
-The preview used by Amount and the snapshot saved by `DiaryService` call the same domain calculator path. That prevents an on-screen value differing from stored nutrition.
-
-## Historical Integrity Rules
-
-These rules are invariants, not merely UI behaviour:
-
-1. Product nutrition, base unit/amount, and serving units live only in immutable `ProductVersion` records. A new current version never mutates v1.
-2. Recipe composition, ingredient units/amounts/pinned product versions, output quantities, and totals live only in immutable `RecipeVersion` records.
-3. A `RecipeIngredient` always references a concrete `ProductVersionID`; it never follows a current product version automatically.
-4. A new diary entry resolves the selected source's current version once, stores `sourceType`, `sourceID`, `sourceVersionID`, `sourceName`, amount/unit, and nutrition snapshot, then does not automatically recalculate.
-5. Editing a diary amount/unit resolves exactly its saved `sourceVersionID`; it does not look up `currentVersionID`.
-6. A diary move/reorder never alters its local day, source/version reference, amount/unit, source-name snapshot, or nutrition snapshot.
-7. Soft deleting a product or recipe removes it from selectable/catalog results but preserves all versions, recipe ingredients, and diary snapshots.
-8. Goals are selected by `effectiveFrom <= LocalDay`, so a historic diary/statistics screen does not use today's settings.
-
-Each relevant implementation phase must include manual regression checks for these invariants, particularly Product v1 → v2 / old entry; Recipe v1 → v2 / old entry; editing an old entry after a source version changes; soft delete; historical goal resolution; and moving/reordering without changing a source, nutrition snapshot, or local day.
-
-## Supabase-ready Schema
-
-Sync is not part of native v1. The local design nevertheless keeps server-compatible UUIDs, scalar enum keys, normalised child records, timestamps, tombstones, and UUID references.
-
-### Ownership and common fields
-
-Every cloud table has `id uuid primary key` generated by the client, `user_id uuid not null references auth.users(id)`, and `created_at timestamptz not null`. Mutable logical parents (`products`, `recipes`, `diary_entries`) also have `updated_at timestamptz not null` and `deleted_at timestamptz null`. Append-only version/child rows have `created_at`; they are not ordinarily updated/deleted. `weekly_goals` is append-only, so its creation time is its effective audit timestamp; add a nullable tombstone only if a future product decision introduces goal deletion.
-
-`LocalDay` maps to PostgreSQL `date`, while absolute `Date` maps to `timestamptz`. App/API conversion must format/parse `date` as the same `yyyy-MM-dd` civil key, never as a timestamp.
-
-### Tables, foreign keys, and constraints
-
-| Table | Important columns and foreign keys | Important uniqueness and indexes |
-| --- | --- | --- |
-| `products` | `name`, `barcode?`, `current_version_id uuid`, timestamps/tombstone. `current_version_id` is validated by service/RPC after version insert to avoid a circular create FK. | Unique partial `(user_id, barcode) WHERE barcode IS NOT NULL`, including deleted rows. Index `(user_id, deleted_at, name)` and `(user_id, updated_at)`. |
-| `product_versions` | `product_id → products(id) ON DELETE RESTRICT`, `based_on_version_id → product_versions(id) RESTRICT?`, `version_number`, base unit/amount, four nutrition values. | Unique `(user_id, product_id, version_number)` after server sequence assignment; index `(user_id, product_id, created_at)`. |
-| `product_serving_units` | `product_version_id → product_versions(id) ON DELETE RESTRICT`, position, name, conversion amount/unit. | Unique `(user_id, product_version_id, position)`; index by version. |
-| `recipes` | `name`, `current_version_id`, timestamps/tombstone. | Index `(user_id, deleted_at, name)` and `(user_id, updated_at)`. |
-| `recipe_versions` | `recipe_id → recipes(id) ON DELETE RESTRICT`, `based_on_version_id → recipe_versions(id) RESTRICT?`, version number, totals, optional cooked weight/servings. | Unique `(user_id, recipe_id, version_number)` after canonical assignment; index `(user_id, recipe_id, created_at)`. |
-| `recipe_ingredients` | `recipe_version_id → recipe_versions(id) ON DELETE RESTRICT`; `product_id → products(id) RESTRICT`; `product_version_id → product_versions(id) RESTRICT`; position, amount, unit, normalised amount. | Unique `(user_id, recipe_version_id, position)`; index `(user_id, product_version_id)`. A service/trigger verifies the pinned version belongs to the stated product. |
-| `diary_entries` | `day date`, `meal_type`, `sort_order`, source type/id/version/name, amount/unit, four nutrition snapshots, timestamps/tombstone. | Index `(user_id, day, deleted_at, meal_type, sort_order)`, `(user_id, source_type, source_id)`, and `(user_id, updated_at)`. |
-| `weekly_goals` | `effective_from date`, created timestamp. | Unique `(user_id, effective_from)`; index `(user_id, effective_from desc)`. |
-| `daily_macro_goals` | `weekly_goal_id → weekly_goals(id) ON DELETE RESTRICT`, weekday, position, four fields. | Unique `(user_id, weekly_goal_id, weekday)` and index by goal. |
-
-`diary_entries.source_id/source_version_id` is intentionally polymorphic (`product` or `recipe`) and cannot be a normal single SQL foreign key. `source_type` plus application/RPC validation verifies the matching pair. Source versions use `ON DELETE RESTRICT` and are never user-physically-deleted, so the reference remains resolvable. A later server-side trigger/RPC may enforce the matching source type/version relationship; duplicating nullable product and recipe version columns merely to force an FK would make the shared mobile model worse.
-
-`user_id` is repeated in dependent tables to make RLS and indexed sync queries efficient. Insertion is performed through a transaction/RPC that verifies child ownership agrees with the parent; client-provided `user_id` is not trusted.
-
-### RLS concept
-
-After authentication exists, enable RLS on every application table. The basic policy is `user_id = auth.uid()` for `SELECT`, `INSERT`, `UPDATE`, and `DELETE`; inserts require `WITH CHECK (user_id = auth.uid())`. Child writes also validate parent ownership through the trusted transaction/RPC. The client never uses a service-role key. There is no local `user_id` or login requirement in Phase iOS 1.
-
-## Sync Strategy Draft
-
-### Local metadata, not cloud state
-
-When sync becomes an approved feature, add a separate local-only `SyncMetadataRecord` keyed by a unique `"entityType:UUID"` string. It contains `entityType`, `entityID`, `statusRaw` (`pending`, `synced`, `failed`), `lastSyncedAt?`, `lastError?`, `retryCount`, and optionally a server revision/cursor. It is not uploaded as a product/diary field and is not shown in normal product UI.
-
-One local save changes a user record and marks its metadata pending. For multi-record commands (a new version plus parent current-version update, diary reordering, or seven-goal creation), mark every changed sync entity pending in the same local save.
-
-### Future cycle
-
-```text
-user command
-  → validate and persist locally
-  → write/update local outbox metadata as pending
-  → UI immediately reflects local data
-
-app launch / foreground / network return / periodic active-app timer
-  → pull remote changes since cursor
-  → merge into local store transactionally
-  → push pending changes in dependency order
-       parents → versions → children → parent current pointer / diary / goals
-  → mark accepted items synced; retain retryable failures as failed/pending
-```
-
-No realtime subscription is required for the MVP. A bounded foreground timer and lifecycle/network triggers are enough. Pull-before-push reduces avoidable conflicts; a final pull after a successful push verifies the canonical server state.
-
-Tombstones are retained in cloud and locally until every active device has safely passed a retention horizon. Purging a tombstone before an offline device syncs would resurrect data.
-
-## Conflict Strategy
-
-The initial sync policy is deliberately modest and must surface, not hide, version conflicts.
-
-- **Append-only records:** ProductVersion, RecipeVersion, serving units, recipe ingredients, and weekly goals are merged by UUID union. They do not overwrite nutrition/composition in place.
-- **Logical parent metadata/current pointer:** Use deterministic last-write-wins on `(updated_at, deviceID tie-breaker)`. This applies to name, barcode, soft delete, and `current_version_id`. A later soft delete wins over an earlier non-delete. The losing version record remains history.
-- **Diary entries:** Last-write-wins by `(updated_at, deviceID)` for the same entry ID. Simultaneous edits to one entry are rare; no automatic field-level merge is promised. Diary entry creates with distinct UUIDs both survive. Reorder writes can conflict, so after merging the affected day/meal, order deterministically by `sortOrder`, then `updatedAt`, then UUID and normalise on the next explicit move/save.
-- **Goals:** Different effective dates union. The cloud unique `(user_id, effective_from)` exposes two independent goals for the same effective day as a conflict. Pick deterministic LWW for the effective result but retain the losing immutable record for audit/recovery until UX for resolving it exists.
-
-### Concurrent new versions: explicit edge case
-
-Two offline devices can both edit Product v1 and create a different local v2. UUIDs keep both immutable versions safe, but an always-unique global `versionNumber` cannot be guaranteed offline.
-
-Recommended sync design: include `based_on_version_id`; on push, a server-side append transaction validates the base/current relationship and atomically assigns the next **canonical** display sequence. An unsynced local version number is provisional. If a competing version has arrived, the server accepts both UUID-distinct versions, assigns a distinct sequence to the later accepted one, and LWW decides which parent points at current. Only the display ordinal of an unsynced record may be reconciled; nutrition, units, ingredients, and identity never change. The UI should describe this as a version conflict if it becomes visible, rather than silently discarding either change.
-
-This requires an approved server RPC in the future sync phase; do not attempt to solve it with a client-side `max(versionNumber) + 1` write. The same rule applies to RecipeVersion.
-
-## Migration Strategy
-
-### SwiftData schema evolution
-
-Start the first implementation with explicit `SchemaV1: VersionedSchema`, a `MigrationPlan`, stable record names, and a `ModelContainer` constructed from that versioned schema. This adds little code now and avoids treating a production local store as disposable later.
-
-- Use lightweight stages for additive optional fields and safe renames (with `originalName` when appropriate).
-- Use a custom staged migration for splits/merges, such as moving an encoded collection to child records, changing a unit representation, or repairing invalid imported data.
-- Never change the meaning of a field in place. Add a new field/table, backfill, switch reads, then retire only in a later safe schema stage.
-- When a real migration is introduced, carefully validate it manually with representative existing data, including soft-deleted sources and old diary/version references. Do not reset user data as a migration strategy.
-
-### Existing web-user data
-
-Do not implement IndexedDB → SwiftData transfer in native v1. The realistic future path is authenticated Supabase migration: add an explicit export/import capability to the web client or a signed one-time migration tool, validate its JSON against the current web schema, upload/import in dependency order, then let iPhone pull through normal sync. A standalone signed JSON import could be an alternative after an explicit backup product decision. There is no safe direct iOS access to a Safari IndexedDB database.
-
-## Web → Native Model Mapping
-
-This mapping preserves a future import path. Web timestamps are ISO-8601 strings; native absolute timestamps become `Date` and cloud `timestamptz`. Web local date keys remain exact strings locally and become `date` in cloud.
-
-| React / Dexie | Native SwiftData | Future Postgres |
-| --- | --- | --- |
-| `products.id` | `ProductRecord.id: UUID` | `products.id uuid PK` |
-| `products.name`, `barcode`, `currentVersionId` | `name`, `barcode?`, `currentVersionID` | `name`, `barcode`, `current_version_id` |
-| `products.createdAt`, `updatedAt`, `deletedAt?` | same camel-case `Date` properties | `created_at`, `updated_at`, `deleted_at` |
-| `productVersions.id`, `productId`, `versionNumber` | `ProductVersionRecord.id`, `productID`, `versionNumber` | `product_versions.id`, `product_id`, `version_number` |
-| `baseUnitType`, `baseAmount`, nutrition scalar fields | `baseUnitRaw`, `baseAmount`, scalar nutrition | `base_unit`, `base_amount`, `calories`, `protein`, `fat`, `carbs` |
-| `recipes.id`, `name`, `currentVersionId`, timestamps/tombstone | `RecipeRecord` equivalents | `recipes` equivalents |
-| `recipeVersions` nutritional/output fields | `RecipeVersionRecord` equivalents | `recipe_versions` columns |
-| embedded `recipeVersions.ingredients[]` | `RecipeIngredientRecord[]` owned by recipe version | `recipe_ingredients` rows |
-| ingredient `productId`, `productVersionId`, `amount`, `unit`, `normalizedAmount` | same with `unitToken`, `position` | product/version IDs, `amount`, `unit_token`, `normalized_amount`, position |
-| `diaryEntries.date` | `DiaryEntryRecord.dayKey: String` / `LocalDay` domain | `diary_entries.day date` |
-| `mealType: 'breakfast'|'lunch'|'dinner'|'snack'` | `mealTypeRaw`; `MealType` | `meal_type` check/enum; retain `snack` |
-| `sortOrder`, source fields, amount/unit, sourceName | same fields with ID/raw naming | snake-case equivalents |
-| diary nutrition fields | scalar snapshot fields | scalar snapshot columns |
-| `weeklyGoals.effectiveFrom`, `monday…sunday` embedded goals | `WeeklyGoalRecord.effectiveFromKey` + seven `DailyMacroGoalRecord`s | `weekly_goals` + `daily_macro_goals` |
-
-`basedOnVersionID`, child positions, and future sync metadata have no current web field. They are native/future-sync additions; imports set `basedOnVersionID` to the immediately preceding version by number when safely inferable, or `nil` if it cannot be proved, and derive positions from the imported array order.
-
-## Native Implementation Roadmap
-
-
-The original phase order has largely been completed. Keep future work separated from parity/UI work.
-
-### Validation workflow
-
-Automated test infrastructure is not a native rewrite requirement. Do not create XCTest/UI-test targets, an automated regression suite, or fixtures solely for validation unless a future task explicitly requests them.
-
-For every implemented change, validate with:
-
-```text
-Swift compiler
-→ Xcode build
-→ manual scenario checks
-→ physical iPhone check where relevant
-```
-
-Do not launch Simulator as part of the normal Codex workflow; a generic simulator destination may be used only as an `xcodebuild` compile destination.
-
-### Current implementation status
-
-1. **Foundation — implemented.** SwiftUI project, SwiftData `SchemaV1`, model container, domain primitives, mappings, repositories, typed tab/navigation foundation.
-2. **Products — implemented.** Catalog, create/edit/details, soft delete, barcode string semantics, immutable ProductVersion history.
-3. **Diary — implemented, UI interaction polish ongoing.** Today, local-day navigation, meals/totals, Product/Recipe Amount flow, historic edit, soft delete, ordering and move/reorder semantics. The desired tap/swipe/DnD interaction contract is defined by `PRODUCT_SPEC.md`.
-4. **Recipes — implemented.** Recipe records/ingredients/calculator, versioning, pinned ProductVersions, management UI and Diary integration.
-5. **Goals and Statistics — implemented.** Historical weekly goals, Today goal resolution, weekly calories/balance and macro-energy statistics.
-6. **Barcode scanner — next native feature.** Add the isolated VisionKit/AVFoundation wrapper, scanner contexts for catalog and diary, unknown-barcode Product creation return flow, accessibility and offline/error-state polish.
-7. **Parity/UI audit — after scanner.** Verify the native client as one product on a physical iPhone, including gestures, keyboard flows, historical integrity and persistence.
-8. **Migration/import readiness — only after product approval.** Carefully validate actual SwiftData migrations and design/implement a user-consented web-data transfer route.
-9. **Optional Supabase sync — only after product approval.** Add authentication, server schema/RLS/RPCs, outbox/inbox, conflict UX and manual multi-device conflict scenarios. Sync remains separate from parity work.
-
-### Target PRODUCT_SPEC parity checklist
-
-- [x] Today is the default tab and uses local civil days, four meals, totals and persistent ordering.
-- [x] Products support create/search/details/edit/soft delete/barcode/current version/version history.
-- [x] Recipes are versioned and pin concrete ProductVersions.
-- [x] Goals are immutable, weekly and selected historically.
-- [x] Statistics derives data from Diary snapshots and historical goals.
-- [ ] Today interaction polish matches the final tap/swipe/DnD contract on physical iPhone.
-- [ ] Native barcode scanner and scanner return flows.
-- [ ] Final whole-app parity/accessibility/offline audit.
-- [ ] Optional migration/import and Supabase sync only after explicit approval.
-
-Backup/import, Supabase sync, AI, weight/water/exercise, notifications, HealthKit, widgets, Watch, sharing, subscriptions, and App Store work are not native-v1 parity work unless separately approved.
-
-## Risks / Decisions
-
-1. **SwiftData is local-only, not a sync engine.** Keep it behind repositories. Future Supabase merging must use DTOs and local transactions rather than expose SwiftData objects to network code.
-2. **Version number under offline multi-device sync needs server coordination.** UUID identity and immutable content are safe today; canonical ordinal assignment requires the later append RPC described above.
-3. **Polymorphic diary source references cannot receive one simple SQL FK.** The type-plus-ID pair is validated by services/RPC and protected by never physically deleting source versions.
-4. **Local `LocalDay` is intentionally a string key.** Replacing it with a `Date` would introduce time-zone regressions and make web import less reliable.
-5. **Barcode uniqueness needs two layers.** The local repository validates it, while Postgres later supplies the authoritative partial unique index. Race-free cloud enforcement cannot be delegated to the UI.
-6. **Goals have no current deletion product behaviour.** The chosen immutable append-only model is enough for v1. A future delete/replace feature must define whether historical reports remain unchanged before adding tombstones.
-
-## Architecture Decisions
-
-- **ADR-001 — Minimum platform:** iOS 17.0; use Swift, SwiftUI, SwiftData, `NavigationStack`, and `TabView`.
-- **ADR-002 — Local persistence:** SwiftData is the sole Phase iOS 1 persistence implementation and sits behind repository protocols.
-- **ADR-003 — Identifiers:** all synchronisable identities are client-generated `UUID`s; never use auto-increment domain IDs.
-- **ADR-004 — Product versioning:** `Product` is mutable logical metadata; `ProductVersion` and its serving units are immutable append-only historical data.
-- **ADR-005 — Recipe versioning:** `Recipe` is mutable logical metadata; `RecipeVersion` and its ingredients are immutable, and ingredients pin ProductVersion UUIDs.
-- **ADR-006 — Diary snapshots:** `DiaryEntry` persists source type/IDs/name, amount/unit, nutrition snapshot, and sort order. Historic edits calculate from `sourceVersionID` only.
-- **ADR-007 — Calendar days:** diary and goal effective dates use validated `LocalDay` `YYYY-MM-DD` keys, never timestamp dates. Audit timestamps are absolute `Date` values.
-- **ADR-008 — Meal compatibility:** persist `snack` and localise it as `Перекусы`.
-- **ADR-009 — Deletes:** user-visible product, recipe, and diary deletion is soft deletion; no cascade may destroy historical versions/entries.
-- **ADR-010 — Goals:** store exactly seven normalised `DailyMacroGoal` children for one immutable `WeeklyGoal`.
-- **ADR-011 — Navigation:** Today is the default selected tab; all tabs own a `NavigationStack`; Goals is a Statistics destination; internal navigation is typed rather than URL-based.
-- **ADR-012 — Sync readiness:** cloud records are user-owned UUID records with timestamps/tombstones where mutable; sync status remains local metadata, and Supabase/auth are deferred.
-- **ADR-013 — Calculations:** nutrition, unit conversion, recipe totals, goal lookup, and statistics are domain/application logic, not SwiftUI logic.
-- **ADR-014 — Shared food selection UI:** Products/Recipes Catalog has `management` and one `selection(FoodSelectionContext)` mode. Today and Recipe ingredient composition use the exact same selection UI and controls; typed callbacks keep diary writes separate from recipe-draft composition and flattening.
-- **ADR-015 — Today interactions:** the required contract is tap → edit, swipe left → destructive trash action, long press+drag → reorder/move. The concrete SwiftUI container is not an architectural invariant and is chosen by physical-iPhone reliability.
-
-## Open Decisions
-
-No Phase iOS 1 blocker is unresolved. The only deferred product decisions are intentionally outside the approved scope:
-
-1. **Future web-to-native transfer UX.** Recommended: Supabase-backed authenticated migration or explicit signed one-time export/import after backup/sync is approved. Do not add hidden automatic transfer.
-2. **Future version-conflict UX.** Recommended: retain both immutable versions and show a concise conflict/history indication only when a real multi-device conflict occurs; do not silently discard nutrition data.
-3. **Future goal removal behaviour.** Recommended: keep goals append-only until a user need proves a delete/replace flow, then define historical-report semantics before implementing it.
+| ProductRecord, ProductVersionRecord | Product identity and immutable version data |
+| RecipeRecord, RecipeVersionRecord, RecipeIngredientRecord | Recipe identity, version and pinned ingredients |
+| DiaryEntryRecord | Historical source and nutrition snapshot |
+| WeeklyGoalRecord, DailyMacroGoalRecord | Effective goal and seven daily values |
+
+Every record has a unique UUID; enum values are scalar string raw values.
+Record relationships support local traversal, but UUID fields are authoritative
+for polymorphic/historical references. Recipe-version ingredients and weekly
+goal daily values are owned children. Normal user deletion never cascades
+through history.
+
+## Repository boundary and query strategy
+
+Repository protocols pass domain values, not Model objects or ModelContext. They
+provide individual and bounded collection lookups. A caller that knows a set of
+IDs must deduplicate and fetch the set rather than issuing a per-row call.
+
+Performance rules:
+
+- Use a bounded predicate instead of a full-table scan when possible.
+- Batch current versions for logical Product/Recipe source sets.
+- Batch ProductVersions and Products needed to resolve Recipe ingredients.
+- Query latest Diary usage defaults only for requested source sets.
+- Restore semantic ordering after a batch fetch; storage return order is not
+  UI order.
+
+Catalog services fetch logical sources and batch their current versions. Recipe
+detail resolution batches pinned ProductVersions and Products, yielding one
+resolved ingredient graph for read models, nutrition and outdated status.
+
+## Application services and calculations
+
+| Service | Responsibility |
+| --- | --- |
+| ProductService | Listing/details, validation, version append, metadata and soft delete |
+| RecipeService | Source resolution/pinning, composition calculation, versioning, flattening and output preview |
+| DiaryService | Day totals, usage defaults, Amount source/preview, snapshot create/edit, delete and move/reorder |
+| GoalService | Seven-day validation, creation and effective-date lookup |
+| StatisticsService | Aggregation from Diary snapshots and historical goals |
+
+Amount preview and persisted DiaryEntry use the same calculation path. Recipe
+calculation is intentionally split:
+
+~~~text
+ingredient composition → pinned versions + total nutrition
+output projection      → cookedWeight / servingsCount preview
+~~~
+
+Changing only output fields recomputes projection from the existing composition;
+it must not resolve the ingredient graph from repositories again. Formulae
+belong in the domain/application calculation layer, never in SwiftUI views.
+
+## Current and deferred capabilities
+
+SwiftData is the only current persistence implementation. There is no CloudKit,
+Supabase, backend, authentication, export/import, web migration, barcode scanner
+wrapper or external product API in the native app.
+
+If future sync is approved, it must remain behind repositories, use explicit
+DTOs/merge transactions and preserve immutable versions and Diary snapshots.
+Camera barcode scanning likewise requires a separately approved isolated
+feature; it must not be presented as current architecture.
+
+## Architecture decisions
+
+- **ADR-001 — Native foundation:** iOS 17+, SwiftUI, SwiftData, NavigationStack
+  and TabView.
+- **ADR-002 — Local persistence:** SwiftData is local-only behind repository
+  protocols.
+- **ADR-003 — Identity and dates:** UUID identities and civil LocalDay keys.
+- **ADR-004 — Version pinning:** immutable Product/Recipe versions; Recipe
+  ingredients pin ProductVersion IDs.
+- **ADR-005 — Diary history:** source-version and nutrition snapshots; historic
+  edits use that source version.
+- **ADR-006 — Deletes:** logical deletes are soft and preserve history.
+- **ADR-007 — Shared UI:** Catalog and Amount are reused through typed context.
+- **ADR-008 — Today navigation:** leaving Today clears only transient todayPath.
+- **ADR-009 — Safe navigation:** guarded pop helpers reject stale routes.
+- **ADR-010 — Query bounds:** known-ID resolution is batched/deduplicated; no
+  catalog-current-version or recipe-detail N+1.
+- **ADR-011 — Recipe preview:** output projection is separate from composition
+  resolution.
+- **ADR-012 — Keyboard lifecycle:** local Editor notifications sequence Editor
+  to Ingredient Catalog and are not layout measurements.
+- **ADR-013 — Amount focus:** restore focus only to the current Amount route
+  after its child editor dismisses.
