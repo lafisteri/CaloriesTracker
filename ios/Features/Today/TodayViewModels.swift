@@ -12,6 +12,7 @@ final class TodayViewModel {
     private(set) var calorieGoal: Double?
     private(set) var isLoading = false
     var errorMessage: String?
+    private var currentLoadID: UUID?
 
     init(
         diaryService: DiaryService,
@@ -24,18 +25,37 @@ final class TodayViewModel {
     }
 
     func load() async {
+        let loadID = UUID()
+        let requestedDay = selectedDay
+        currentLoadID = loadID
         isLoading = true
         errorMessage = nil
+        day = nil
         calorieGoal = nil
 
         do {
-            day = try await diaryService.day(for: selectedDay)
-            calorieGoal = try await goalService.goal(for: selectedDay)?.dailyGoals[selectedDay.weekday()]?.calories
+            let loadedDay = try await diaryService.day(for: requestedDay)
+            let loadedGoal = try await goalService.goal(for: requestedDay)
+
+            guard currentLoadID == loadID else {
+                return
+            }
+
+            day = loadedDay
+            calorieGoal = loadedGoal?.dailyGoals[requestedDay.weekday()]?.calories
         } catch {
+            guard currentLoadID == loadID else {
+                return
+            }
+
+            day = nil
+            calorieGoal = nil
             errorMessage = diaryErrorMessage(error, fallback: "Не удалось загрузить дневник.")
         }
 
-        isLoading = false
+        if currentLoadID == loadID {
+            isLoading = false
+        }
     }
 
     func previousDay() async {
