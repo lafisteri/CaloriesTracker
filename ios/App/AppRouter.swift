@@ -12,9 +12,37 @@ final class AppRouter {
     var todayPath: [TodayRoute] = []
     var catalogPath: [CatalogRoute] = []
     var amountFocusRestorationRevision = 0
+    private var pendingCreateAmountSourceRefresh: FoodSourceReference?
+    private var pendingEntryProductRebase: UUID?
 
     func resetTodayNavigationWhenLeavingTab() {
         todayPath = []
+        pendingCreateAmountSourceRefresh = nil
+        pendingEntryProductRebase = nil
+    }
+
+    func requestCreateAmountSourceRefresh(for source: FoodSourceReference) {
+        pendingCreateAmountSourceRefresh = source
+    }
+
+    func consumeCreateAmountSourceRefresh(for source: FoodSourceReference) -> Bool {
+        guard pendingCreateAmountSourceRefresh == source else {
+            return false
+        }
+        pendingCreateAmountSourceRefresh = nil
+        return true
+    }
+
+    func requestEntryProductRebase(entryID: UUID) {
+        pendingEntryProductRebase = entryID
+    }
+
+    func consumeEntryProductRebase(entryID: UUID) -> Bool {
+        guard pendingEntryProductRebase == entryID else {
+            return false
+        }
+        pendingEntryProductRebase = nil
+        return true
     }
 
     func popToday(ifTopIs expectedRoute: TodayRoute) {
@@ -50,7 +78,7 @@ enum TodayRoute: Hashable {
     case entryEditor(UUID)
     case productEditor(context: DiaryContext?, prefilledBarcode: String?)
     case productEditorForDiarySelection(productID: UUID, context: DiaryContext)
-    case productEditorForEntryAmount(productID: UUID)
+    case productEditorForEntryAmount(productID: UUID, entryID: UUID)
     case recipeEditor(context: DiaryContext, recipeID: UUID?)
     case productDetails(productID: UUID, context: DiaryContext)
     case recipeDetails(UUID)

@@ -36,6 +36,7 @@ protocol DiaryRepository: Sendable {
     func activeEntries(for sources: [FoodSourceReference]) async throws -> [DiaryEntry]
     func create(_ entry: DiaryEntry) async throws
     func save(_ entry: DiaryEntry) async throws
+    func rebaseSourceSnapshot(_ entry: DiaryEntry) async throws
     func save(_ entries: [DiaryEntry]) async throws
     func softDeleteEntry(id: UUID, at: Date) async throws
 }

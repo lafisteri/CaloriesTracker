@@ -230,11 +230,15 @@ drafts; persisted data has no nested Recipe→Recipe dependency.
 
 DiaryEntry stores source type, source ID, source version ID, source name,
 amount, unit, nutrition, day, meal and order. New entries resolve the selected
-source's current version once. Existing-entry edits resolve saved
-sourceVersionID, not a current source version.
+source's current version once. Existing-entry amount edits resolve saved
+sourceVersionID, not a current source version. Historical snapshots are stable
+by default: ordinary Product/Recipe edits never rewrite them.
 
-Move/reorder may change only meal, order and audit time. Product/Recipe edits
-must not rewrite historical DiaryEntry snapshots.
+An explicit Product edit initiated from one DiaryEntry is the narrow exception:
+DiaryService may rebase that one Product-sourced entry to Product.currentVersionID,
+refresh its source-name and nutrition snapshots, and preserve its identity and
+placement. This application-service operation never bulk-updates history. Move/
+reorder may change only meal, order and audit time.
 
 User-visible Product, Recipe and DiaryEntry deletion is soft. It removes active
 sources from Catalog but must not destroy versions/ingredients needed for

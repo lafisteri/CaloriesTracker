@@ -297,6 +297,45 @@ final class DiaryService {
         try await diaryRepository.save(updatedEntry)
     }
 
+    func rebaseEntryToCurrentProduct(entryID: UUID) async throws {
+        guard let entry = try await diaryRepository.entry(id: entryID, includingDeleted: false) else {
+            throw DiaryServiceError.entryNotFound
+        }
+        guard entry.sourceType == .product else {
+            throw DiaryServiceError.unsupportedSource
+        }
+
+        let source = try await currentSource(
+            for: FoodSourceReference(sourceType: .product, sourceID: entry.sourceID),
+        )
+        let amountSource = makeAmountSource(from: source, initialAmount: nil, initialUnitToken: nil)
+        let unitToken = compatibleUnitToken(entry.unitToken, options: amountSource.unitOptions)
+            ?? amountSource.initialUnitToken
+        let nutrition = try preview(
+            source: source.calculationSource,
+            amount: entry.amount,
+            unitToken: unitToken,
+        )
+        let rebasedEntry = DiaryEntry(
+            id: entry.id,
+            day: entry.day,
+            mealType: entry.mealType,
+            sortOrder: entry.sortOrder,
+            sourceType: entry.sourceType,
+            sourceID: entry.sourceID,
+            sourceVersionID: source.sourceVersionID,
+            sourceName: source.sourceName,
+            amount: entry.amount,
+            unitToken: unitToken,
+            nutrition: nutrition,
+            createdAt: entry.createdAt,
+            updatedAt: Date(),
+            deletedAt: entry.deletedAt,
+        )
+
+        try await diaryRepository.rebaseSourceSnapshot(rebasedEntry)
+    }
+
     func softDelete(entryID: UUID) async throws {
         guard try await diaryRepository.entry(id: entryID, includingDeleted: false) != nil else {
             throw DiaryServiceError.entryNotFound

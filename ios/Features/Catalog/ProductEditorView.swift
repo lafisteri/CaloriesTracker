@@ -6,17 +6,18 @@ struct ProductEditorView: View {
 
     let router: AppRouter
     let onSaved: (@MainActor () -> Void)?
-    let onDismissed: (@MainActor () -> Void)?
+    let onDismissed: (@MainActor (Bool) -> Void)?
 
     @State private var model: ProductEditorViewModel
     @FocusState private var focusedField: EditorField?
+    @State private var didSave = false
 
     init(
         productID: UUID?,
         router: AppRouter,
         productService: ProductService,
         onSaved: (@MainActor () -> Void)? = nil,
-        onDismissed: (@MainActor () -> Void)? = nil,
+        onDismissed: (@MainActor (Bool) -> Void)? = nil,
     ) {
         self.router = router
         self.onSaved = onSaved
@@ -83,6 +84,7 @@ struct ProductEditorView: View {
                         let didSave = await model.save()
                         Self.logger.notice("action=product_save_finished success=\(didSave)")
                         if didSave {
+                            self.didSave = true
                             if let onSaved {
                                 Self.logger.notice("navigation=editor_save_return_requested")
                                 onSaved()
@@ -119,7 +121,7 @@ struct ProductEditorView: View {
             Task { @MainActor in
                 await Task.yield()
                 Self.logger.notice("lifecycle=editor_dismissed_callback")
-                onDismissed()
+                onDismissed(didSave)
             }
         }
         .onChange(of: focusedField) { previousField, currentField in

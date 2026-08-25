@@ -135,6 +135,7 @@ final class AmountViewModel {
     private(set) var previewErrorMessage: String?
     private(set) var isLoading = false
     private(set) var isSaving = false
+    private(set) var isProductEditRefreshBlocked = false
     var errorMessage: String?
 
     init(mode: DiaryAmountEditorMode, diaryService: DiaryService) {
@@ -149,10 +150,15 @@ final class AmountViewModel {
         }
     }
 
+    var isSourceAvailable: Bool {
+        source != nil && !isProductEditRefreshBlocked
+    }
+
     func load() async {
         isLoading = true
         defer { isLoading = false }
         errorMessage = nil
+        isProductEditRefreshBlocked = false
 
         do {
             switch mode {
@@ -184,6 +190,47 @@ final class AmountViewModel {
             refreshPreview()
         } catch {
             errorMessage = diaryErrorMessage(error, fallback: "Не удалось загрузить источник.")
+        }
+    }
+
+    func beginProductEditRefresh() {
+        isLoading = true
+        isProductEditRefreshBlocked = true
+        errorMessage = nil
+        preview = nil
+        previewErrorMessage = nil
+    }
+
+    @discardableResult
+    func refreshAfterProductEdit() async -> Bool {
+        if !isProductEditRefreshBlocked {
+            beginProductEditRefresh()
+        }
+
+        defer { isLoading = false }
+
+        do {
+            switch mode {
+            case let .create(_, sourceReference, _):
+                let refreshedSource = try await diaryService.amountSource(for: sourceReference)
+                source = refreshedSource
+                if !refreshedSource.unitOptions.contains(where: { $0.token == selectedUnitToken }) {
+                    selectedUnitToken = refreshedSource.initialUnitToken
+                }
+            case let .edit(entryID):
+                try await diaryService.rebaseEntryToCurrentProduct(entryID: entryID)
+                let refreshedSource = try await diaryService.amountSource(forEntryID: entryID)
+                source = refreshedSource
+                amountText = refreshedSource.initialAmount.map(numericString) ?? ""
+                selectedUnitToken = refreshedSource.initialUnitToken
+            }
+
+            isProductEditRefreshBlocked = false
+            refreshPreview()
+            return true
+        } catch {
+            errorMessage = diaryErrorMessage(error, fallback: "Не удалось обновить продукт в записи. Повторите попытку.")
+            return false
         }
     }
 
@@ -219,6 +266,11 @@ final class AmountViewModel {
     @discardableResult
     func save() async -> Bool {
         errorMessage = nil
+
+        guard !isProductEditRefreshBlocked else {
+            errorMessage = "Не удалось обновить продукт в записи. Повторите попытку."
+            return false
+        }
 
         guard let amount = parsedPositiveAmount() else {
             return false

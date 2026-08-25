@@ -173,23 +173,35 @@ struct TodayRootView: View {
                     router: router,
                     productService: productService,
                     onSaved: {
+                        router.requestCreateAmountSourceRefresh(
+                            for: FoodSourceReference(sourceType: .product, sourceID: productID),
+                        )
                         router.popToday(
                             ifTopIs: .productEditorForDiarySelection(productID: productID, context: context),
                         )
                     },
-                    onDismissed: {
+                    onDismissed: { didSave in
+                        guard !didSave else {
+                            return
+                        }
                         router.amountFocusRestorationRevision += 1
                     },
                 )
-            case let .productEditorForEntryAmount(productID):
+            case let .productEditorForEntryAmount(productID, entryID):
                 ProductEditorView(
                     productID: productID,
                     router: router,
                     productService: productService,
                     onSaved: {
-                        router.popToday(ifTopIs: .productEditorForEntryAmount(productID: productID))
+                        router.requestEntryProductRebase(entryID: entryID)
+                        router.popToday(
+                            ifTopIs: .productEditorForEntryAmount(productID: productID, entryID: entryID),
+                        )
                     },
-                    onDismissed: {
+                    onDismissed: { didSave in
+                        guard !didSave else {
+                            return
+                        }
                         router.amountFocusRestorationRevision += 1
                     },
                 )

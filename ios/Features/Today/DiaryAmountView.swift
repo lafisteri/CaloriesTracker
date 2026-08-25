@@ -21,9 +21,9 @@ struct DiaryAmountView: View {
         @Bindable var model = model
 
         AmountEditorView(
-            title: model.source?.sourceName ?? "",
+            title: model.isProductEditRefreshBlocked ? "Обновление продукта" : model.source?.sourceName ?? "",
             isLoading: model.isLoading,
-            isAvailable: model.source != nil,
+            isAvailable: model.isSourceAvailable,
             preview: model.preview,
             previewErrorMessage: model.previewErrorMessage,
             errorMessage: model.errorMessage,
@@ -50,6 +50,16 @@ struct DiaryAmountView: View {
         )
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
+            if model.isProductEditRefreshBlocked {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        refreshAfterProductEdit()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .accessibilityLabel("Повторить обновление продукта")
+                }
+            }
             if let productID {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -87,6 +97,7 @@ struct DiaryAmountView: View {
         .onChange(of: router.todayPath) { _, path in
             let isCurrentRoute = isCurrentAmountRoute
             Self.logger.notice("navigation=today_path_changed path_count=\(path.count) top_route=\(Self.routeLabel(path.last), privacy: .public) current_amount_route=\(isCurrentRoute)")
+            refreshAfterProductEditIfRequested()
         }
         .onChange(of: router.amountFocusRestorationRevision) { _, revision in
             guard isCurrentAmountRoute else {
@@ -121,6 +132,39 @@ struct DiaryAmountView: View {
             await Task.yield()
             UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
             Self.logger.debug("focus=amount_select_all_sent")
+        }
+    }
+
+    private func refreshAfterProductEditIfRequested() {
+        guard isCurrentAmountRoute else {
+            return
+        }
+
+        switch model.mode {
+        case let .create(_, sourceReference, _):
+            guard router.consumeCreateAmountSourceRefresh(for: sourceReference) else {
+                return
+            }
+        case let .edit(entryID):
+            guard router.consumeEntryProductRebase(entryID: entryID) else {
+                return
+            }
+        }
+
+        refreshAfterProductEdit()
+    }
+
+    private func refreshAfterProductEdit() {
+        model.beginProductEditRefresh()
+        isAmountFocusEnabled = false
+
+        Task { @MainActor in
+            let didRefresh = await model.refreshAfterProductEdit()
+            guard didRefresh, isCurrentAmountRoute else {
+                return
+            }
+            isAmountFocusEnabled = true
+            restoreAmountFocus()
         }
     }
 
@@ -208,8 +252,8 @@ struct DiaryAmountView: View {
         switch model.mode {
         case let .create(context, _, _):
             return .productEditorForDiarySelection(productID: productID, context: context)
-        case .edit:
-            return .productEditorForEntryAmount(productID: productID)
+        case let .edit(entryID):
+            return .productEditorForEntryAmount(productID: productID, entryID: entryID)
         }
     }
 }

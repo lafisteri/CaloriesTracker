@@ -625,6 +625,35 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         }
     }
 
+    func rebaseSourceSnapshot(_ entry: DiaryEntry) async throws {
+        guard let record = try entryRecord(id: entry.id) else {
+            throw DiaryRepositoryError.entryNotFound
+        }
+        guard matchesRebaseIdentityFields(record, entry),
+              record.deletedAt == nil,
+              entry.deletedAt == nil
+        else {
+            throw DiaryRepositoryError.invalidSourceRebase
+        }
+
+        record.sourceVersionID = entry.sourceVersionID
+        record.sourceName = entry.sourceName
+        record.amount = entry.amount
+        record.unitToken = entry.unitToken
+        record.calories = entry.nutrition.calories
+        record.protein = entry.nutrition.protein
+        record.fat = entry.nutrition.fat
+        record.carbs = entry.nutrition.carbs
+        record.updatedAt = entry.updatedAt
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
     func save(_ entries: [DiaryEntry]) async throws {
         guard !entries.isEmpty else {
             return
@@ -690,6 +719,15 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             && record.createdAt == entry.createdAt
     }
 
+    private func matchesRebaseIdentityFields(_ record: DiaryEntryRecord, _ entry: DiaryEntry) -> Bool {
+        record.dayKey == entry.day.rawValue
+            && record.mealTypeRaw == entry.mealType.rawValue
+            && record.sortOrder == entry.sortOrder
+            && record.sourceTypeRaw == entry.sourceType.rawValue
+            && record.sourceID == entry.sourceID
+            && record.createdAt == entry.createdAt
+    }
+
     private func makeRecord(_ entry: DiaryEntry) -> DiaryEntryRecord {
         DiaryEntryRecord(
             id: entry.id,
@@ -717,6 +755,7 @@ private enum DiaryRepositoryError: LocalizedError {
     case entryNotFound
     case invalidCreate
     case invalidAmountUpdate
+    case invalidSourceRebase
     case invalidOrderUpdate
     case duplicateEntry
 
@@ -728,6 +767,8 @@ private enum DiaryRepositoryError: LocalizedError {
             "Не удалось создать запись дневника."
         case .invalidAmountUpdate:
             "Можно изменить только количество и единицу записи."
+        case .invalidSourceRebase:
+            "Не удалось обновить источник записи."
         case .invalidOrderUpdate:
             "Не удалось изменить порядок записи."
         case .duplicateEntry:
