@@ -263,7 +263,7 @@ private struct ProductListView: View {
                         NavigationLink(value: CatalogRoute.product(item.id)) {
                             ProductListRow(item: item)
                         }
-                        .swipeActions {
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 Task {
                                     await model.softDelete(productID: item.id)

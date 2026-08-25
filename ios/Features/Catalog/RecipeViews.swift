@@ -46,7 +46,7 @@ struct RecipeListView: View {
                         NavigationLink(value: CatalogRoute.recipe(item.id)) {
                             RecipeListRow(item: item)
                         }
-                        .swipeActions {
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 Task {
                                     await model.softDelete(recipeID: item.id)
