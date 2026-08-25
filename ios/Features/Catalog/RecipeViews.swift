@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct RecipeListView: View {
@@ -367,6 +368,8 @@ struct RecipeEditorView: View {
     @State private var showsIngredientProductCreation = false
     @State private var showsIngredientRecipeCreation = false
     @State private var editingIngredient: RecipeIngredientEditorItem?
+    @State private var isKeyboardVisible = false
+    @State private var isIngredientSelectionPending = false
     @FocusState private var focusedField: RecipeEditorField?
 
     init(
@@ -401,6 +404,7 @@ struct RecipeEditorView: View {
                 Section {
                     TextField("Название", text: $model.name)
                         .textInputAutocapitalization(.sentences)
+                        .focused($focusedField, equals: .name)
 
                     Picker("Единица", selection: $model.outputUnit) {
                         ForEach(RecipeDiaryUnit.allCases, id: \.self) { unit in
@@ -435,7 +439,7 @@ struct RecipeEditorView: View {
                     }
                 } addRow: {
                     FoodCompositionAddRow {
-                        showsIngredientSelection = true
+                        requestIngredientSelection()
                     }
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
                     .listRowSeparator(.hidden)
@@ -488,10 +492,12 @@ struct RecipeEditorView: View {
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isLoading || model.isSaving)
             }
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Готово") {
-                    focusedField = nil
+            if !isIngredientSelectionPending && !showsIngredientSelection {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Готово") {
+                        focusedField = nil
+                    }
                 }
             }
         }
@@ -503,6 +509,17 @@ struct RecipeEditorView: View {
         }
         .onChange(of: model.servingsCountText) { _, _ in
             model.refreshOutputPreview()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+            isKeyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+            isKeyboardVisible = false
+            presentIngredientSelectionIfPending()
+        }
+        .onDisappear {
+            isIngredientSelectionPending = false
+            isKeyboardVisible = false
         }
         .navigationDestination(isPresented: $showsIngredientSelection) {
             CatalogView(
@@ -605,6 +622,26 @@ struct RecipeEditorView: View {
     }
 
     @MainActor
+    private func requestIngredientSelection() {
+        isIngredientSelectionPending = true
+        focusedField = nil
+
+        if !isKeyboardVisible {
+            presentIngredientSelectionIfPending()
+        }
+    }
+
+    @MainActor
+    private func presentIngredientSelectionIfPending() {
+        guard isIngredientSelectionPending else {
+            return
+        }
+
+        isIngredientSelectionPending = false
+        showsIngredientSelection = true
+    }
+
+    @MainActor
     private func quickAddIngredient(
         productID: UUID,
         defaultValue: FoodSelectionAmountDefault,
@@ -668,6 +705,7 @@ private struct RecipeIngredientListEntryRow: View {
 }
 
 private enum RecipeEditorField: Hashable {
+    case name
     case outputAmount
 }
 
