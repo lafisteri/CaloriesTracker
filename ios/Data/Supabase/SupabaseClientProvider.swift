@@ -41,6 +41,9 @@ final class SupabaseClientProvider {
         client = SupabaseClient(
             supabaseURL: configuration.url,
             supabaseKey: configuration.publishableKey,
+            options: SupabaseClientOptions(
+                auth: .init(emitLocalSessionAsInitialSession: true),
+            ),
         )
     }
 
