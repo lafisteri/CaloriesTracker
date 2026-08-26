@@ -16,8 +16,8 @@ application a solid starting point for a future sync discussion.
 The correctness, performance and hardening work visible in current code is
 substantively complete. The remaining confirmed debt is narrow: Catalog view
 lifecycle duplication/search-task cancellation, focused accessibility labels,
-the size of `RecipeViews.swift`, and non-standardised observability. None is a
-reason to make sync decisions in this document.
+and the size of `RecipeViews.swift`. None is a reason to make sync decisions
+in this document.
 
 ## 2. Current Architecture
 
@@ -180,7 +180,7 @@ not implemented by this audit.
 | A11Y-01 | CONFIRMED | Low | Several important controls have labels, but Today day-navigation and Statistics week-navigation chevron controls lack explicit accessible labels/hints. No complete VoiceOver audit is encoded in the source. |
 | MAINT-01 | CONFIRMED | Low | `RecipeViews.swift` is about 1,040 lines and contains list, detail, editor, ingredient Amount and composition Amount view types. Its physical split is deferred. |
 | DEAD-01 | NO LONGER APPLICABLE | — | Current source review did not establish a concrete unused production member that justifies a cleanup-only change. No dead-code deletion is proposed. |
-| OBS-01 | CONFIRMED | Low | Useful navigation, focus and error logs exist, but there is no documented, consistent observability convention or correlation strategy across feature flows. |
+| OBS-01 | ALREADY RESOLVED | — | High-volume navigation, focus and lifecycle telemetry was removed. Feature error mappers retain only unexpected technical failures for diagnostics. |
 
 ## 9. Sync-Relevant Strengths
 

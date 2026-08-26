@@ -714,23 +714,22 @@ private enum RecipeEditorError: LocalizedError {
 }
 
 func recipeErrorMessage(_ error: Error, fallback: String) -> String {
-    recipeErrorLogger.error(
-        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
-    )
-
-    return switch error {
+    switch error {
     case let error as RecipeServiceError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as RecipeCalculatorError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as NutritionError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as RecipeEditorError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     default:
-        fallback
+        recipeErrorLogger.error(
+            "unexpected_user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+        )
+        return fallback
     }
 }
 

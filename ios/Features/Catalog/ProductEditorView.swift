@@ -1,9 +1,6 @@
-import OSLog
 import SwiftUI
 
 struct ProductEditorView: View {
-    private static let logger = Logger(subsystem: "com.caloriestracker.ios", category: "ProductEditor")
-
     let router: AppRouter
     let onSaved: (@MainActor () -> Void)?
     let onDismissed: (@MainActor (Bool) -> Void)?
@@ -77,16 +74,12 @@ struct ProductEditorView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Self.logger.notice("action=product_save_tapped focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
-                    Self.logger.notice("focus=editor_resign_before_save")
                     focusedField = nil
                     Task {
                         let didSave = await model.save()
-                        Self.logger.notice("action=product_save_finished success=\(didSave)")
                         if didSave {
                             self.didSave = true
                             if let onSaved {
-                                Self.logger.notice("navigation=editor_save_return_requested")
                                 onSaved()
                             } else {
                                 router.catalogPath = []
@@ -105,27 +98,17 @@ struct ProductEditorView: View {
             }
         }
         .task {
-            Self.logger.debug("lifecycle=editor_load_started")
             await model.loadForEditing()
-            Self.logger.debug("lifecycle=editor_load_finished")
-        }
-        .onAppear {
-            Self.logger.notice("lifecycle=editor_appear")
         }
         .onDisappear {
-            Self.logger.notice("lifecycle=editor_disappear focused_field=\(focusedField?.diagnosticName ?? "none", privacy: .public)")
             focusedField = nil
             guard let onDismissed else {
                 return
             }
             Task { @MainActor in
                 await Task.yield()
-                Self.logger.notice("lifecycle=editor_dismissed_callback")
                 onDismissed(didSave)
             }
-        }
-        .onChange(of: focusedField) { previousField, currentField in
-            Self.logger.notice("focus=editor_changed previous=\(previousField?.diagnosticName ?? "none", privacy: .public) current=\(currentField?.diagnosticName ?? "none", privacy: .public)")
         }
     }
 
@@ -144,23 +127,4 @@ private enum EditorField: Hashable {
     case protein
     case fat
     case carbs
-
-    var diagnosticName: String {
-        switch self {
-        case .name:
-            "name"
-        case .barcode:
-            "barcode"
-        case .baseAmount:
-            "base_amount"
-        case .calories:
-            "calories"
-        case .protein:
-            "protein"
-        case .fat:
-            "fat"
-        case .carbs:
-            "carbs"
-        }
-    }
 }

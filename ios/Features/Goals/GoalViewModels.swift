@@ -111,17 +111,16 @@ private enum GoalEditorError: LocalizedError {
 }
 
 func goalErrorMessage(_ error: Error, fallback: String) -> String {
-    goalErrorLogger.error(
-        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
-    )
-
-    return switch error {
+    switch error {
     case let error as GoalServiceError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as GoalEditorError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     default:
-        fallback
+        goalErrorLogger.error(
+            "unexpected_user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+        )
+        return fallback
     }
 }
 

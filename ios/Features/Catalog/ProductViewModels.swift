@@ -332,22 +332,21 @@ private enum ProductEditorError: LocalizedError {
 private let productErrorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "Product")
 
 func productErrorMessage(_ error: Error, fallback: String) -> String {
-    productErrorLogger.error(
-        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
-    )
-
-    return switch error {
+    switch error {
     case let error as ProductServiceError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as ProductEditorError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as DiaryServiceError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     case let error as NutritionError:
-        error.errorDescription ?? fallback
+        return error.errorDescription ?? fallback
     default:
-        fallback
+        productErrorLogger.error(
+            "unexpected_user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+        )
+        return fallback
     }
 }
