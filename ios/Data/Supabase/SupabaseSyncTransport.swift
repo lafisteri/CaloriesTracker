@@ -77,12 +77,13 @@ struct SupabaseRemoteSyncRecord: Codable, Equatable, Sendable {
         serverRevision: Int64,
         serverUpdatedAt: Date,
     ) throws {
-        guard payload.key == key else {
+        let canonicalPayload = payload.canonicalizedTimestamps()
+        guard canonicalPayload.key == key else {
             throw SupabaseInfrastructureError.invalidResponse
         }
         self.key = key
         self.payloadSchemaVersion = payloadSchemaVersion
-        self.payload = payload
+        self.payload = canonicalPayload
         self.serverRevision = serverRevision
         self.serverUpdatedAt = serverUpdatedAt
     }
@@ -137,7 +138,7 @@ struct SupabasePushRequest: Encodable, Sendable {
         entityType = key.entityType
         entityID = key.entityID
         payloadSchemaVersion = envelope.schemaVersion
-        payload = envelope.payload
+        payload = envelope.payload.canonicalizedTimestamps()
         self.expectedServerRevision = expectedServerRevision
     }
 

@@ -117,7 +117,7 @@ final class SyncLocalStore {
         _ payload: SyncPayload,
         in modelContext: ModelContext,
     ) throws -> SyncMergeResult {
-        try apply(payload, in: modelContext)
+        try apply(payload.canonicalizedTimestamps(), in: modelContext)
     }
 
     func applyRemote(_ payloads: [SyncPayload]) throws -> [SyncMergeResult] {
@@ -438,8 +438,10 @@ final class SyncLocalStore {
         localTimestamp: Date,
         remoteTimestamp: Date,
     ) throws -> MergeWinner {
-        if localTimestamp != remoteTimestamp {
-            return localTimestamp > remoteTimestamp ? .local : .remote
+        let canonicalLocalTimestamp = SyncTimestamp.canonical(localTimestamp)
+        let canonicalRemoteTimestamp = SyncTimestamp.canonical(remoteTimestamp)
+        if canonicalLocalTimestamp != canonicalRemoteTimestamp {
+            return canonicalLocalTimestamp > canonicalRemoteTimestamp ? .local : .remote
         }
 
         return try SyncPayloadCanonicalizer.compare(local, remote) == .orderedAscending ? .remote : .local
@@ -830,9 +832,9 @@ final class SyncLocalStore {
             name: record.name,
             barcode: record.barcode,
             currentVersionID: record.currentVersionID,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
-            deletedAt: record.deletedAt,
+            createdAt: SyncTimestamp.canonical(record.createdAt),
+            updatedAt: SyncTimestamp.canonical(record.updatedAt),
+            deletedAt: SyncTimestamp.canonical(record.deletedAt),
         )
     }
 
@@ -856,7 +858,7 @@ final class SyncLocalStore {
                 fat: record.fat,
                 carbs: record.carbs,
             ),
-            createdAt: record.createdAt,
+            createdAt: SyncTimestamp.canonical(record.createdAt),
         )
     }
 
@@ -865,9 +867,9 @@ final class SyncLocalStore {
             id: record.id,
             name: record.name,
             currentVersionID: record.currentVersionID,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
-            deletedAt: record.deletedAt,
+            createdAt: SyncTimestamp.canonical(record.createdAt),
+            updatedAt: SyncTimestamp.canonical(record.updatedAt),
+            deletedAt: SyncTimestamp.canonical(record.deletedAt),
         )
     }
 
@@ -888,7 +890,7 @@ final class SyncLocalStore {
             ingredients: record.ingredients
                 .sorted { $0.position < $1.position }
                 .map { recipeIngredientPayload(from: $0) },
-            createdAt: record.createdAt,
+            createdAt: SyncTimestamp.canonical(record.createdAt),
         )
     }
 
@@ -932,9 +934,9 @@ final class SyncLocalStore {
                 fat: record.fat,
                 carbs: record.carbs,
             ),
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
-            deletedAt: record.deletedAt,
+            createdAt: SyncTimestamp.canonical(record.createdAt),
+            updatedAt: SyncTimestamp.canonical(record.updatedAt),
+            deletedAt: SyncTimestamp.canonical(record.deletedAt),
         )
     }
 
@@ -971,7 +973,7 @@ final class SyncLocalStore {
             id: record.id,
             effectiveFrom: effectiveFrom,
             days: days,
-            createdAt: record.createdAt,
+            createdAt: SyncTimestamp.canonical(record.createdAt),
         )
     }
 

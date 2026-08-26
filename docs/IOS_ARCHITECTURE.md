@@ -244,6 +244,17 @@ uses a `SyncPayloadEnvelope` with `schemaVersion: 1`, an explicit entity type
 (`product`, `productVersion`, `recipe`, `recipeVersion`, `diaryEntry`, or
 `weeklyGoal`) and a UUID. The same `SyncEntityKey` is used by the outbox and
 payload export, so there is no runtime-type-name or second identity mapping.
+
+All domain `Date` values at this boundary are normalized by `SyncTimestamp` to
+canonical Unix-millisecond precision before local export, remote application,
+canonical equality/fingerprint comparison, and transport export. This covers
+Product `createdAt` / `updatedAt` / `deletedAt`, ProductVersion `createdAt`,
+Recipe `createdAt` / `updatedAt` / `deletedAt`, RecipeVersion `createdAt`,
+DiaryEntry `createdAt` / `updatedAt` / `deletedAt`, and WeeklyGoal `createdAt`.
+SwiftData retains its original Date values; normalization is only a sync
+boundary operation. `LocalDay` remains a civil-date value, while
+`server_updated_at` and other transport/operational metadata are not canonical
+domain timestamps.
 Only these six top-level payloads exist: RecipeVersion embeds its ordered,
 pinned ingredients and WeeklyGoal embeds its seven ordered daily values.
 
@@ -257,13 +268,14 @@ therefore cannot echo a pull back into a future push. Its result distinguishes
 insertion, remote application, identical content, local-wins, dependency
 deferral and explicit republish effects.
 
-Product, Recipe and DiaryEntry use whole-record last-writer-wins by `updatedAt`.
-Tombstones are sticky: a tombstone always wins over a non-tombstone; two
-tombstones use the same timestamp rule. WeeklyGoal competes as a whole aggregate
-by its natural `effectiveFrom` key and `createdAt`. For an equal timestamp, the
-canonical sorted-key JSON bytes of the version-1 envelope break the tie; the
-lexicographically greater payload wins. This is deterministic and
-direction-independent.
+Product, Recipe and DiaryEntry use whole-record last-writer-wins by canonical
+millisecond `updatedAt`; raw high-precision local Dates never compare against
+canonical remote Dates. Tombstones are sticky: a tombstone always wins over a
+non-tombstone; two tombstones use the same timestamp rule. WeeklyGoal competes
+as a whole aggregate by its natural `effectiveFrom` key and `createdAt`. For an
+equal canonical timestamp, the canonical sorted-key JSON bytes of the version-1
+envelope break the tie; the lexicographically greater payload wins. This is
+deterministic and direction-independent.
 
 Remote Product/Recipe current-version references, RecipeVersion pinned
 ProductVersions and DiaryEntry source versions are dependencies. Missing

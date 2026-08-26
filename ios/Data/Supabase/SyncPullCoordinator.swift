@@ -28,6 +28,31 @@ enum SyncPullFailure: Equatable, Sendable {
     case persistence
 }
 
+private enum SyncRemoteApplyFailureCategory: String {
+    case syncLocalStoreUnsupportedPayloadSchema
+    case syncLocalStoreMissingEntity
+    case syncLocalStoreInvalidPayload
+    case syncLocalStoreInconsistentIdentity
+    case syncLocalStoreImmutableCollision
+    case syncMetadata
+    case persistence
+}
+
+private struct SyncRemoteApplyFailureDiagnostic {
+    let reason: SyncPullFailure
+    let category: SyncRemoteApplyFailureCategory
+    let safeErrorDescription: String
+
+    var requiresCanonicalDifferenceSummary: Bool {
+        switch reason {
+        case .immutableCollision, .invariantViolation:
+            true
+        case .invalidRemoteRecord, .invalidPayload, .metadata, .persistence:
+            false
+        }
+    }
+}
+
 enum SyncPullRunFailure: Equatable, Sendable {
     case transport(SupabaseInfrastructureError)
     case cursorPersistence
@@ -393,11 +418,18 @@ final class SyncPullCoordinator {
             )
         } catch {
             modelContext.rollback()
-            syncPullLogger.error("Sync pull could not apply a remote record")
+            let diagnostic = failureDiagnostic(for: error)
+            logRemoteApplyFailure(
+                record,
+                diagnostic: diagnostic,
+                canonicalDifferenceSummary: diagnostic.requiresCanonicalDifferenceSummary
+                    ? canonicalDifferenceSummary(for: record)
+                    : nil,
+            )
             return .failed(
                 key: record.key,
                 serverRevision: record.serverRevision,
-                reason: failureReason(for: error),
+                reason: diagnostic.reason,
             )
         }
     }
@@ -430,24 +462,359 @@ final class SyncPullCoordinator {
         }
     }
 
-    private func failureReason(for error: Error) -> SyncPullFailure {
+    private func failureDiagnostic(for error: Error) -> SyncRemoteApplyFailureDiagnostic {
         guard let error = error as? SyncLocalStoreError else {
             if error is SyncMetadataStoreError {
-                return .metadata
+                return SyncRemoteApplyFailureDiagnostic(
+                    reason: .metadata,
+                    category: .syncMetadata,
+                    safeErrorDescription: "sync metadata rejected the remote record",
+                )
             }
-            return .persistence
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .persistence,
+                category: .persistence,
+                safeErrorDescription: "persistence operation failed",
+            )
         }
 
         switch error {
-        case .immutableCollision:
-            return .immutableCollision
-        case .invalidPayload, .unsupportedPayloadSchema:
-            return .invalidPayload
-        case .inconsistentIdentity:
-            return .invariantViolation
+        case let .unsupportedPayloadSchema(version):
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .invalidPayload,
+                category: .syncLocalStoreUnsupportedPayloadSchema,
+                safeErrorDescription: "unsupported payload schema \(version)",
+            )
         case .missingEntity:
-            return .persistence
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .persistence,
+                category: .syncLocalStoreMissingEntity,
+                safeErrorDescription: "local entity is missing",
+            )
+        case .invalidPayload:
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .invalidPayload,
+                category: .syncLocalStoreInvalidPayload,
+                safeErrorDescription: "payload validation rejected the remote record",
+            )
+        case .inconsistentIdentity:
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .invariantViolation,
+                category: .syncLocalStoreInconsistentIdentity,
+                safeErrorDescription: "local identity invariant rejected the remote record",
+            )
+        case .immutableCollision:
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .immutableCollision,
+                category: .syncLocalStoreImmutableCollision,
+                safeErrorDescription: "immutable canonical payload differs from the local record",
+            )
         }
+    }
+
+    private func logRemoteApplyFailure(
+        _ record: SupabaseRemoteSyncRecord,
+        diagnostic: SyncRemoteApplyFailureDiagnostic,
+        canonicalDifferenceSummary: String?,
+    ) {
+        if let canonicalDifferenceSummary {
+            syncPullLogger.error(
+                "Sync pull remote apply failure serverRevision=\(record.serverRevision, privacy: .public) entityType=\(record.key.entityType.rawValue, privacy: .public) entityID=\(record.key.entityID.uuidString.lowercased(), privacy: .public) failureCategory=\(diagnostic.category.rawValue, privacy: .public) error=\(diagnostic.safeErrorDescription, privacy: .public) difference=\(canonicalDifferenceSummary, privacy: .public)",
+            )
+        } else {
+            syncPullLogger.error(
+                "Sync pull remote apply failure serverRevision=\(record.serverRevision, privacy: .public) entityType=\(record.key.entityType.rawValue, privacy: .public) entityID=\(record.key.entityID.uuidString.lowercased(), privacy: .public) failureCategory=\(diagnostic.category.rawValue, privacy: .public) error=\(diagnostic.safeErrorDescription, privacy: .public)",
+            )
+        }
+    }
+
+    /// Rebuilds the persisted payload after the failed transaction has rolled back. This is
+    /// diagnostic-only; no merge result, cursor or local record is changed by this read.
+    private func canonicalDifferenceSummary(for record: SupabaseRemoteSyncRecord) -> String {
+        do {
+            let localPayload = try localStore.payload(for: record.key)
+            return canonicalDifferenceSummary(local: localPayload, incoming: record.payload)
+        } catch {
+            return "localCanonicalPayload=unavailable"
+        }
+    }
+
+    private func canonicalDifferenceSummary(local: SyncPayload, incoming: SyncPayload) -> String {
+        switch (local, incoming) {
+        case let (.productVersion(local), .productVersion(incoming)):
+            return productVersionDifferenceSummary(local: local, incoming: incoming)
+        case let (.recipeVersion(local), .recipeVersion(incoming)):
+            return recipeVersionDifferenceSummary(local: local, incoming: incoming)
+        default:
+            return genericCanonicalDifferenceSummary(local: local, incoming: incoming)
+        }
+    }
+
+    /// Non-version invariants do not need scalar values in logs. Their canonical JSON is used
+    /// only to name differing fields, never to emit a payload or a user-provided value.
+    private func genericCanonicalDifferenceSummary(local: SyncPayload, incoming: SyncPayload) -> String {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            let localJSON = try JSONSerialization.jsonObject(with: encoder.encode(local))
+            let incomingJSON = try JSONSerialization.jsonObject(with: encoder.encode(incoming))
+            var differences: [String] = []
+            appendCanonicalFieldDifferences(
+                local: localJSON,
+                incoming: incomingJSON,
+                path: "payload",
+                to: &differences,
+            )
+            return boundedDifferenceSummary(differences)
+        } catch {
+            return "canonicalPayload=changed(fieldSummaryUnavailable)"
+        }
+    }
+
+    private func appendCanonicalFieldDifferences(
+        local: Any,
+        incoming: Any,
+        path: String,
+        to differences: inout [String],
+    ) {
+        if let localDictionary = local as? [String: Any],
+           let incomingDictionary = incoming as? [String: Any]
+        {
+            let keys = Set(localDictionary.keys).union(incomingDictionary.keys).sorted()
+            for key in keys {
+                let fieldPath = "\(path).\(key)"
+                guard let localValue = localDictionary[key] else {
+                    differences.append("\(fieldPath) local=missing incoming=present")
+                    continue
+                }
+                guard let incomingValue = incomingDictionary[key] else {
+                    differences.append("\(fieldPath) local=present incoming=missing")
+                    continue
+                }
+                appendCanonicalFieldDifferences(
+                    local: localValue,
+                    incoming: incomingValue,
+                    path: fieldPath,
+                    to: &differences,
+                )
+            }
+            return
+        }
+
+        if let localArray = local as? [Any],
+           let incomingArray = incoming as? [Any]
+        {
+            if localArray.count != incomingArray.count {
+                differences.append("\(path).count local=\(localArray.count) incoming=\(incomingArray.count)")
+            }
+            for index in 0 ..< min(localArray.count, incomingArray.count) {
+                appendCanonicalFieldDifferences(
+                    local: localArray[index],
+                    incoming: incomingArray[index],
+                    path: "\(path)[\(index)]",
+                    to: &differences,
+                )
+            }
+            return
+        }
+
+        let localValue = local as? NSObject
+        let incomingValue = incoming as? NSObject
+        guard localValue?.isEqual(incomingValue) == true else {
+            differences.append("\(path) differs")
+            return
+        }
+    }
+
+    private func productVersionDifferenceSummary(
+        local: ProductVersionPayload,
+        incoming: ProductVersionPayload,
+    ) -> String {
+        var differences: [String] = []
+        appendDifference("id", local.id, incoming.id, format: formatUUID, to: &differences)
+        appendDifference("productID", local.productID, incoming.productID, format: formatUUID, to: &differences)
+        appendDifference(
+            "basedOnVersionID",
+            local.basedOnVersionID,
+            incoming.basedOnVersionID,
+            format: formatOptionalUUID,
+            to: &differences,
+        )
+        appendDifference("versionNumber", local.versionNumber, incoming.versionNumber, format: formatInteger, to: &differences)
+        appendDifference("baseUnit", local.baseUnit.rawValue, incoming.baseUnit.rawValue, format: { $0 }, to: &differences)
+        appendDifference("baseAmount", local.baseAmount, incoming.baseAmount, format: formatNumber, to: &differences)
+        appendDifference(
+            "nutrition.calories",
+            local.nutrition.calories,
+            incoming.nutrition.calories,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "nutrition.protein",
+            local.nutrition.protein,
+            incoming.nutrition.protein,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "nutrition.fat",
+            local.nutrition.fat,
+            incoming.nutrition.fat,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "nutrition.carbs",
+            local.nutrition.carbs,
+            incoming.nutrition.carbs,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference("createdAt", local.createdAt, incoming.createdAt, format: formatDate, to: &differences)
+        return boundedDifferenceSummary(differences)
+    }
+
+    private func recipeVersionDifferenceSummary(
+        local: RecipeVersionPayload,
+        incoming: RecipeVersionPayload,
+    ) -> String {
+        var differences: [String] = []
+        appendDifference("id", local.id, incoming.id, format: formatUUID, to: &differences)
+        appendDifference("recipeID", local.recipeID, incoming.recipeID, format: formatUUID, to: &differences)
+        appendDifference(
+            "basedOnVersionID",
+            local.basedOnVersionID,
+            incoming.basedOnVersionID,
+            format: formatOptionalUUID,
+            to: &differences,
+        )
+        appendDifference("versionNumber", local.versionNumber, incoming.versionNumber, format: formatInteger, to: &differences)
+        appendDifference(
+            "totalNutrition.calories",
+            local.totalNutrition.calories,
+            incoming.totalNutrition.calories,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "totalNutrition.protein",
+            local.totalNutrition.protein,
+            incoming.totalNutrition.protein,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "totalNutrition.fat",
+            local.totalNutrition.fat,
+            incoming.totalNutrition.fat,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "totalNutrition.carbs",
+            local.totalNutrition.carbs,
+            incoming.totalNutrition.carbs,
+            format: formatNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "cookedWeight",
+            local.cookedWeight,
+            incoming.cookedWeight,
+            format: formatOptionalNumber,
+            to: &differences,
+        )
+        appendDifference(
+            "servingsCount",
+            local.servingsCount,
+            incoming.servingsCount,
+            format: formatOptionalNumber,
+            to: &differences,
+        )
+        appendDifference("createdAt", local.createdAt, incoming.createdAt, format: formatDate, to: &differences)
+        appendIngredientDifferences(local: local.ingredients, incoming: incoming.ingredients, to: &differences)
+        return boundedDifferenceSummary(differences)
+    }
+
+    private func appendIngredientDifferences(
+        local: [RecipeVersionPayload.Ingredient],
+        incoming: [RecipeVersionPayload.Ingredient],
+        to differences: inout [String],
+    ) {
+        appendDifference("ingredients.count", local.count, incoming.count, format: formatInteger, to: &differences)
+
+        let sharedCount = min(local.count, incoming.count)
+        for index in 0 ..< sharedCount where local[index] != incoming[index] {
+            differences.append(
+                "ingredient[index=\(index)] local={\(formatIngredient(local[index]))} incoming={\(formatIngredient(incoming[index]))}",
+            )
+        }
+
+        if local.count > sharedCount {
+            for index in sharedCount ..< local.count {
+                differences.append("ingredient[index=\(index)] local={\(formatIngredient(local[index]))} incoming=missing")
+            }
+        }
+        if incoming.count > sharedCount {
+            for index in sharedCount ..< incoming.count {
+                differences.append("ingredient[index=\(index)] local=missing incoming={\(formatIngredient(incoming[index]))}")
+            }
+        }
+    }
+
+    private func appendDifference<Value: Equatable>(
+        _ field: String,
+        _ local: Value,
+        _ incoming: Value,
+        format: (Value) -> String,
+        to differences: inout [String],
+    ) {
+        guard local != incoming else {
+            return
+        }
+        differences.append("\(field) local=\(format(local)) incoming=\(format(incoming))")
+    }
+
+    private func boundedDifferenceSummary(_ differences: [String]) -> String {
+        guard !differences.isEmpty else {
+            return "canonicalPayload=identical"
+        }
+
+        let maximumEntries = 24
+        let displayed = differences.prefix(maximumEntries)
+        let suffix = differences.count > maximumEntries
+            ? " additionalDifferences=\(differences.count - maximumEntries)"
+            : ""
+        return "changedFields=\(displayed.joined(separator: "; "))\(suffix)"
+    }
+
+    private func formatIngredient(_ ingredient: RecipeVersionPayload.Ingredient) -> String {
+        "position=\(ingredient.position),id=\(formatUUID(ingredient.id)),recipeVersionID=\(formatUUID(ingredient.recipeVersionID)),productID=\(formatUUID(ingredient.productID)),productVersionID=\(formatUUID(ingredient.productVersionID)),amount=\(formatNumber(ingredient.amount)),unit=\(ingredient.unitToken),normalizedAmount=\(formatNumber(ingredient.normalizedAmount))"
+    }
+
+    private func formatUUID(_ value: UUID) -> String {
+        value.uuidString.lowercased()
+    }
+
+    private func formatOptionalUUID(_ value: UUID?) -> String {
+        value.map(formatUUID) ?? "nil"
+    }
+
+    private func formatInteger(_ value: Int) -> String {
+        String(value)
+    }
+
+    private func formatNumber(_ value: Double) -> String {
+        String(format: "%.17g", value)
+    }
+
+    private func formatOptionalNumber(_ value: Double?) -> String {
+        value.map(formatNumber) ?? "nil"
+    }
+
+    private func formatDate(_ value: Date) -> String {
+        formatNumber(value.timeIntervalSince1970)
     }
 
     private func safeCursor(

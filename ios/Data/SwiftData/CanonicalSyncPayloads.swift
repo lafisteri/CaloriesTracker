@@ -4,6 +4,41 @@ enum SyncPayloadFormat {
     static let currentSchemaVersion = 1
 }
 
+/// The only timestamp precision used at the sync canonical boundary.
+///
+/// Supabase's current payload round-trip retains Unix milliseconds. Dates are first
+/// represented as integral microseconds to remove `Date`'s binary floating-point
+/// representation noise, then deterministically truncated to Unix milliseconds.
+/// This is normalization, not approximate timestamp comparison.
+enum SyncTimestamp {
+    private static let microsecondsPerSecond = 1_000_000.0
+    private static let microsecondsPerMillisecond = 1_000.0
+    private static let millisecondsPerSecond = 1_000.0
+
+    static func canonical(_ date: Date) -> Date {
+        let seconds = date.timeIntervalSince1970
+        guard seconds.isFinite else {
+            return date
+        }
+
+        let roundedMicroseconds = (seconds * microsecondsPerSecond).rounded(.toNearestOrAwayFromZero)
+        let milliseconds = (roundedMicroseconds / microsecondsPerMillisecond).rounded(.down)
+        guard
+            milliseconds.isFinite,
+            milliseconds >= Double(Int64.min),
+            milliseconds <= Double(Int64.max)
+        else {
+            return date
+        }
+
+        return Date(timeIntervalSince1970: Double(Int64(milliseconds)) / millisecondsPerSecond)
+    }
+
+    static func canonical(_ date: Date?) -> Date? {
+        date.map { canonical($0) }
+    }
+}
+
 struct SyncPayloadEnvelope: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let payload: SyncPayload
@@ -81,6 +116,91 @@ enum SyncPayload: Codable, Equatable, Sendable {
             try container.encode(payload, forKey: .payload)
         case let .weeklyGoal(payload):
             try container.encode(payload, forKey: .payload)
+        }
+    }
+
+    /// Reconstructs every domain payload with sync-canonical timestamps. This is
+    /// deliberately exhaustive so a new payload Date cannot bypass the boundary.
+    func canonicalizedTimestamps() -> SyncPayload {
+        switch self {
+        case let .product(payload):
+            .product(
+                ProductPayload(
+                    id: payload.id,
+                    name: payload.name,
+                    barcode: payload.barcode,
+                    currentVersionID: payload.currentVersionID,
+                    createdAt: SyncTimestamp.canonical(payload.createdAt),
+                    updatedAt: SyncTimestamp.canonical(payload.updatedAt),
+                    deletedAt: SyncTimestamp.canonical(payload.deletedAt),
+                ),
+            )
+        case let .productVersion(payload):
+            .productVersion(
+                ProductVersionPayload(
+                    id: payload.id,
+                    productID: payload.productID,
+                    basedOnVersionID: payload.basedOnVersionID,
+                    versionNumber: payload.versionNumber,
+                    baseUnit: payload.baseUnit,
+                    baseAmount: payload.baseAmount,
+                    nutrition: payload.nutrition,
+                    createdAt: SyncTimestamp.canonical(payload.createdAt),
+                ),
+            )
+        case let .recipe(payload):
+            .recipe(
+                RecipePayload(
+                    id: payload.id,
+                    name: payload.name,
+                    currentVersionID: payload.currentVersionID,
+                    createdAt: SyncTimestamp.canonical(payload.createdAt),
+                    updatedAt: SyncTimestamp.canonical(payload.updatedAt),
+                    deletedAt: SyncTimestamp.canonical(payload.deletedAt),
+                ),
+            )
+        case let .recipeVersion(payload):
+            .recipeVersion(
+                RecipeVersionPayload(
+                    id: payload.id,
+                    recipeID: payload.recipeID,
+                    basedOnVersionID: payload.basedOnVersionID,
+                    versionNumber: payload.versionNumber,
+                    totalNutrition: payload.totalNutrition,
+                    cookedWeight: payload.cookedWeight,
+                    servingsCount: payload.servingsCount,
+                    ingredients: payload.ingredients,
+                    createdAt: SyncTimestamp.canonical(payload.createdAt),
+                ),
+            )
+        case let .diaryEntry(payload):
+            .diaryEntry(
+                DiaryEntryPayload(
+                    id: payload.id,
+                    day: payload.day,
+                    mealType: payload.mealType,
+                    sortOrder: payload.sortOrder,
+                    sourceType: payload.sourceType,
+                    sourceID: payload.sourceID,
+                    sourceVersionID: payload.sourceVersionID,
+                    sourceName: payload.sourceName,
+                    amount: payload.amount,
+                    unitToken: payload.unitToken,
+                    nutrition: payload.nutrition,
+                    createdAt: SyncTimestamp.canonical(payload.createdAt),
+                    updatedAt: SyncTimestamp.canonical(payload.updatedAt),
+                    deletedAt: SyncTimestamp.canonical(payload.deletedAt),
+                ),
+            )
+        case let .weeklyGoal(payload):
+            .weeklyGoal(
+                WeeklyGoalPayload(
+                    id: payload.id,
+                    effectiveFrom: payload.effectiveFrom,
+                    days: payload.days,
+                    createdAt: SyncTimestamp.canonical(payload.createdAt),
+                ),
+            )
         }
     }
 }
@@ -172,8 +292,8 @@ struct WeeklyGoalPayload: Codable, Equatable, Sendable {
 
 enum SyncPayloadCanonicalizer {
     static func compare(_ lhs: SyncPayload, _ rhs: SyncPayload) throws -> ComparisonResult {
-        let lhsData = try canonicalData(for: lhs)
-        let rhsData = try canonicalData(for: rhs)
+        let lhsData = try canonicalData(for: lhs.canonicalizedTimestamps())
+        let rhsData = try canonicalData(for: rhs.canonicalizedTimestamps())
         if lhsData == rhsData {
             return .orderedSame
         }
