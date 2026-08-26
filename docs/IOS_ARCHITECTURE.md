@@ -112,6 +112,25 @@ safe to replay. Dependency deferrals, invalid payloads and immutable-content
 collisions never move the cursor past the blocking record. Pull never invokes
 push, bootstrap, realtime or a local mutation backfill.
 
+`SyncBootstrapCoordinator` is a third, manually callable coordinator for an
+account that has no completed bootstrap marker. It reuses pull, push and the
+existing `SyncLocalStore` rules rather than adding another transport or conflict
+path. It first pulls cloud state to exhaustion, then performs one deterministic
+local identity scan (ProductVersion, Product, RecipeVersion, Recipe, WeeklyGoal,
+DiaryEntry) and seeds only account-unknown identities through `ensurePending`.
+Existing outbox tokens are preserved. It pushes through `SyncPushCoordinator`,
+pulls again so its own server revisions enter the pull cursor, and repeats for at
+most ten rounds. A conflict is followed by normal pull before any later attempt;
+there is no blind retry.
+
+Completion is account-scoped and persists only after a final caught-up pull has
+no deferred or failed records, every local top-level identity has a known remote
+revision, and no outbox work remains. A crash before that marker is safe: the
+next manual run reuses the persistent cursor, remote revisions and outbox tokens.
+Completed accounts return a no-op without rescanning local records. Bootstrap
+never advances the pull cursor itself, and remains manual-only: it has no launch,
+foreground, login, timer, push-follow-up, Realtime or production UI trigger.
+
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
 
@@ -153,6 +172,12 @@ Revisions and cursors are monotonic and reject regression rather than silently
 using a maximum. A pushed entity revision never advances the pull cursor: other
 account changes may still exist before that revision.
 
+The V4 lightweight migration adds only `SyncBootstrapStateRecord`, an
+account-scoped completed-at marker. It does not change domain records or delete
+or backfill local data, outbox rows, remote revisions or pull cursors. Signing
+out retains this marker; returning to the same account remains complete while a
+different account has an independent bootstrap state.
+
 Signing out retains local data, outbox rows and account-scoped metadata. A later
 sign-in to the same account can reuse its metadata, while another account gets
 an isolated namespace. No migration backfills revisions or treats current local
@@ -175,11 +200,12 @@ pinned ingredients and WeeklyGoal embeds its seven ordered daily values.
 `SyncLocalStore.payload(for:)` exports the current local state immutably,
 including tombstones. A missing physical record for a requested key is an
 invariant error, never an empty or synthetic payload. `applyRemote` validates a
-payload, checks dependencies, resolves conflicts and saves directly through a
-SwiftData `ModelContext`; it never marks an outbox record and therefore cannot
-echo a pull back into a future push. Its result distinguishes insertion, remote
-application, identical content, local-wins, dependency deferral and explicit
-republish effects.
+payload, checks dependencies and resolves conflicts. Its caller-owned context
+variant lets pull combine the merge with metadata/outbox updates in one save;
+the convenience form saves by itself. It never marks an outbox record and
+therefore cannot echo a pull back into a future push. Its result distinguishes
+insertion, remote application, identical content, local-wins, dependency
+deferral and explicit republish effects.
 
 Product, Recipe and DiaryEntry use whole-record last-writer-wins by `updatedAt`.
 Tombstones are sticky: a tombstone always wins over a non-tombstone; two
@@ -199,8 +225,8 @@ and normalized amounts with `RecipeCalculator` without rewriting payload values.
 Barcode uniqueness includes deleted Products. A collision keeps the newer
 Product by the same timestamp/canonical rule, clears only the losing barcode and
 returns that Product as a `needsRepublish` effect. Local-wins outcomes also
-return explicit republish effects; neither path writes an outbox row. There is
-no persistent schema change, staging queue or networking dependency in
+return explicit republish effects; the pull coordinator reconciles them through
+the outbox. There is no staging queue or additional networking dependency in
 this foundation.
 
 ## Project structure
@@ -217,12 +243,12 @@ ios/
     Goals/GoalService.swift
     Statistics/StatisticsService.swift
   Data/SwiftData/
-    Models/ Mappers/ Repositories/ SchemaV1.swift MigrationPlan.swift
+    Models/ Mappers/ Repositories/ SchemaV1.swift SchemaV4.swift MigrationPlan.swift
     SyncEntityIdentity.swift SyncMetadata.swift CanonicalSyncPayloads.swift
     SyncLocalStore.swift
   Data/Supabase/
     SupabaseClientProvider.swift SupabaseAuthService.swift SupabaseSyncTransport.swift
-    SyncPushCoordinator.swift SyncPullCoordinator.swift
+    SyncPushCoordinator.swift SyncPullCoordinator.swift SyncBootstrapCoordinator.swift
   Features/
     Today/ Catalog/ Statistics/ Goals/
 ~~~
@@ -505,8 +531,8 @@ presented to the user only through a stable context-specific message.
 SwiftData remains the only persistence implementation and the local source of
 truth. Supabase provides an internal, optional email-OTP and typed transport
 foundation, including persistent account-scoped revision and pull-cursor metadata
-and explicit manual outbox push and incremental pull APIs. There is no sync UI,
-automatic worker, initial upload/bootstrap, realtime or automatic orchestration.
+and explicit manual outbox push, incremental pull and initial-bootstrap APIs.
+There is no sync UI, automatic worker, realtime or automatic orchestration.
 staging queue, web migration, barcode scanner wrapper or external product API.
 Canonical payload export and direct local remote-merge support remain internal
 foundation rather than a user-facing import/export feature.

@@ -40,6 +40,19 @@ final class SyncPullStateRecord {
     }
 }
 
+@Model
+final class SyncBootstrapStateRecord {
+    @Attribute(.unique) var accountID: UUID
+    var completedAt: Date
+    var updatedAt: Date
+
+    init(accountID: UUID, completedAt: Date, updatedAt: Date) {
+        self.accountID = accountID
+        self.completedAt = completedAt
+        self.updatedAt = updatedAt
+    }
+}
+
 enum SyncMetadataStoreError: Error, LocalizedError {
     case invalidRemoteRevision(Int64)
     case invalidPullCursor(Int64)
@@ -47,6 +60,7 @@ enum SyncMetadataStoreError: Error, LocalizedError {
     case invalidEntityType(String)
     case corruptRemoteState(String)
     case corruptPullState(UUID)
+    case corruptBootstrapState(UUID)
 
     var errorDescription: String? {
         switch self {
@@ -62,6 +76,8 @@ enum SyncMetadataStoreError: Error, LocalizedError {
             "Неконсистентный remote sync metadata: \(key)."
         case let .corruptPullState(accountID):
             "Неконсистентный pull sync metadata для account \(accountID.uuidString)."
+        case let .corruptBootstrapState(accountID):
+            "Неконсистентный bootstrap sync metadata для account \(accountID.uuidString)."
         }
     }
 }
@@ -180,6 +196,53 @@ enum SyncMetadataStore {
         )
     }
 
+    static func bootstrapCompleted(
+        accountID: UUID,
+        in modelContext: ModelContext,
+    ) throws -> Bool {
+        guard let state = try bootstrapState(accountID: accountID, in: modelContext) else {
+            return false
+        }
+        try validate(state, accountID: accountID)
+        return true
+    }
+
+    static func markBootstrapCompleted(
+        accountID: UUID,
+        in modelContext: ModelContext,
+    ) throws {
+        if let state = try bootstrapState(accountID: accountID, in: modelContext) {
+            try validate(state, accountID: accountID)
+            return
+        }
+
+        let now = Date()
+        modelContext.insert(
+            SyncBootstrapStateRecord(
+                accountID: accountID,
+                completedAt: now,
+                updatedAt: now,
+            ),
+        )
+    }
+
+    static func remoteEntityKeys(
+        accountID: UUID,
+        in modelContext: ModelContext,
+    ) throws -> Set<SyncEntityKey> {
+        let descriptor = FetchDescriptor<SyncRemoteStateRecord>(
+            predicate: #Predicate { $0.accountID == accountID },
+        )
+        return try Set(modelContext.fetch(descriptor).map { state in
+            guard let entityType = SyncEntityType(rawValue: state.entityTypeRaw) else {
+                throw SyncMetadataStoreError.invalidEntityType(state.entityTypeRaw)
+            }
+            let entityKey = SyncEntityKey(entityType: entityType, entityID: state.entityID)
+            try validate(state, accountID: accountID, entityKey: entityKey)
+            return entityKey
+        })
+    }
+
     static func remoteStateKey(accountID: UUID, entityKey: SyncEntityKey) -> String {
         "\(accountID.uuidString.lowercased()):\(entityKey.rawValue)"
     }
@@ -202,6 +265,17 @@ enum SyncMetadataStore {
         in modelContext: ModelContext,
     ) throws -> SyncPullStateRecord? {
         var descriptor = FetchDescriptor<SyncPullStateRecord>(
+            predicate: #Predicate { $0.accountID == accountID },
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private static func bootstrapState(
+        accountID: UUID,
+        in modelContext: ModelContext,
+    ) throws -> SyncBootstrapStateRecord? {
+        var descriptor = FetchDescriptor<SyncBootstrapStateRecord>(
             predicate: #Predicate { $0.accountID == accountID },
         )
         descriptor.fetchLimit = 1
@@ -232,6 +306,16 @@ enum SyncMetadataStore {
     private static func validate(_ state: SyncPullStateRecord, accountID: UUID) throws {
         guard state.accountID == accountID, state.lastPulledRevision >= 0 else {
             throw SyncMetadataStoreError.corruptPullState(state.accountID)
+        }
+    }
+
+    private static func validate(_ state: SyncBootstrapStateRecord, accountID: UUID) throws {
+        guard
+            state.accountID == accountID,
+            state.completedAt.timeIntervalSinceReferenceDate.isFinite,
+            state.updatedAt.timeIntervalSinceReferenceDate.isFinite
+        else {
+            throw SyncMetadataStoreError.corruptBootstrapState(state.accountID)
         }
     }
 }

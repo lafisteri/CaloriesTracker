@@ -48,6 +48,35 @@ final class SyncLocalStore {
         SyncPayloadEnvelope(payload: try payload(for: key))
     }
 
+    /// Returns all top-level sync identities without exporting their canonical payloads.
+    func syncEntityKeys() throws -> [SyncEntityKey] {
+        let modelContext = ModelContext(modelContainer)
+        return try syncEntityKeys(in: modelContext)
+    }
+
+    /// Returns all top-level sync identities in deterministic dependency-friendly order.
+    func syncEntityKeys(in modelContext: ModelContext) throws -> [SyncEntityKey] {
+        let productVersions = try modelContext.fetch(FetchDescriptor<ProductVersionRecord>())
+        let products = try modelContext.fetch(FetchDescriptor<ProductRecord>())
+        let recipeVersions = try modelContext.fetch(FetchDescriptor<RecipeVersionRecord>())
+        let recipes = try modelContext.fetch(FetchDescriptor<RecipeRecord>())
+        let weeklyGoals = try modelContext.fetch(FetchDescriptor<WeeklyGoalRecord>())
+        let diaryEntries = try modelContext.fetch(FetchDescriptor<DiaryEntryRecord>())
+
+        func keys<T>(_ records: [T], type: SyncEntityType, id: (T) -> UUID) -> [SyncEntityKey] {
+            records
+                .map { SyncEntityKey(entityType: type, entityID: id($0)) }
+                .sorted { $0.rawValue < $1.rawValue }
+        }
+
+        return keys(productVersions, type: .productVersion, id: { $0.id })
+            + keys(products, type: .product, id: { $0.id })
+            + keys(recipeVersions, type: .recipeVersion, id: { $0.id })
+            + keys(recipes, type: .recipe, id: { $0.id })
+            + keys(weeklyGoals, type: .weeklyGoal, id: { $0.id })
+            + keys(diaryEntries, type: .diaryEntry, id: { $0.id })
+    }
+
     func applyRemote(_ envelope: SyncPayloadEnvelope) throws -> SyncMergeResult {
         let modelContext = ModelContext(modelContainer)
         do {

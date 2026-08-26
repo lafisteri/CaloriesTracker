@@ -124,6 +124,10 @@ enum SyncOutboxStore {
         return try modelContext.fetch(descriptor)
     }
 
+    static func pendingCount(in modelContext: ModelContext) throws -> Int {
+        try pending(in: modelContext).count
+    }
+
     static func pending(
         limit: Int = defaultPendingLimit,
         in modelContext: ModelContext,

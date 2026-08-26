@@ -18,9 +18,10 @@ final class AppDependencies {
     let syncLocalStore: SyncLocalStore
     let syncPushCoordinator: SyncPushCoordinator?
     let syncPullCoordinator: SyncPullCoordinator?
+    let syncBootstrapCoordinator: SyncBootstrapCoordinator?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
-        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV3.self)
+        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV4.self)
         let configuration = ModelConfiguration(
             "CaloriesTracker",
             schema: schema,
@@ -64,21 +65,31 @@ final class AppDependencies {
         self.supabaseAuth = supabaseAuth
         self.supabaseSyncTransport = supabaseSyncTransport
         if let supabaseAuth, let supabaseSyncTransport {
-            syncPushCoordinator = SyncPushCoordinator(
+            let syncPushCoordinator = SyncPushCoordinator(
                 modelContainer: modelContainer,
                 localStore: syncLocalStore,
                 authService: supabaseAuth,
                 transport: supabaseSyncTransport,
             )
-            syncPullCoordinator = SyncPullCoordinator(
+            let syncPullCoordinator = SyncPullCoordinator(
                 modelContainer: modelContainer,
                 localStore: syncLocalStore,
                 authService: supabaseAuth,
                 transport: supabaseSyncTransport,
+            )
+            self.syncPushCoordinator = syncPushCoordinator
+            self.syncPullCoordinator = syncPullCoordinator
+            syncBootstrapCoordinator = SyncBootstrapCoordinator(
+                modelContainer: modelContainer,
+                localStore: syncLocalStore,
+                authService: supabaseAuth,
+                pullCoordinator: syncPullCoordinator,
+                pushCoordinator: syncPushCoordinator,
             )
         } else {
             syncPushCoordinator = nil
             syncPullCoordinator = nil
+            syncBootstrapCoordinator = nil
         }
     }
 }

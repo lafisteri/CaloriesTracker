@@ -56,6 +56,7 @@ struct SyncPullReport: Equatable, Sendable {
     let endingCursor: Int64
     let fetched: Int
     let pagesFetched: Int
+    let caughtUpToRemoteState: Bool
     let outcomes: [SyncPullItemOutcome]
     let runFailure: SyncPullRunFailure?
 
@@ -183,6 +184,7 @@ final class SyncPullCoordinator {
         var outcomes: [Int64: SyncPullItemOutcome] = [:]
         var runFailure: SyncPullRunFailure?
         var shouldContinue = true
+        var caughtUpToRemoteState = false
 
         syncPullLogger.debug("Sync pull run started at cursor \(startingCursor, privacy: .public)")
 
@@ -206,6 +208,7 @@ final class SyncPullCoordinator {
             }
 
             guard !page.isEmpty else {
+                caughtUpToRemoteState = true
                 break
             }
 
@@ -271,6 +274,7 @@ final class SyncPullCoordinator {
                 shouldContinue = false
             } else if page.count < requestLimit {
                 shouldContinue = false
+                caughtUpToRemoteState = true
             }
         }
 
@@ -287,6 +291,7 @@ final class SyncPullCoordinator {
             endingCursor: endingCursor,
             fetched: fetched,
             pagesFetched: pagesFetched,
+            caughtUpToRemoteState: caughtUpToRemoteState,
             outcomes: outcomes.keys.sorted().compactMap { outcomes[$0] },
             runFailure: runFailure,
         )
