@@ -67,6 +67,18 @@ to use repositories and services and do not depend directly on CloudKit.
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
 
+Product, Recipe and DiaryEntry are mutable local sync entities with stable UUID
+identity and `createdAt` / `updatedAt` / `deletedAt` business timestamps. Their
+user-visible deletion is a retained tombstone; immutable ProductVersion,
+RecipeVersion and RecipeIngredient records never receive sync mutations.
+
+WeeklyGoal and its seven DailyMacroGoal values are a write-once aggregate for
+one `effectiveFrom` key. It has a stable UUID and `createdAt` records its sole
+local mutation; goals are not edited or deleted in place.
+
+Business timestamps are distinct from future sync operational metadata. That
+metadata belongs to future sync infrastructure, not domain or SwiftData records.
+
 ## Project structure
 
 ~~~text
