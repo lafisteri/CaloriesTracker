@@ -92,6 +92,26 @@ the new outbox item remains pending while the accepted remote revision is kept.
 Conflicts and missing remote records remain pending without merge, retry,
 metadata rewrite or recovery. Pushes never change the pull cursor.
 
+`SyncPullCoordinator` is a separate explicit manual API, never run on launch,
+foreground, login, after push or a timer. It starts from the account-scoped
+persistent pull cursor and fetches `server_revision` pages in ascending order,
+bounded to 200 rows per page, five pages and 1,000 rows per run. Its transient
+scan cursor may look ahead beyond the persisted cursor to resolve dependencies:
+deferred records are retried after later ProductVersion or RecipeVersion rows
+arrive. The persisted cursor advances only through the safe range before the
+earliest unresolved or failed revision; revision gaps are valid because
+`sync_records` is a latest-snapshot table, not an append-only changelog.
+
+For each handled remote record, the local merge, account/entity remote revision,
+republish outbox effects and any exact-token stale-outbox acknowledgement commit
+in one `ModelContext.save()`. Remote wins acknowledge only the outbox token
+observed before the merge, so a newer local token survives. Local wins keep the
+local value, record the incoming revision and ensure every explicit republish
+key remains pending without rotating an existing token. Idempotent records are
+safe to replay. Dependency deferrals, invalid payloads and immutable-content
+collisions never move the cursor past the blocking record. Pull never invokes
+push, bootstrap, realtime or a local mutation backfill.
+
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
 
@@ -202,7 +222,7 @@ ios/
     SyncLocalStore.swift
   Data/Supabase/
     SupabaseClientProvider.swift SupabaseAuthService.swift SupabaseSyncTransport.swift
-    SyncPushCoordinator.swift
+    SyncPushCoordinator.swift SyncPullCoordinator.swift
   Features/
     Today/ Catalog/ Statistics/ Goals/
 ~~~
@@ -485,8 +505,8 @@ presented to the user only through a stable context-specific message.
 SwiftData remains the only persistence implementation and the local source of
 truth. Supabase provides an internal, optional email-OTP and typed transport
 foundation, including persistent account-scoped revision and pull-cursor metadata
-and an explicit manual outbox push API. There is no sync UI, automatic worker,
-initial upload, pull, remote merge application,
+and explicit manual outbox push and incremental pull APIs. There is no sync UI,
+automatic worker, initial upload/bootstrap, realtime or automatic orchestration.
 staging queue, web migration, barcode scanner wrapper or external product API.
 Canonical payload export and direct local remote-merge support remain internal
 foundation rather than a user-facing import/export feature.

@@ -17,6 +17,7 @@ final class AppDependencies {
     let supabaseSyncTransport: SupabaseSyncTransport?
     let syncLocalStore: SyncLocalStore
     let syncPushCoordinator: SyncPushCoordinator?
+    let syncPullCoordinator: SyncPullCoordinator?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema(versionedSchema: CaloriesTrackerSchemaV3.self)
@@ -69,8 +70,15 @@ final class AppDependencies {
                 authService: supabaseAuth,
                 transport: supabaseSyncTransport,
             )
+            syncPullCoordinator = SyncPullCoordinator(
+                modelContainer: modelContainer,
+                localStore: syncLocalStore,
+                authService: supabaseAuth,
+                transport: supabaseSyncTransport,
+            )
         } else {
             syncPushCoordinator = nil
+            syncPullCoordinator = nil
         }
     }
 }

@@ -95,6 +95,28 @@ enum SyncOutboxStore {
         }
     }
 
+    /// Ensures a key is pending without rotating an in-flight change token.
+    @discardableResult
+    static func ensurePending(
+        key: SyncEntityKey,
+        in modelContext: ModelContext,
+    ) throws -> Bool {
+        guard try record(key: key.rawValue, in: modelContext) == nil else {
+            return false
+        }
+
+        modelContext.insert(
+            SyncOutboxRecord(
+                key: key.rawValue,
+                entityTypeRaw: key.entityType.rawValue,
+                entityID: key.entityID,
+                changeToken: UUID(),
+                enqueuedAt: Date(),
+            ),
+        )
+        return true
+    }
+
     static func pending(in modelContext: ModelContext) throws -> [SyncOutboxRecord] {
         let descriptor = FetchDescriptor<SyncOutboxRecord>(
             sortBy: [SortDescriptor(\SyncOutboxRecord.enqueuedAt)],
@@ -125,6 +147,21 @@ enum SyncOutboxStore {
                 enqueuedAt: record.enqueuedAt,
             )
         }
+    }
+
+    static func pendingItem(
+        key: SyncEntityKey,
+        in modelContext: ModelContext,
+    ) throws -> SyncOutboxItem? {
+        guard let record = try record(key: key.rawValue, in: modelContext) else {
+            return nil
+        }
+        return SyncOutboxItem(
+            key: record.key,
+            entityKey: try record.syncEntityKey(),
+            changeToken: record.changeToken,
+            enqueuedAt: record.enqueuedAt,
+        )
     }
 
     @discardableResult

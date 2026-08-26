@@ -49,20 +49,46 @@ final class SyncLocalStore {
     }
 
     func applyRemote(_ envelope: SyncPayloadEnvelope) throws -> SyncMergeResult {
+        let modelContext = ModelContext(modelContainer)
+        do {
+            let result = try applyRemote(envelope, in: modelContext)
+            try modelContext.save()
+            return result
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    /// Applies a remote envelope without saving. The caller owns the transaction boundary.
+    func applyRemote(
+        _ envelope: SyncPayloadEnvelope,
+        in modelContext: ModelContext,
+    ) throws -> SyncMergeResult {
         guard envelope.schemaVersion == SyncPayloadFormat.currentSchemaVersion else {
             throw SyncLocalStoreError.unsupportedPayloadSchema(envelope.schemaVersion)
         }
-        return try applyRemote(envelope.payload)
+        return try applyRemote(envelope.payload, in: modelContext)
     }
 
     func applyRemote(_ payload: SyncPayload) throws -> SyncMergeResult {
         let modelContext = ModelContext(modelContainer)
         do {
-            return try apply(payload, in: modelContext)
+            let result = try applyRemote(payload, in: modelContext)
+            try modelContext.save()
+            return result
         } catch {
             modelContext.rollback()
             throw error
         }
+    }
+
+    /// Applies a remote payload without saving. The caller owns the transaction boundary.
+    func applyRemote(
+        _ payload: SyncPayload,
+        in modelContext: ModelContext,
+    ) throws -> SyncMergeResult {
+        try apply(payload, in: modelContext)
     }
 
     func applyRemote(_ payloads: [SyncPayload]) throws -> [SyncMergeResult] {
@@ -150,7 +176,6 @@ final class SyncLocalStore {
             apply(remote, to: localRecord)
             try attachProductVersions(to: localRecord, in: modelContext)
             let repairs = try repairBarcodeConflict(for: localRecord, in: modelContext)
-            try modelContext.save()
             return .remoteApplied(key, needsRepublish: repairs)
         }
 
@@ -163,7 +188,6 @@ final class SyncLocalStore {
         modelContext.insert(record)
         try attachProductVersions(to: record, in: modelContext)
         let repairs = try repairBarcodeConflict(for: record, in: modelContext)
-        try modelContext.save()
         return .inserted(key, needsRepublish: repairs)
     }
 
@@ -184,7 +208,6 @@ final class SyncLocalStore {
             record.product = owner
         }
         modelContext.insert(record)
-        try modelContext.save()
         return .inserted(key, needsRepublish: [])
     }
 
@@ -215,7 +238,6 @@ final class SyncLocalStore {
 
             apply(remote, to: localRecord)
             try attachRecipeVersions(to: localRecord, in: modelContext)
-            try modelContext.save()
             return .remoteApplied(key, needsRepublish: [])
         }
 
@@ -227,7 +249,6 @@ final class SyncLocalStore {
         let record = makeRecipeRecord(from: remote)
         modelContext.insert(record)
         try attachRecipeVersions(to: record, in: modelContext)
-        try modelContext.save()
         return .inserted(key, needsRepublish: [])
     }
 
@@ -262,7 +283,6 @@ final class SyncLocalStore {
         for ingredient in ingredients {
             modelContext.insert(ingredient)
         }
-        try modelContext.save()
         return .inserted(key, needsRepublish: [])
     }
 
@@ -295,7 +315,6 @@ final class SyncLocalStore {
             }
 
             apply(remote, to: localRecord)
-            try modelContext.save()
             return .remoteApplied(key, needsRepublish: [])
         }
 
@@ -305,7 +324,6 @@ final class SyncLocalStore {
         }
 
         modelContext.insert(makeDiaryEntryRecord(from: remote))
-        try modelContext.save()
         return .inserted(key, needsRepublish: [])
     }
 
@@ -351,14 +369,12 @@ final class SyncLocalStore {
                 try apply(remote, to: record, in: modelContext)
                 modelContext.insert(record)
             }
-            try modelContext.save()
             return .remoteApplied(key, needsRepublish: [])
         }
 
         let record = makeWeeklyGoalRecord(from: remote)
         try apply(remote, to: record, in: modelContext)
         modelContext.insert(record)
-        try modelContext.save()
         return .inserted(key, needsRepublish: [])
     }
 
