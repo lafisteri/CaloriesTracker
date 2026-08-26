@@ -10,6 +10,12 @@ struct FoodSourceReference: Hashable, Codable, Sendable {
     let sourceID: UUID
 }
 
+struct LatestDiaryUsage: Hashable, Sendable {
+    let source: FoodSourceReference
+    let amount: Double
+    let unitToken: String
+}
+
 /// Nutrition and source fields are snapshots. They must not be automatically recalculated.
 struct DiaryEntry: Identifiable, Hashable, Codable, Sendable {
     let id: UUID

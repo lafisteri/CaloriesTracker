@@ -162,20 +162,12 @@ final class DiaryService {
     }
 
     func latestUsageDefaults(for sources: [FoodSourceReference]) async throws -> [FoodSourceReference: DiaryUsageDefault] {
-        let entries = try await diaryRepository.activeEntries(for: sources)
-        var latestEntries: [FoodSourceReference: DiaryEntry] = [:]
-
-        for entry in entries {
-            let source = FoodSourceReference(sourceType: entry.sourceType, sourceID: entry.sourceID)
-            if let existing = latestEntries[source], !isMoreRecent(entry, than: existing) {
-                continue
-            }
-            latestEntries[source] = entry
-        }
-
-        return latestEntries.mapValues { entry in
-            DiaryUsageDefault(amount: entry.amount, unitToken: entry.unitToken)
-        }
+        let usages = try await diaryRepository.latestActiveUsages(for: sources)
+        return Dictionary(
+            uniqueKeysWithValues: usages.map { usage in
+                (usage.source, DiaryUsageDefault(amount: usage.amount, unitToken: usage.unitToken))
+            },
+        )
     }
 
     func preview(
@@ -492,16 +484,6 @@ final class DiaryService {
             return preferredToken
         }
         return nil
-    }
-
-    private func isMoreRecent(_ candidate: DiaryEntry, than existing: DiaryEntry) -> Bool {
-        if candidate.updatedAt != existing.updatedAt {
-            return candidate.updatedAt > existing.updatedAt
-        }
-        if candidate.createdAt != existing.createdAt {
-            return candidate.createdAt > existing.createdAt
-        }
-        return candidate.id.uuidString > existing.id.uuidString
     }
 
     private func preview(

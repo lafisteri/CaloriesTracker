@@ -580,6 +580,39 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             }
     }
 
+    func latestActiveUsages(for sources: [FoodSourceReference]) async throws -> [LatestDiaryUsage] {
+        let sourceSet = Set(sources)
+        guard !sourceSet.isEmpty else {
+            return []
+        }
+
+        return try sourceSet.compactMap { source in
+            let sourceTypeRaw = source.sourceType.rawValue
+            let sourceID = source.sourceID
+            var descriptor = FetchDescriptor<DiaryEntryRecord>(
+                predicate: #Predicate {
+                    $0.deletedAt == nil
+                        && $0.sourceTypeRaw == sourceTypeRaw
+                        && $0.sourceID == sourceID
+                },
+                sortBy: [
+                    SortDescriptor(\DiaryEntryRecord.updatedAt, order: .reverse),
+                    SortDescriptor(\DiaryEntryRecord.createdAt, order: .reverse),
+                    SortDescriptor(\DiaryEntryRecord.id, order: .reverse),
+                ],
+            )
+            descriptor.fetchLimit = 1
+
+            return try modelContext.fetch(descriptor).first.map { record in
+                LatestDiaryUsage(
+                    source: source,
+                    amount: record.amount,
+                    unitToken: record.unitToken,
+                )
+            }
+        }
+    }
+
     func create(_ entry: DiaryEntry) async throws {
         guard entry.deletedAt == nil else {
             throw DiaryRepositoryError.invalidCreate
