@@ -107,6 +107,8 @@ final class SwiftDataProductRepository: ProductRepository {
         do {
             modelContext.insert(productRecord)
             modelContext.insert(versionRecord)
+            try SyncOutboxStore.markChanged(type: .product, id: product.id, in: modelContext)
+            try SyncOutboxStore.markChanged(type: .productVersion, id: initialVersion.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -128,6 +130,7 @@ final class SwiftDataProductRepository: ProductRepository {
         record.updatedAt = product.updatedAt
 
         do {
+            try SyncOutboxStore.markChanged(type: .product, id: product.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -163,6 +166,8 @@ final class SwiftDataProductRepository: ProductRepository {
 
         do {
             modelContext.insert(versionRecord)
+            try SyncOutboxStore.markChanged(type: .product, id: product.id, in: modelContext)
+            try SyncOutboxStore.markChanged(type: .productVersion, id: version.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -179,6 +184,7 @@ final class SwiftDataProductRepository: ProductRepository {
         record.updatedAt = date
 
         do {
+            try SyncOutboxStore.markChanged(type: .product, id: id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -336,6 +342,8 @@ final class SwiftDataRecipeRepository: RecipeRepository {
             for ingredient in versionRecord.ingredients {
                 modelContext.insert(ingredient)
             }
+            try SyncOutboxStore.markChanged(type: .recipe, id: recipe.id, in: modelContext)
+            try SyncOutboxStore.markChanged(type: .recipeVersion, id: initialVersion.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -356,6 +364,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
         record.deletedAt = recipe.deletedAt
 
         do {
+            try SyncOutboxStore.markChanged(type: .recipe, id: recipe.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -396,6 +405,8 @@ final class SwiftDataRecipeRepository: RecipeRepository {
             for ingredient in versionRecord.ingredients {
                 modelContext.insert(ingredient)
             }
+            try SyncOutboxStore.markChanged(type: .recipe, id: recipe.id, in: modelContext)
+            try SyncOutboxStore.markChanged(type: .recipeVersion, id: version.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -411,6 +422,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
         record.updatedAt = date
 
         do {
+            try SyncOutboxStore.markChanged(type: .recipe, id: id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -627,6 +639,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
         do {
             modelContext.insert(record)
+            try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -656,6 +669,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         record.updatedAt = entry.updatedAt
 
         do {
+            try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -685,6 +699,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         record.updatedAt = entry.updatedAt
 
         do {
+            try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -719,6 +734,9 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         }
 
         do {
+            for entry in entries {
+                try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
+            }
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -735,6 +753,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         record.updatedAt = date
 
         do {
+            try SyncOutboxStore.markChanged(type: .diaryEntry, id: id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -898,6 +917,7 @@ final class SwiftDataGoalRepository: GoalRepository {
             for dailyGoalRecord in dailyGoalRecords {
                 modelContext.insert(dailyGoalRecord)
             }
+            try SyncOutboxStore.markChanged(type: .weeklyGoal, id: goal.id, in: modelContext)
             try modelContext.save()
         } catch {
             modelContext.rollback()

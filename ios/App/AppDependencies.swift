@@ -14,7 +14,7 @@ final class AppDependencies {
     let statisticsService: StatisticsService
 
     init(isStoredInMemoryOnly: Bool = false) throws {
-        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV1.self)
+        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV2.self)
         let configuration = ModelConfiguration(
             "CaloriesTracker",
             schema: schema,

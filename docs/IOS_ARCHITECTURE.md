@@ -79,6 +79,22 @@ local mutation; goals are not edited or deleted in place.
 Business timestamps are distinct from future sync operational metadata. That
 metadata belongs to future sync infrastructure, not domain or SwiftData records.
 
+For a local user mutation, the affected domain record and its persistent,
+local-only outbox marker are committed by the same `ModelContext.save()`. Outbox
+items coalesce by stable typed identity (`entityType:entityID`): a later local
+mutation replaces the change token and enqueue time instead of adding a second
+pending item. A future acknowledgement may remove an item only when its token
+still matches the uploaded token.
+
+Product, Recipe and DiaryEntry tombstones are synchronized as the current
+entity state. RecipeVersion includes its ingredient composition and WeeklyGoal
+includes its daily values as their respective sync aggregates. The V2 migration
+adds an empty outbox table only; existing local records are not backfilled.
+
+Outbox marking is explicit at local mutation save boundaries, rather than an
+automatic SwiftData side effect. A future remote-import path can therefore write
+remote state without creating another pending local change.
+
 ## Project structure
 
 ~~~text

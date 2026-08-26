@@ -25,6 +25,8 @@
 		A10000000000000000000018 /* SwiftDataRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* SwiftDataRecords.swift */; };
 		A10000000000000000000019 /* SchemaV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* SchemaV1.swift */; };
 		A10000000000000000000020 /* MigrationPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* MigrationPlan.swift */; };
+		A10000000000000000000049 /* SchemaV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000049 /* SchemaV2.swift */; };
+		A10000000000000000000050 /* SyncOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* SyncOutbox.swift */; };
 		A10000000000000000000021 /* RecordMappers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* RecordMappers.swift */; };
 		A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* SwiftDataRepositories.swift */; };
 		A10000000000000000000023 /* ProductService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* ProductService.swift */; };
@@ -71,6 +73,8 @@
 		A20000000000000000000018 /* SwiftDataRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRecords.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* SchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV1.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* MigrationPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationPlan.swift; sourceTree = "<group>"; };
+		A20000000000000000000049 /* SchemaV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV2.swift; sourceTree = "<group>"; };
+		A20000000000000000000050 /* SyncOutbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncOutbox.swift; sourceTree = "<group>"; };
 		A20000000000000000000021 /* RecordMappers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordMappers.swift; sourceTree = "<group>"; };
 		A20000000000000000000022 /* SwiftDataRepositories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositories.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* CaloriesTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CaloriesTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -357,7 +361,9 @@
 				A40000000000000000000011 /* Mappers */,
 				A40000000000000000000012 /* Repositories */,
 				A20000000000000000000019 /* SchemaV1.swift */,
+				A20000000000000000000049 /* SchemaV2.swift */,
 				A20000000000000000000020 /* MigrationPlan.swift */,
+				A20000000000000000000050 /* SyncOutbox.swift */,
 			);
 			path = SwiftData;
 			sourceTree = "<group>";
@@ -471,7 +477,9 @@
 				A10000000000000000000017 /* RepositoryProtocols.swift in Sources */,
 				A10000000000000000000018 /* SwiftDataRecords.swift in Sources */,
 				A10000000000000000000019 /* SchemaV1.swift in Sources */,
+				A10000000000000000000049 /* SchemaV2.swift in Sources */,
 				A10000000000000000000020 /* MigrationPlan.swift in Sources */,
+				A10000000000000000000050 /* SyncOutbox.swift in Sources */,
 				A10000000000000000000021 /* RecordMappers.swift in Sources */,
 				A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */,
 				A10000000000000000000023 /* ProductService.swift in Sources */,
