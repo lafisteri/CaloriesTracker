@@ -438,10 +438,10 @@ final class SyncLocalStore {
         localTimestamp: Date,
         remoteTimestamp: Date,
     ) throws -> MergeWinner {
-        let canonicalLocalTimestamp = SyncTimestamp.canonical(localTimestamp)
-        let canonicalRemoteTimestamp = SyncTimestamp.canonical(remoteTimestamp)
-        if canonicalLocalTimestamp != canonicalRemoteTimestamp {
-            return canonicalLocalTimestamp > canonicalRemoteTimestamp ? .local : .remote
+        let localMilliseconds = SyncTimestamp.millisecondsSinceEpoch(localTimestamp)
+        let remoteMilliseconds = SyncTimestamp.millisecondsSinceEpoch(remoteTimestamp)
+        if let localMilliseconds, let remoteMilliseconds, localMilliseconds != remoteMilliseconds {
+            return localMilliseconds > remoteMilliseconds ? .local : .remote
         }
 
         return try SyncPayloadCanonicalizer.compare(local, remote) == .orderedAscending ? .remote : .local

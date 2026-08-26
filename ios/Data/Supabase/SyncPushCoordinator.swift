@@ -46,6 +46,16 @@ struct SyncPushReport: Equatable, Sendable {
 
 private let syncPushLogger = Logger(subsystem: "com.caloriestracker.ios", category: "SyncPush")
 
+private struct SyncPushTransportFailureLogKey: Hashable {
+    let category: String
+    let httpStatusCode: Int?
+    let safeDescription: String
+
+    var sortValue: String {
+        "\(category)|\(httpStatusCode.map(String.init) ?? "none")|\(safeDescription)"
+    }
+}
+
 /// Explicit push-only infrastructure; `SyncOrchestrator` decides when to invoke it.
 @MainActor
 final class SyncPushCoordinator {
@@ -54,6 +64,7 @@ final class SyncPushCoordinator {
     private let authService: SupabaseAuthService
     private let transport: SupabaseSyncTransport
     private var isPushRunning = false
+    private var transportFailureCounts: [SyncPushTransportFailureLogKey: Int] = [:]
 
     init(
         modelContainer: ModelContainer,
@@ -73,7 +84,12 @@ final class SyncPushCoordinator {
             throw SyncPushCoordinatorError.alreadyRunning
         }
         isPushRunning = true
-        defer { isPushRunning = false }
+        transportFailureCounts.removeAll(keepingCapacity: true)
+        defer {
+            logTransportFailureAggregates()
+            transportFailureCounts.removeAll(keepingCapacity: true)
+            isPushRunning = false
+        }
 
         guard let session = try await authService.currentSession() else {
             throw SupabaseInfrastructureError.notAuthenticated
@@ -154,16 +170,85 @@ final class SyncPushCoordinator {
                 syncPushLogger.debug("Sync push missing remote record")
                 return .missingRemote(key: item.entityKey)
             }
+        } catch let failure as SupabasePushTransportFailure {
+            if failure.category == .notAuthenticated || failure.category == .unauthorized {
+                syncPushLogger.error("Sync push stopped because authentication is unavailable")
+                throw failure.category
+            }
+            recordTransportFailure(
+                entityKey: item.entityKey,
+                expectedServerRevision: expectedServerRevision,
+                category: failure.category,
+                httpStatusCode: failure.httpStatusCode,
+                safeDescription: failure.safeDescription,
+            )
+            return .failed(key: item.entityKey, reason: .transport(failure.category))
         } catch let error as SupabaseInfrastructureError {
             if error == .notAuthenticated || error == .unauthorized {
                 syncPushLogger.error("Sync push stopped because authentication is unavailable")
                 throw error
             }
-            syncPushLogger.error("Sync push transport failure")
+            recordTransportFailure(
+                entityKey: item.entityKey,
+                expectedServerRevision: expectedServerRevision,
+                category: error,
+                httpStatusCode: nil,
+                safeDescription: error.errorDescription ?? "Supabase infrastructure request failed",
+            )
             return .failed(key: item.entityKey, reason: .transport(error))
         } catch {
-            syncPushLogger.error("Sync push transport failure")
+            recordTransportFailure(
+                entityKey: item.entityKey,
+                expectedServerRevision: expectedServerRevision,
+                category: .server,
+                httpStatusCode: nil,
+                safeDescription: "Supabase request failed",
+            )
             return .failed(key: item.entityKey, reason: .transport(.server))
+        }
+    }
+
+    private func recordTransportFailure(
+        entityKey: SyncEntityKey,
+        expectedServerRevision: Int64?,
+        category: SupabaseInfrastructureError,
+        httpStatusCode: Int?,
+        safeDescription: String,
+    ) {
+        let key = SyncPushTransportFailureLogKey(
+            category: diagnosticCategory(for: category),
+            httpStatusCode: httpStatusCode,
+            safeDescription: safeDescription,
+        )
+        let count = (transportFailureCounts[key] ?? 0) + 1
+        transportFailureCounts[key] = count
+        guard count == 1 else { return }
+
+        let expectedRevisionPresent = expectedServerRevision != nil
+        let expectedRevision = expectedServerRevision.map(String.init) ?? "none"
+        let httpStatus = httpStatusCode.map(String.init) ?? "none"
+        syncPushLogger.error(
+            "Sync push transport failure entityType=\(entityKey.entityType.rawValue, privacy: .public) entityID=\(entityKey.entityID.uuidString, privacy: .public) expectedServerRevisionPresent=\(expectedRevisionPresent, privacy: .public) expectedServerRevision=\(expectedRevision, privacy: .public) category=\(key.category, privacy: .public) httpStatus=\(httpStatus, privacy: .public) error=\(safeDescription, privacy: .public)",
+        )
+    }
+
+    private func logTransportFailureAggregates() {
+        for (key, count) in transportFailureCounts.sorted(by: { $0.key.sortValue < $1.key.sortValue }) {
+            syncPushLogger.error(
+                "Sync push transport failure aggregate category=\(key.category, privacy: .public) httpStatus=\(key.httpStatusCode.map(String.init) ?? "none", privacy: .public) error=\(key.safeDescription, privacy: .public) count=\(count, privacy: .public)",
+            )
+        }
+    }
+
+    private func diagnosticCategory(for error: SupabaseInfrastructureError) -> String {
+        switch error {
+        case .notConfigured: "notConfigured"
+        case .notAuthenticated: "notAuthenticated"
+        case .network: "network"
+        case .unauthorized: "unauthorized"
+        case .server: "server"
+        case .decode: "decode"
+        case .invalidResponse: "invalidResponse"
         }
     }
 

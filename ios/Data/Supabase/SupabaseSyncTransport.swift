@@ -59,6 +59,66 @@ enum SupabaseInfrastructureError: Error, Equatable, Sendable, LocalizedError {
     }
 }
 
+/// Safe diagnostic detail retained for a failed push RPC without retaining the
+/// original SDK error, response body, request body, or headers.
+struct SupabasePushTransportFailure: Error, Sendable {
+    let category: SupabaseInfrastructureError
+    let httpStatusCode: Int?
+    let safeDescription: String
+
+    init(error: Error) {
+        // A decoding failure after a successful push RPC represents a malformed
+        // server response.
+        category = error is DecodingError ? .invalidResponse : SupabaseInfrastructureError.categorize(error)
+
+        if let error = error as? HTTPError {
+            httpStatusCode = error.response.statusCode
+            safeDescription = "HTTP request failed"
+            return
+        }
+
+        if let error = error as? AuthError {
+            if case let .api(_, _, _, response) = error {
+                httpStatusCode = response.statusCode
+            } else {
+                httpStatusCode = nil
+            }
+            safeDescription = "Supabase authentication request failed"
+            return
+        }
+
+        if let error = error as? PostgrestError {
+            httpStatusCode = nil
+            let code = error.code.map { " code=\($0)" } ?? ""
+            safeDescription = "PostgREST\(code): \(Self.safePostgrestMessage(error.message))"
+            return
+        }
+
+        httpStatusCode = nil
+        if error is DecodingError {
+            safeDescription = "Supabase response decoding failed"
+        } else if let error = error as? URLError {
+            safeDescription = "Network request failed (\(error.code.rawValue))"
+        } else if let error = error as? SupabaseInfrastructureError {
+            safeDescription = error.errorDescription ?? "Supabase infrastructure request failed"
+        } else {
+            safeDescription = "Supabase request failed"
+        }
+    }
+
+    private static func safePostgrestMessage(_ message: String) -> String {
+        let normalized = message
+            .components(separatedBy: .newlines)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let sensitiveTerms = ["token", "authorization", "bearer", "apikey", "password", "otp", "session", "jwt", "credential"]
+        guard !sensitiveTerms.contains(where: { normalized.localizedCaseInsensitiveContains($0) }) else {
+            return "server message redacted"
+        }
+        return String(normalized.prefix(240))
+    }
+}
+
 struct SupabaseRemoteSyncRecord: Codable, Equatable, Sendable {
     let key: SyncEntityKey
     let payloadSchemaVersion: Int
@@ -151,7 +211,7 @@ struct SupabasePushRequest: Encodable, Sendable {
     }
 }
 
-struct SupabasePushResponse: Decodable, Sendable {
+private struct SupabasePushRPCResponse: Decodable, Sendable {
     enum Outcome: String, Sendable {
         case accepted
         case conflict
@@ -159,10 +219,6 @@ struct SupabasePushResponse: Decodable, Sendable {
     }
 
     let outcome: Outcome
-    private let serverRevision: Int64?
-    private let serverUpdatedAt: Date?
-    private let payloadSchemaVersion: Int?
-    private let payload: SyncPayload?
     private let currentRevision: Int64?
     private let currentUpdatedAt: Date?
     private let currentPayloadSchemaVersion: Int?
@@ -170,11 +226,6 @@ struct SupabasePushResponse: Decodable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case result
-        case status
-        case serverRevision = "server_revision"
-        case serverUpdatedAt = "server_updated_at"
-        case payloadSchemaVersion = "payload_schema_version"
-        case payload
         case currentRevision = "current_revision"
         case currentUpdatedAt = "current_updated_at"
         case currentPayloadSchemaVersion = "current_payload_schema_version"
@@ -183,17 +234,12 @@ struct SupabasePushResponse: Decodable, Sendable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let rawOutcome = try container.decodeIfPresent(String.self, forKey: .result)
-            ?? container.decode(String.self, forKey: .status)
+        let rawOutcome = try container.decode(String.self, forKey: .result)
         guard let outcome = Outcome(rawValue: rawOutcome) else {
             throw SupabaseInfrastructureError.invalidResponse
         }
 
         self.outcome = outcome
-        serverRevision = try container.decodeIfPresent(Int64.self, forKey: .serverRevision)
-        serverUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .serverUpdatedAt)
-        payloadSchemaVersion = try container.decodeIfPresent(Int.self, forKey: .payloadSchemaVersion)
-        payload = try container.decodeIfPresent(SyncPayload.self, forKey: .payload)
         currentRevision = try container.decodeIfPresent(Int64.self, forKey: .currentRevision)
         currentUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .currentUpdatedAt)
         currentPayloadSchemaVersion = try container.decodeIfPresent(Int.self, forKey: .currentPayloadSchemaVersion)
@@ -203,44 +249,30 @@ struct SupabasePushResponse: Decodable, Sendable {
     func pushResult(for key: SyncEntityKey) throws -> SupabasePushResult {
         switch outcome {
         case .accepted:
-            guard
-                let serverRevision,
-                let serverUpdatedAt,
-                let payloadSchemaVersion,
-                let payload
-            else {
-                throw SupabaseInfrastructureError.invalidResponse
-            }
-            return .accepted(
-                try SupabaseRemoteSyncRecord(
-                    key: key,
-                    payloadSchemaVersion: payloadSchemaVersion,
-                    payload: payload,
-                    serverRevision: serverRevision,
-                    serverUpdatedAt: serverUpdatedAt,
-                ),
-            )
+            return .accepted(try currentRecord(for: key))
         case .conflict:
-            guard
-                let currentRevision,
-                let currentUpdatedAt,
-                let currentPayloadSchemaVersion,
-                let currentPayload
-            else {
-                throw SupabaseInfrastructureError.invalidResponse
-            }
-            return .conflict(
-                try SupabaseRemoteSyncRecord(
-                    key: key,
-                    payloadSchemaVersion: currentPayloadSchemaVersion,
-                    payload: currentPayload,
-                    serverRevision: currentRevision,
-                    serverUpdatedAt: currentUpdatedAt,
-                ),
-            )
+            return .conflict(try currentRecord(for: key))
         case .missing:
             return .missing
         }
+    }
+
+    private func currentRecord(for key: SyncEntityKey) throws -> SupabaseRemoteSyncRecord {
+        guard
+            let currentRevision,
+            let currentUpdatedAt,
+            let currentPayloadSchemaVersion,
+            let currentPayload
+        else {
+            throw SupabaseInfrastructureError.invalidResponse
+        }
+        return try SupabaseRemoteSyncRecord(
+            key: key,
+            payloadSchemaVersion: currentPayloadSchemaVersion,
+            payload: currentPayload,
+            serverRevision: currentRevision,
+            serverUpdatedAt: currentUpdatedAt,
+        )
     }
 }
 
@@ -248,21 +280,6 @@ enum SupabasePushResult: Equatable, Sendable {
     case accepted(SupabaseRemoteSyncRecord)
     case conflict(SupabaseRemoteSyncRecord)
     case missing
-}
-
-private struct SupabasePushRPCResponse: Decodable, Sendable {
-    let response: SupabasePushResponse
-
-    init(from decoder: any Decoder) throws {
-        if var array = try? decoder.unkeyedContainer() {
-            guard let response = try array.decodeIfPresent(SupabasePushResponse.self), array.isAtEnd else {
-                throw SupabaseInfrastructureError.invalidResponse
-            }
-            self.response = response
-        } else {
-            response = try SupabasePushResponse(from: decoder)
-        }
-    }
 }
 
 /// Network-only transport for canonical sync payloads. It neither schedules work nor mutates SwiftData.
@@ -296,12 +313,15 @@ actor SupabaseSyncTransport {
                 envelope: envelope,
                 expectedServerRevision: expectedServerRevision,
             )
-            let response: PostgrestResponse<SupabasePushRPCResponse> = try await client
+            let response: PostgrestResponse<[SupabasePushRPCResponse]> = try await client
                 .rpc("push_sync_record", params: request)
                 .execute()
-            return try response.value.response.pushResult(for: key)
+            guard response.value.count == 1, let row = response.value.first else {
+                throw SupabaseInfrastructureError.invalidResponse
+            }
+            return try row.pushResult(for: key)
         } catch {
-            throw SupabaseInfrastructureError.categorize(error)
+            throw SupabasePushTransportFailure(error: error)
         }
     }
 

@@ -6,36 +6,138 @@ enum SyncPayloadFormat {
 
 /// The only timestamp precision used at the sync canonical boundary.
 ///
-/// Supabase's current payload round-trip retains Unix milliseconds. Dates are first
-/// represented as integral microseconds to remove `Date`'s binary floating-point
-/// representation noise, then deterministically truncated to Unix milliseconds.
-/// This is normalization, not approximate timestamp comparison.
+/// Unix milliseconds are the source of truth. `Date` cannot represent every
+/// millisecond exactly, so a canonical `Date` can print just below its integer
+/// millisecond. The ULP-sized snap below only recovers that representation noise;
+/// all original, non-boundary timestamps still truncate to milliseconds.
 enum SyncTimestamp {
-    private static let microsecondsPerSecond = 1_000_000.0
-    private static let microsecondsPerMillisecond = 1_000.0
     private static let millisecondsPerSecond = 1_000.0
+    private static let integerSnapULPs = 4.0
 
-    static func canonical(_ date: Date) -> Date {
-        let seconds = date.timeIntervalSince1970
-        guard seconds.isFinite else {
-            return date
-        }
-
-        let roundedMicroseconds = (seconds * microsecondsPerSecond).rounded(.toNearestOrAwayFromZero)
-        let milliseconds = (roundedMicroseconds / microsecondsPerMillisecond).rounded(.down)
+    /// Converts a `Date` to the authoritative Unix-millisecond representation.
+    ///
+    /// This is deliberately not a fuzzy comparison: only a value within a few
+    /// floating-point ULPs of an integer millisecond is snapped to that integer.
+    /// Every other timestamp is truncated to milliseconds.
+    static func millisecondsSinceEpoch(_ date: Date) -> Int64? {
+        let milliseconds = date.timeIntervalSince1970 * millisecondsPerSecond
         guard
             milliseconds.isFinite,
             milliseconds >= Double(Int64.min),
             milliseconds <= Double(Int64.max)
         else {
-            return date
+            return nil
         }
 
-        return Date(timeIntervalSince1970: Double(Int64(milliseconds)) / millisecondsPerSecond)
+        let nearestInteger = milliseconds.rounded(.toNearestOrAwayFromZero)
+        if abs(milliseconds - nearestInteger) <= milliseconds.ulp * integerSnapULPs,
+           nearestInteger >= Double(Int64.min),
+           nearestInteger <= Double(Int64.max)
+        {
+            return Int64(nearestInteger)
+        }
+
+        return Int64(milliseconds.rounded(.down))
+    }
+
+    /// Reconstructs a Date from the authoritative Unix-millisecond representation.
+    static func date(fromMilliseconds milliseconds: Int64) -> Date {
+        Date(timeIntervalSince1970: Double(milliseconds) / millisecondsPerSecond)
+    }
+
+    static func canonical(_ date: Date) -> Date {
+        guard let milliseconds = millisecondsSinceEpoch(date) else { return date }
+        return Self.date(fromMilliseconds: milliseconds)
     }
 
     static func canonical(_ date: Date?) -> Date? {
         date.map { canonical($0) }
+    }
+
+    /// Encodes a canonical domain timestamp without handing its reconstructed
+    /// `Date` to another formatter. The payload JSON remains ISO-8601 strings.
+    static func encode<Key: CodingKey>(
+        _ date: Date,
+        to container: inout KeyedEncodingContainer<Key>,
+        forKey key: Key,
+    ) throws {
+        guard let milliseconds = millisecondsSinceEpoch(date) else {
+            throw EncodingError.invalidValue(
+                date,
+                .init(codingPath: container.codingPath + [key], debugDescription: "Timestamp is not representable as Unix milliseconds"),
+            )
+        }
+        try container.encode(iso8601String(fromMilliseconds: milliseconds), forKey: key)
+    }
+
+    static func encode<Key: CodingKey>(
+        _ date: Date?,
+        to container: inout KeyedEncodingContainer<Key>,
+        forKey key: Key,
+    ) throws {
+        guard let date else {
+            try container.encodeNil(forKey: key)
+            return
+        }
+        try encode(date, to: &container, forKey: key)
+    }
+
+    static func decode<Key: CodingKey>(
+        from container: KeyedDecodingContainer<Key>,
+        forKey key: Key,
+    ) throws -> Date {
+        let wireValue = try container.decode(String.self, forKey: key)
+        guard let milliseconds = milliseconds(fromISO8601: wireValue) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: key,
+                in: container,
+                debugDescription: "Timestamp is not a supported ISO-8601 value",
+            )
+        }
+        return date(fromMilliseconds: milliseconds)
+    }
+
+    static func decodeIfPresent<Key: CodingKey>(
+        from container: KeyedDecodingContainer<Key>,
+        forKey key: Key,
+    ) throws -> Date? {
+        guard container.contains(key), try !container.decodeNil(forKey: key) else { return nil }
+        return try decode(from: container, forKey: key)
+    }
+
+    private static func milliseconds(fromISO8601 value: String) -> Int64? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let wholeSecondFormatter = ISO8601DateFormatter()
+        wholeSecondFormatter.formatOptions = [.withInternetDateTime]
+        guard let date = fractionalFormatter.date(from: value) ?? wholeSecondFormatter.date(from: value) else {
+            return nil
+        }
+        return millisecondsSinceEpoch(date)
+    }
+
+    private static func iso8601String(fromMilliseconds milliseconds: Int64) -> String {
+        let wholeSeconds = milliseconds / 1_000
+        let remainder = milliseconds % 1_000
+        let normalizedSeconds: Int64
+        let fractionalMilliseconds: Int64
+        if remainder < 0 {
+            normalizedSeconds = wholeSeconds - 1
+            fractionalMilliseconds = remainder + 1_000
+        } else {
+            normalizedSeconds = wholeSeconds
+            fractionalMilliseconds = remainder
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        let wholeSecondValue = formatter.string(
+            from: Date(timeIntervalSince1970: TimeInterval(normalizedSeconds)),
+        )
+        let fraction = String(fractionalMilliseconds)
+        let paddedFraction = String(repeating: "0", count: 3 - fraction.count) + fraction
+        return "\(wholeSecondValue.dropLast()).\(paddedFraction)Z"
     }
 }
 
@@ -288,6 +390,201 @@ struct WeeklyGoalPayload: Codable, Equatable, Sendable {
     let effectiveFrom: LocalDay
     let days: [Day]
     let createdAt: Date
+}
+
+// Domain timestamp fields use this explicit codec instead of the enclosing
+// JSONEncoder's Date strategy. That makes canonical JSON and Supabase RPC JSON
+// originate from the same integer millisecond values.
+extension ProductPayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, barcode, currentVersionID, createdAt, updatedAt, deletedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            name: try container.decode(String.self, forKey: .name),
+            barcode: try container.decodeIfPresent(String.self, forKey: .barcode),
+            currentVersionID: try container.decode(UUID.self, forKey: .currentVersionID),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+            updatedAt: try SyncTimestamp.decode(from: container, forKey: .updatedAt),
+            deletedAt: try SyncTimestamp.decodeIfPresent(from: container, forKey: .deletedAt),
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(barcode, forKey: .barcode)
+        try container.encode(currentVersionID, forKey: .currentVersionID)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+        try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
+        try SyncTimestamp.encode(deletedAt, to: &container, forKey: .deletedAt)
+    }
+}
+
+extension ProductVersionPayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, productID, basedOnVersionID, versionNumber, baseUnit, baseAmount, nutrition, createdAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            productID: try container.decode(UUID.self, forKey: .productID),
+            basedOnVersionID: try container.decodeIfPresent(UUID.self, forKey: .basedOnVersionID),
+            versionNumber: try container.decode(Int.self, forKey: .versionNumber),
+            baseUnit: try container.decode(ProductBaseUnit.self, forKey: .baseUnit),
+            baseAmount: try container.decode(Double.self, forKey: .baseAmount),
+            nutrition: try container.decode(Nutrition.self, forKey: .nutrition),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(productID, forKey: .productID)
+        try container.encodeIfPresent(basedOnVersionID, forKey: .basedOnVersionID)
+        try container.encode(versionNumber, forKey: .versionNumber)
+        try container.encode(baseUnit, forKey: .baseUnit)
+        try container.encode(baseAmount, forKey: .baseAmount)
+        try container.encode(nutrition, forKey: .nutrition)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+    }
+}
+
+extension RecipePayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, currentVersionID, createdAt, updatedAt, deletedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            name: try container.decode(String.self, forKey: .name),
+            currentVersionID: try container.decode(UUID.self, forKey: .currentVersionID),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+            updatedAt: try SyncTimestamp.decode(from: container, forKey: .updatedAt),
+            deletedAt: try SyncTimestamp.decodeIfPresent(from: container, forKey: .deletedAt),
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(currentVersionID, forKey: .currentVersionID)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+        try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
+        try SyncTimestamp.encode(deletedAt, to: &container, forKey: .deletedAt)
+    }
+}
+
+extension RecipeVersionPayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, recipeID, basedOnVersionID, versionNumber, totalNutrition, cookedWeight, servingsCount, ingredients, createdAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            recipeID: try container.decode(UUID.self, forKey: .recipeID),
+            basedOnVersionID: try container.decodeIfPresent(UUID.self, forKey: .basedOnVersionID),
+            versionNumber: try container.decode(Int.self, forKey: .versionNumber),
+            totalNutrition: try container.decode(Nutrition.self, forKey: .totalNutrition),
+            cookedWeight: try container.decodeIfPresent(Double.self, forKey: .cookedWeight),
+            servingsCount: try container.decodeIfPresent(Double.self, forKey: .servingsCount),
+            ingredients: try container.decode([Ingredient].self, forKey: .ingredients),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(recipeID, forKey: .recipeID)
+        try container.encodeIfPresent(basedOnVersionID, forKey: .basedOnVersionID)
+        try container.encode(versionNumber, forKey: .versionNumber)
+        try container.encode(totalNutrition, forKey: .totalNutrition)
+        try container.encodeIfPresent(cookedWeight, forKey: .cookedWeight)
+        try container.encodeIfPresent(servingsCount, forKey: .servingsCount)
+        try container.encode(ingredients, forKey: .ingredients)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+    }
+}
+
+extension DiaryEntryPayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, day, mealType, sortOrder, sourceType, sourceID, sourceVersionID, sourceName, amount, unitToken, nutrition, createdAt, updatedAt, deletedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            day: try container.decode(LocalDay.self, forKey: .day),
+            mealType: try container.decode(MealType.self, forKey: .mealType),
+            sortOrder: try container.decode(Int.self, forKey: .sortOrder),
+            sourceType: try container.decode(SourceType.self, forKey: .sourceType),
+            sourceID: try container.decode(UUID.self, forKey: .sourceID),
+            sourceVersionID: try container.decode(UUID.self, forKey: .sourceVersionID),
+            sourceName: try container.decode(String.self, forKey: .sourceName),
+            amount: try container.decode(Double.self, forKey: .amount),
+            unitToken: try container.decode(String.self, forKey: .unitToken),
+            nutrition: try container.decode(Nutrition.self, forKey: .nutrition),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+            updatedAt: try SyncTimestamp.decode(from: container, forKey: .updatedAt),
+            deletedAt: try SyncTimestamp.decodeIfPresent(from: container, forKey: .deletedAt),
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(day, forKey: .day)
+        try container.encode(mealType, forKey: .mealType)
+        try container.encode(sortOrder, forKey: .sortOrder)
+        try container.encode(sourceType, forKey: .sourceType)
+        try container.encode(sourceID, forKey: .sourceID)
+        try container.encode(sourceVersionID, forKey: .sourceVersionID)
+        try container.encode(sourceName, forKey: .sourceName)
+        try container.encode(amount, forKey: .amount)
+        try container.encode(unitToken, forKey: .unitToken)
+        try container.encode(nutrition, forKey: .nutrition)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+        try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
+        try SyncTimestamp.encode(deletedAt, to: &container, forKey: .deletedAt)
+    }
+}
+
+extension WeeklyGoalPayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, effectiveFrom, days, createdAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            effectiveFrom: try container.decode(LocalDay.self, forKey: .effectiveFrom),
+            days: try container.decode([Day].self, forKey: .days),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(effectiveFrom, forKey: .effectiveFrom)
+        try container.encode(days, forKey: .days)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+    }
 }
 
 enum SyncPayloadCanonicalizer {
