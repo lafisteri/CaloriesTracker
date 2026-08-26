@@ -67,10 +67,12 @@ to use repositories and services and do not depend directly on CloudKit.
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
 
-Product, Recipe and DiaryEntry are mutable local sync entities with stable UUID
+Product, Recipe and DiaryEntry are mutable sync entities with stable UUID
 identity and `createdAt` / `updatedAt` / `deletedAt` business timestamps. Their
-user-visible deletion is a retained tombstone; immutable ProductVersion,
-RecipeVersion and RecipeIngredient records never receive sync mutations.
+user-visible deletion is a retained tombstone. ProductVersion and RecipeVersion
+(including its RecipeIngredient children) are immutable: remote data may insert
+an unknown version, but a known version must be canonical-payload equivalent or
+is treated as a corruption/invariant error.
 
 WeeklyGoal and its seven DailyMacroGoal values are a write-once aggregate for
 one `effectiveFrom` key. It has a stable UUID and `createdAt` records its sole
@@ -95,6 +97,47 @@ Outbox marking is explicit at local mutation save boundaries, rather than an
 automatic SwiftData side effect. A future remote-import path can therefore write
 remote state without creating another pending local change.
 
+### Canonical payload and remote merge foundation
+
+The sync boundary is independent of both SwiftData and CloudKit. Every transfer
+uses a `SyncPayloadEnvelope` with `schemaVersion: 1`, an explicit entity type
+(`product`, `productVersion`, `recipe`, `recipeVersion`, `diaryEntry`, or
+`weeklyGoal`) and a UUID. The same `SyncEntityKey` is used by the outbox and
+payload export, so there is no runtime-type-name or second identity mapping.
+Only these six top-level payloads exist: RecipeVersion embeds its ordered,
+pinned ingredients and WeeklyGoal embeds its seven ordered daily values.
+
+`SyncLocalStore.payload(for:)` exports the current local state immutably,
+including tombstones. A missing physical record for a requested key is an
+invariant error, never an empty or synthetic payload. `applyRemote` validates a
+payload, checks dependencies, resolves conflicts and saves directly through a
+SwiftData `ModelContext`; it never marks an outbox record and therefore cannot
+echo a pull back into a future push. Its result distinguishes insertion, remote
+application, identical content, local-wins, dependency deferral and explicit
+republish effects.
+
+Product, Recipe and DiaryEntry use whole-record last-writer-wins by `updatedAt`.
+Tombstones are sticky: a tombstone always wins over a non-tombstone; two
+tombstones use the same timestamp rule. WeeklyGoal competes as a whole aggregate
+by its natural `effectiveFrom` key and `createdAt`. For an equal timestamp, the
+canonical sorted-key JSON bytes of the version-1 envelope break the tie; the
+lexicographically greater payload wins. This is deterministic and
+direction-independent.
+
+Remote Product/Recipe current-version references, RecipeVersion pinned
+ProductVersions and DiaryEntry source versions are dependencies. Missing
+dependencies return a typed deferred result with the exact missing keys; no
+fallback snapshot or placeholder is invented. RecipeVersion validates child IDs
+and ordering, finite values, units and pins, then verifies its supplied totals
+and normalized amounts with `RecipeCalculator` without rewriting payload values.
+
+Barcode uniqueness includes deleted Products. A collision keeps the newer
+Product by the same timestamp/canonical rule, clears only the losing barcode and
+returns that Product as a `needsRepublish` effect. Local-wins outcomes also
+return explicit republish effects; neither path writes an outbox row. There is
+no persistent schema change, staging queue, networking or CloudKit dependency in
+this foundation.
+
 ## Project structure
 
 ~~~text
@@ -110,6 +153,7 @@ ios/
     Statistics/StatisticsService.swift
   Data/SwiftData/
     Models/ Mappers/ Repositories/ SchemaV1.swift MigrationPlan.swift
+    SyncEntityIdentity.swift CanonicalSyncPayloads.swift SyncLocalStore.swift
   Features/
     Today/ Catalog/ Statistics/ Goals/
 ~~~
@@ -323,6 +367,7 @@ stage rather than discard user data.
 | RecipeRecord, RecipeVersionRecord, RecipeIngredientRecord | Recipe identity, version and pinned ingredients |
 | DiaryEntryRecord | Historical source and nutrition snapshot |
 | WeeklyGoalRecord, DailyMacroGoalRecord | Effective goal and seven daily values |
+| SyncOutboxRecord | Coalesced local mutation marker (added by V2) |
 
 Every record has a unique UUID; enum values are scalar string raw values.
 Record relationships support local traversal, but UUID fields are authoritative
@@ -387,8 +432,10 @@ presented to the user only through a stable context-specific message.
 ## Current and deferred capabilities
 
 SwiftData is the only current persistence implementation. There is no CloudKit,
-Supabase, backend, authentication, export/import, web migration, barcode scanner
-wrapper or external product API in the native app.
+Supabase, backend, authentication, network sync worker, staging queue, web
+migration, barcode scanner wrapper or external product API in the native app.
+Canonical payload export and direct local remote-merge support are internal sync
+foundation only, not a user-facing import/export or transport feature.
 
 If future sync is approved, it must remain behind repositories, use explicit
 DTOs/merge transactions and preserve immutable versions and Diary snapshots.

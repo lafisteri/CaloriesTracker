@@ -22,41 +22,63 @@ final class SyncOutboxRecord {
         self.changeToken = changeToken
         self.enqueuedAt = enqueuedAt
     }
+
+    func syncEntityKey() throws -> SyncEntityKey {
+        guard let entityType = SyncEntityType(rawValue: entityTypeRaw) else {
+            throw SyncOutboxError.invalidEntityType(entityTypeRaw)
+        }
+        let key = SyncEntityKey(entityType: entityType, entityID: entityID)
+        guard self.key == key.rawValue else {
+            throw SyncOutboxError.inconsistentKey(self.key)
+        }
+        return key
+    }
 }
 
-enum SyncOutboxEntityType: String, CaseIterable, Sendable {
-    case product
-    case productVersion
-    case recipe
-    case recipeVersion
-    case diaryEntry
-    case weeklyGoal
+enum SyncOutboxError: Error, LocalizedError {
+    case invalidEntityType(String)
+    case inconsistentKey(String)
 
-    func outboxKey(for entityID: UUID) -> String {
-        "\(rawValue):\(entityID.uuidString.lowercased())"
+    var errorDescription: String? {
+        switch self {
+        case let .invalidEntityType(rawValue):
+            "Неизвестный тип sync outbox: \(rawValue)."
+        case let .inconsistentKey(key):
+            "Некорректный ключ sync outbox: \(key)."
+        }
     }
 }
 
 @MainActor
 enum SyncOutboxStore {
     static func markChanged(
-        type: SyncOutboxEntityType,
+        type: SyncEntityType,
         id: UUID,
         in modelContext: ModelContext,
     ) throws {
-        let key = type.outboxKey(for: id)
+        try markChanged(
+            key: SyncEntityKey(entityType: type, entityID: id),
+            in: modelContext,
+        )
+    }
+
+    static func markChanged(
+        key: SyncEntityKey,
+        in modelContext: ModelContext,
+    ) throws {
+        let rawKey = key.rawValue
         let now = Date()
         let changeToken = UUID()
 
-        if let record = try record(key: key, in: modelContext) {
+        if let record = try record(key: rawKey, in: modelContext) {
             record.changeToken = changeToken
             record.enqueuedAt = now
         } else {
             modelContext.insert(
                 SyncOutboxRecord(
-                    key: key,
-                    entityTypeRaw: type.rawValue,
-                    entityID: id,
+                    key: rawKey,
+                    entityTypeRaw: key.entityType.rawValue,
+                    entityID: key.entityID,
                     changeToken: changeToken,
                     enqueuedAt: now,
                 ),
