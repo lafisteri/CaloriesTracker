@@ -343,6 +343,12 @@ Metadata-only rename вне этого явного contextual rebase не пе�
 Products, ProductVersions, Recipes, RecipeVersions, ingredients, DiaryEntries и
 weekly goals. Приложение не требует аккаунт для работы с этими данными.
 
+При настроенном Supabase в Today доступна компактная кнопка «Настройки». В
+разделе «Синхронизация» пользователь может войти по email и одноразовому коду,
+увидеть состояние foreground-синхронизации, запустить «Синхронизировать сейчас»
+или выйти. Аккаунт остаётся опциональным: выход и отсутствие настройки не
+удаляют и не ограничивают локальные Products, Recipes, Diary или Goals.
+
 ## 13. Offline behaviour
 
 После успешного запуска приложение работает с локальными данными без сети для
@@ -376,7 +382,7 @@ food recognition, HealthKit, widgets, Watch и complex onboarding.
 
 - camera barcode scanner;
 - export/import backup;
-- account, cloud backup или multi-device sync;
+- Realtime, cloud reset/delete или отдельный conflict UI;
 - external barcode/product lookup;
 - web-data migration.
 

@@ -33,6 +33,9 @@ struct RootApplicationView: View {
                     goalService: dependencies.goalService,
                     productService: dependencies.productService,
                     recipeService: dependencies.recipeService,
+                    supabaseAuth: dependencies.supabaseAuth,
+                    syncStatus: dependencies.syncStatus,
+                    syncOrchestrator: dependencies.syncOrchestrator,
                 )
             }
             .tabItem {

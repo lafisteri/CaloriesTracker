@@ -6,10 +6,14 @@ struct TodayRootView: View {
     let goalService: GoalService
     let productService: ProductService
     let recipeService: RecipeService
+    let supabaseAuth: SupabaseAuthService?
+    let syncStatus: SyncStatusStore?
+    let syncOrchestrator: SyncOrchestrator?
 
     @State private var model: TodayViewModel
     @State private var draggedEntryID: UUID?
     @State private var quickAddState = CatalogQuickAddState()
+    @State private var isSettingsPresented = false
 
     init(
         router: AppRouter,
@@ -17,12 +21,18 @@ struct TodayRootView: View {
         goalService: GoalService,
         productService: ProductService,
         recipeService: RecipeService,
+        supabaseAuth: SupabaseAuthService?,
+        syncStatus: SyncStatusStore?,
+        syncOrchestrator: SyncOrchestrator?,
     ) {
         self.router = router
         self.diaryService = diaryService
         self.goalService = goalService
         self.productService = productService
         self.recipeService = recipeService
+        self.supabaseAuth = supabaseAuth
+        self.syncStatus = syncStatus
+        self.syncOrchestrator = syncOrchestrator
         _model = State(initialValue: TodayViewModel(diaryService: diaryService, goalService: goalService))
     }
 
@@ -224,6 +234,27 @@ struct TodayRootView: View {
                 )
             case .recipeDetails:
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")
+            }
+        }
+        .toolbar {
+            if router.todayPath.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isSettingsPresented = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("Настройки")
+                }
+            }
+        }
+        .sheet(isPresented: $isSettingsPresented) {
+            NavigationStack {
+                SettingsView(
+                    supabaseAuth: supabaseAuth,
+                    syncStatus: syncStatus,
+                    syncOrchestrator: syncOrchestrator,
+                )
             }
         }
     }

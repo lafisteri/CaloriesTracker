@@ -122,7 +122,7 @@ private let syncPullLogger = Logger(subsystem: "com.caloriestracker.ios", catego
 private let defaultSyncPullPageSize = 200
 private let defaultSyncPullMaximumPages = 5
 
-/// Explicit, incremental pull infrastructure. It is never scheduled automatically.
+/// Explicit incremental-pull infrastructure; `SyncOrchestrator` decides when to invoke it.
 @MainActor
 final class SyncPullCoordinator {
     static let defaultPageSize = defaultSyncPullPageSize

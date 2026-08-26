@@ -4,6 +4,7 @@ import SwiftUI
 @main
 @MainActor
 struct CaloriesTrackerApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     private let dependencies: AppDependencies?
     private let startupMessage: String?
 
@@ -22,6 +23,15 @@ struct CaloriesTrackerApp: App {
             if let dependencies {
                 RootApplicationView(dependencies: dependencies)
                     .modelContainer(dependencies.modelContainer)
+                    .onChange(of: scenePhase, initial: true) { _, phase in
+                        Task {
+                            if phase == .active {
+                                await dependencies.syncOrchestrator?.applicationDidBecomeActive()
+                            } else {
+                                await dependencies.syncOrchestrator?.applicationDidLeaveActive()
+                            }
+                        }
+                    }
             } else {
                 StartupFailureView(message: startupMessage ?? "Не удалось запустить приложение.")
             }

@@ -19,6 +19,9 @@ final class AppDependencies {
     let syncPushCoordinator: SyncPushCoordinator?
     let syncPullCoordinator: SyncPullCoordinator?
     let syncBootstrapCoordinator: SyncBootstrapCoordinator?
+    let syncChangeNotifier: SyncChangeNotifier?
+    let syncStatus: SyncStatusStore?
+    let syncOrchestrator: SyncOrchestrator?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema(versionedSchema: CaloriesTrackerSchemaV4.self)
@@ -37,10 +40,25 @@ final class AppDependencies {
         self.modelContainer = modelContainer
         let syncLocalStore = SyncLocalStore(modelContainer: modelContainer)
         self.syncLocalStore = syncLocalStore
-        productRepository = SwiftDataProductRepository(modelContainer: modelContainer)
-        recipeRepository = SwiftDataRecipeRepository(modelContainer: modelContainer)
-        diaryRepository = SwiftDataDiaryRepository(modelContainer: modelContainer)
-        goalRepository = SwiftDataGoalRepository(modelContainer: modelContainer)
+        let supabaseClientProvider = SupabaseClientProvider.makeFromMainBundle()
+        let syncChangeNotifier = supabaseClientProvider.map { _ in SyncChangeNotifier() }
+        self.syncChangeNotifier = syncChangeNotifier
+        productRepository = SwiftDataProductRepository(
+            modelContainer: modelContainer,
+            syncChangeNotifier: syncChangeNotifier,
+        )
+        recipeRepository = SwiftDataRecipeRepository(
+            modelContainer: modelContainer,
+            syncChangeNotifier: syncChangeNotifier,
+        )
+        diaryRepository = SwiftDataDiaryRepository(
+            modelContainer: modelContainer,
+            syncChangeNotifier: syncChangeNotifier,
+        )
+        goalRepository = SwiftDataGoalRepository(
+            modelContainer: modelContainer,
+            syncChangeNotifier: syncChangeNotifier,
+        )
         productService = ProductService(repository: productRepository)
         recipeService = RecipeService(
             recipeRepository: recipeRepository,
@@ -58,7 +76,6 @@ final class AppDependencies {
             goalService: goalService,
         )
 
-        let supabaseClientProvider = SupabaseClientProvider.makeFromMainBundle()
         let supabaseAuth = supabaseClientProvider.map { SupabaseAuthService(client: $0.client) }
         let supabaseSyncTransport = supabaseClientProvider.map { SupabaseSyncTransport(client: $0.client) }
         self.supabaseClientProvider = supabaseClientProvider
@@ -79,17 +96,46 @@ final class AppDependencies {
             )
             self.syncPushCoordinator = syncPushCoordinator
             self.syncPullCoordinator = syncPullCoordinator
-            syncBootstrapCoordinator = SyncBootstrapCoordinator(
+            let syncBootstrapCoordinator = SyncBootstrapCoordinator(
                 modelContainer: modelContainer,
                 localStore: syncLocalStore,
                 authService: supabaseAuth,
                 pullCoordinator: syncPullCoordinator,
                 pushCoordinator: syncPushCoordinator,
             )
+            self.syncBootstrapCoordinator = syncBootstrapCoordinator
+            let syncStatus = SyncStatusStore()
+            let syncOrchestrator = SyncOrchestrator(
+                modelContainer: modelContainer,
+                authService: supabaseAuth,
+                bootstrapCoordinator: syncBootstrapCoordinator,
+                pullCoordinator: syncPullCoordinator,
+                pushCoordinator: syncPushCoordinator,
+                statusStore: syncStatus,
+            )
+            self.syncStatus = syncStatus
+            self.syncOrchestrator = syncOrchestrator
+            syncChangeNotifier?.setHandler {
+                Task {
+                    await syncOrchestrator.localSyncableMutationCommitted()
+                }
+            }
+            Task {
+                await supabaseAuth.setSessionLifecycleHandlers(
+                    onSessionAvailable: {
+                        await syncOrchestrator.authenticatedSessionDidBecomeAvailable()
+                    },
+                    onSessionEnded: {
+                        await syncOrchestrator.authenticatedSessionDidEnd()
+                    },
+                )
+            }
         } else {
             syncPushCoordinator = nil
             syncPullCoordinator = nil
             syncBootstrapCoordinator = nil
+            syncStatus = nil
+            syncOrchestrator = nil
         }
     }
 }

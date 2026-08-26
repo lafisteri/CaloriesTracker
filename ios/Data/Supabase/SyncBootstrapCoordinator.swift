@@ -65,11 +65,12 @@ private struct SyncBootstrapReadiness {
 }
 
 private let syncBootstrapLogger = Logger(subsystem: "com.caloriestracker.ios", category: "SyncBootstrap")
+private let defaultSyncBootstrapMaximumRounds = 10
 
 /// Explicit remote-first initial synchronization for one Supabase account.
 @MainActor
 final class SyncBootstrapCoordinator {
-    static let defaultMaximumRounds = 10
+    static let defaultMaximumRounds = defaultSyncBootstrapMaximumRounds
     static let pushBatchSize = 200
     static let maximumPushBatchesPerRound = 5
 
@@ -96,7 +97,7 @@ final class SyncBootstrapCoordinator {
 
     /// Bootstraps only accounts that have not already reached convergence.
     func bootstrapIfNeeded(
-        maximumRounds: Int = defaultMaximumRounds,
+        maximumRounds: Int = defaultSyncBootstrapMaximumRounds,
     ) async throws -> SyncBootstrapReport {
         guard maximumRounds > 0 else {
             throw SyncBootstrapCoordinatorError.invalidMaximumRounds

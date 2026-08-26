@@ -46,7 +46,7 @@ struct SyncPushReport: Equatable, Sendable {
 
 private let syncPushLogger = Logger(subsystem: "com.caloriestracker.ios", category: "SyncPush")
 
-/// Explicit, push-only infrastructure. It is never scheduled automatically.
+/// Explicit push-only infrastructure; `SyncOrchestrator` decides when to invoke it.
 @MainActor
 final class SyncPushCoordinator {
     private let modelContainer: ModelContainer

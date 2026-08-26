@@ -15,10 +15,22 @@ struct SupabaseAuthSession: Equatable, Sendable {
 
 /// Passwordless email-OTP authentication for the optional Supabase transport.
 actor SupabaseAuthService {
+    typealias SessionLifecycleHandler = @Sendable () async -> Void
+
     private let client: SupabaseClient
+    private var sessionAvailableHandler: SessionLifecycleHandler?
+    private var sessionEndedHandler: SessionLifecycleHandler?
 
     init(client: SupabaseClient) {
         self.client = client
+    }
+
+    func setSessionLifecycleHandlers(
+        onSessionAvailable: @escaping SessionLifecycleHandler,
+        onSessionEnded: @escaping SessionLifecycleHandler,
+    ) {
+        sessionAvailableHandler = onSessionAvailable
+        sessionEndedHandler = onSessionEnded
     }
 
     func requestOTP(email: String) async throws {
@@ -43,7 +55,11 @@ actor SupabaseAuthService {
             guard let session = response.session else {
                 throw SupabaseInfrastructureError.invalidResponse
             }
-            return SupabaseAuthSession(session: session)
+            let authenticatedSession = SupabaseAuthSession(session: session)
+            if let sessionAvailableHandler {
+                await sessionAvailableHandler()
+            }
+            return authenticatedSession
         } catch {
             throw SupabaseInfrastructureError.categorize(error)
         }
@@ -70,6 +86,9 @@ actor SupabaseAuthService {
     func signOut() async throws {
         do {
             try await client.auth.signOut()
+            if let sessionEndedHandler {
+                await sessionEndedHandler()
+            }
         } catch {
             throw SupabaseInfrastructureError.categorize(error)
         }

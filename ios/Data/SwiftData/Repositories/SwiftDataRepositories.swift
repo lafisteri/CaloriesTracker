@@ -4,9 +4,14 @@ import SwiftData
 @MainActor
 final class SwiftDataProductRepository: ProductRepository {
     private let modelContext: ModelContext
+    private let syncChangeNotifier: SyncChangeNotifier?
 
-    init(modelContainer: ModelContainer) {
+    init(
+        modelContainer: ModelContainer,
+        syncChangeNotifier: SyncChangeNotifier? = nil,
+    ) {
         modelContext = ModelContext(modelContainer)
+        self.syncChangeNotifier = syncChangeNotifier
     }
 
     func activeProducts(matching query: String) async throws -> [Product] {
@@ -109,7 +114,7 @@ final class SwiftDataProductRepository: ProductRepository {
             modelContext.insert(versionRecord)
             try SyncOutboxStore.markChanged(type: .product, id: product.id, in: modelContext)
             try SyncOutboxStore.markChanged(type: .productVersion, id: initialVersion.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -131,7 +136,7 @@ final class SwiftDataProductRepository: ProductRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .product, id: product.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -168,7 +173,7 @@ final class SwiftDataProductRepository: ProductRepository {
             modelContext.insert(versionRecord)
             try SyncOutboxStore.markChanged(type: .product, id: product.id, in: modelContext)
             try SyncOutboxStore.markChanged(type: .productVersion, id: version.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -185,11 +190,16 @@ final class SwiftDataProductRepository: ProductRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .product, id: id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
         }
+    }
+
+    private func commitSyncableMutation() throws {
+        try modelContext.save()
+        syncChangeNotifier?.localSyncableMutationCommitted()
     }
 
     private func productRecord(id: UUID) throws -> ProductRecord? {
@@ -264,9 +274,14 @@ private enum ProductRepositoryError: LocalizedError {
 @MainActor
 final class SwiftDataRecipeRepository: RecipeRepository {
     private let modelContext: ModelContext
+    private let syncChangeNotifier: SyncChangeNotifier?
 
-    init(modelContainer: ModelContainer) {
+    init(
+        modelContainer: ModelContainer,
+        syncChangeNotifier: SyncChangeNotifier? = nil,
+    ) {
         modelContext = ModelContext(modelContainer)
+        self.syncChangeNotifier = syncChangeNotifier
     }
 
     func activeRecipes(matching query: String) async throws -> [Recipe] {
@@ -344,7 +359,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
             }
             try SyncOutboxStore.markChanged(type: .recipe, id: recipe.id, in: modelContext)
             try SyncOutboxStore.markChanged(type: .recipeVersion, id: initialVersion.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -365,7 +380,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .recipe, id: recipe.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -407,7 +422,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
             }
             try SyncOutboxStore.markChanged(type: .recipe, id: recipe.id, in: modelContext)
             try SyncOutboxStore.markChanged(type: .recipeVersion, id: version.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -423,11 +438,16 @@ final class SwiftDataRecipeRepository: RecipeRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .recipe, id: id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
         }
+    }
+
+    private func commitSyncableMutation() throws {
+        try modelContext.save()
+        syncChangeNotifier?.localSyncableMutationCommitted()
     }
 
     private func recipeRecord(id: UUID) throws -> RecipeRecord? {
@@ -499,9 +519,14 @@ private enum RecipeRepositoryError: LocalizedError {
 @MainActor
 final class SwiftDataDiaryRepository: DiaryRepository {
     private let modelContext: ModelContext
+    private let syncChangeNotifier: SyncChangeNotifier?
 
-    init(modelContainer: ModelContainer) {
+    init(
+        modelContainer: ModelContainer,
+        syncChangeNotifier: SyncChangeNotifier? = nil,
+    ) {
         modelContext = ModelContext(modelContainer)
+        self.syncChangeNotifier = syncChangeNotifier
     }
 
     func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry? {
@@ -640,7 +665,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         do {
             modelContext.insert(record)
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -670,7 +695,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -700,7 +725,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -737,7 +762,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             for entry in entries {
                 try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
             }
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
@@ -754,11 +779,16 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
         do {
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
         }
+    }
+
+    private func commitSyncableMutation() throws {
+        try modelContext.save()
+        syncChangeNotifier?.localSyncableMutationCommitted()
     }
 
     private func entryRecord(id: UUID) throws -> DiaryEntryRecord? {
@@ -837,9 +867,14 @@ private enum DiaryRepositoryError: LocalizedError {
 @MainActor
 final class SwiftDataGoalRepository: GoalRepository {
     private let modelContext: ModelContext
+    private let syncChangeNotifier: SyncChangeNotifier?
 
-    init(modelContainer: ModelContainer) {
+    init(
+        modelContainer: ModelContainer,
+        syncChangeNotifier: SyncChangeNotifier? = nil,
+    ) {
         modelContext = ModelContext(modelContainer)
+        self.syncChangeNotifier = syncChangeNotifier
     }
 
     func weeklyGoal(id: UUID) async throws -> WeeklyGoal? {
@@ -918,11 +953,16 @@ final class SwiftDataGoalRepository: GoalRepository {
                 modelContext.insert(dailyGoalRecord)
             }
             try SyncOutboxStore.markChanged(type: .weeklyGoal, id: goal.id, in: modelContext)
-            try modelContext.save()
+            try commitSyncableMutation()
         } catch {
             modelContext.rollback()
             throw error
         }
+    }
+
+    private func commitSyncableMutation() throws {
+        try modelContext.save()
+        syncChangeNotifier?.localSyncableMutationCommitted()
     }
 
     private func allGoals() throws -> [WeeklyGoal] {

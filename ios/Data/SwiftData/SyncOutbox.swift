@@ -58,7 +58,7 @@ enum SyncOutboxError: Error, LocalizedError {
 
 @MainActor
 enum SyncOutboxStore {
-    static let defaultPendingLimit = 50
+    nonisolated static let defaultPendingLimit = 50
 
     static func markChanged(
         type: SyncEntityType,

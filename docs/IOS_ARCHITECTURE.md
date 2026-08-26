@@ -14,7 +14,7 @@ behaviour; this document defines technical boundaries and invariants.
 | Local persistence | One SwiftData ModelContainer from a versioned schema. |
 | Concurrency | async/await; UI and SwiftData repositories are MainActor. |
 | Observation | Swift Observation is normal feature state. Combine is scoped to Recipe Editor keyboard lifecycle notifications. |
-| Data | Local-first SwiftData source of truth. Supabase auth and transport are optional infrastructure, not an automatic sync service. |
+| Data | Local-first SwiftData source of truth. Supabase auth, transport and foreground-only sync orchestration are optional infrastructure. |
 
 The active implementation is the native iOS client. Web/PWA architecture is not
 a native implementation dependency.
@@ -80,10 +80,10 @@ strictly ascending for incremental pulls; it is not part of canonical payloads.
 The transport returns accepted, conflict or missing results, including the
 authoritative conflict payload, but does not apply a local merge.
 
-`SyncPushCoordinator` is the only current connection from the persistent
-outbox to the transport, and it is an explicit manual API: it is not run on
-launch, foreground, edit, login or a timer. It reads at most 50 immutable outbox
-snapshots in `enqueuedAt ASC, key ASC` order, exports each canonical envelope,
+`SyncPushCoordinator` is the only connection from the persistent outbox to the
+transport. It remains a focused push-only coordinator; `SyncOrchestrator`
+decides when it runs. A normal orchestration cycle reads at most 50 immutable
+outbox snapshots in `enqueuedAt ASC, key ASC` order, exports each canonical envelope,
 uses that entity's account-scoped remote revision for optimistic concurrency,
 and pushes items sequentially. For an accepted response it persists the new
 entity revision and acknowledges only the snapshot's exact outbox token in one
@@ -92,8 +92,8 @@ the new outbox item remains pending while the accepted remote revision is kept.
 Conflicts and missing remote records remain pending without merge, retry,
 metadata rewrite or recovery. Pushes never change the pull cursor.
 
-`SyncPullCoordinator` is a separate explicit manual API, never run on launch,
-foreground, login, after push or a timer. It starts from the account-scoped
+`SyncPullCoordinator` is a separate pull-only coordinator, invoked by the
+orchestrator's normal cycle. It starts from the account-scoped
 persistent pull cursor and fetches `server_revision` pages in ascending order,
 bounded to 200 rows per page, five pages and 1,000 rows per run. Its transient
 scan cursor may look ahead beyond the persisted cursor to resolve dependencies:
@@ -112,10 +112,10 @@ safe to replay. Dependency deferrals, invalid payloads and immutable-content
 collisions never move the cursor past the blocking record. Pull never invokes
 push, bootstrap, realtime or a local mutation backfill.
 
-`SyncBootstrapCoordinator` is a third, manually callable coordinator for an
-account that has no completed bootstrap marker. It reuses pull, push and the
-existing `SyncLocalStore` rules rather than adding another transport or conflict
-path. It first pulls cloud state to exhaustion, then performs one deterministic
+`SyncBootstrapCoordinator` is a third coordinator for an account that has no
+completed bootstrap marker. It reuses pull, push and the existing
+`SyncLocalStore` rules rather than adding another transport or conflict path. It
+first pulls cloud state to exhaustion, then performs one deterministic
 local identity scan (ProductVersion, Product, RecipeVersion, Recipe, WeeklyGoal,
 DiaryEntry) and seeds only account-unknown identities through `ensurePending`.
 Existing outbox tokens are preserved. It pushes through `SyncPushCoordinator`,
@@ -126,10 +126,60 @@ there is no blind retry.
 Completion is account-scoped and persists only after a final caught-up pull has
 no deferred or failed records, every local top-level identity has a known remote
 revision, and no outbox work remains. A crash before that marker is safe: the
-next manual run reuses the persistent cursor, remote revisions and outbox tokens.
-Completed accounts return a no-op without rescanning local records. Bootstrap
-never advances the pull cursor itself, and remains manual-only: it has no launch,
-foreground, login, timer, push-follow-up, Realtime or production UI trigger.
+next orchestration wake reuses the persistent cursor, remote revisions and
+outbox tokens. Completed accounts return a no-op without rescanning local
+records. Bootstrap never advances the pull cursor itself.
+
+When Supabase is configured, `AppDependencies` owns exactly one
+`SyncChangeNotifier`, `SyncStatusStore` and actor-isolated `SyncOrchestrator`.
+The app's `scenePhase` wakes it immediately on `.active`; a restored session is
+therefore discovered without blocking launch. `SupabaseAuthService` notifies the
+same orchestrator after a successful OTP verification and after sign-out.
+While active, the orchestrator also performs a 60-second foreground refresh.
+`.inactive` and `.background` stop the periodic timer and cancel pending local
+change debounce and retry sleeps. There is no `BGTaskScheduler`, background
+fetch, silent push or Realtime subscription.
+
+The orchestrator is single-flight: a wake while bootstrap, pull or push is
+already executing only marks `needsAnotherRun`. It performs bootstrap first when
+needed, then normal `Pull → Push → Pull` cycles, with at most three convergence
+cycles per wake and one coalesced follow-up run. Before proceeding after each
+network phase, it checks the original account UUID against the current session,
+so a result for a signed-out or switched account is never continued as work for
+another account. A successful sign-out cancels pending old-account debounce,
+retry and periodic scheduling, while retaining local records, outbox rows and
+account-scoped metadata.
+
+`SyncChangeNotifier` is a typed, post-commit infrastructure signal, not a
+domain-service or `NotificationCenter` dependency. Product create, metadata
+save, version append and soft delete; Recipe create, metadata save, version
+append and soft delete; DiaryEntry create, amount save, source rebase, batch
+reorder and soft delete; and WeeklyGoal creation all signal it only after their
+SwiftData save has successfully committed their existing outbox marker. Remote
+imports bypass this notifier because they do not use those ordinary local
+outbox-staging paths. The signal debounces rapid edits for 1.8 seconds, so local
+repository saves never await network work.
+
+Only transient network and server failures schedule a bounded retry sequence of
+2, 5, 15, 30 and 60 seconds. Authentication, configuration, persistence,
+invariant, missing-remote and unresolved-dependency failures do not receive a
+blind automatic retry. A push conflict remains subject to the established merge
+rules: a final pull runs first and a later normal cycle may republish if local
+state wins. `SyncStatusStore` exposes `disabled`, `signedOut`, `idle`,
+`syncing`, `waitingForRetry` and `blocked`, together with the latest error
+category. It updates `lastSuccessfulSyncAt` only after a complete normal cycle
+has no pending outbox work or known pull blocker.
+
+Today root exposes the optional Sync settings sheet through its trailing
+`gearshape` toolbar button; it does not add a fourth tab or alter `todayPath`.
+`SettingsView` uses `SupabaseAuthService` for passwordless email OTP only and
+receives the observable status store plus `SyncOrchestrator`'s explicit manual
+wake API. It never calls bootstrap, pull or push coordinators. Signed-out users
+enter an email, request a code, enter up to six numeric OTP digits and can resend
+after a view-local 60-second cooldown. Signed-in users see their email, a
+human-readable sync state, last successful sync time, Sync now and sign-out.
+The screen shows no account UUID, access token, refresh token or raw transport
+error. Sign-out preserves all local data, outbox rows and sync metadata.
 
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
@@ -233,7 +283,8 @@ this foundation.
 
 ~~~text
 ios/
-  App/                         # app entry point, dependencies, router and tabs
+  App/                         # app entry point, dependencies, orchestration, router and tabs
+    SyncOrchestration.swift
   Domain/
     Core/ Products/ Recipes/ Diary/ Goals/ Statistics/ Units/ Repositories/
   Application/
@@ -244,13 +295,13 @@ ios/
     Statistics/StatisticsService.swift
   Data/SwiftData/
     Models/ Mappers/ Repositories/ SchemaV1.swift SchemaV4.swift MigrationPlan.swift
-    SyncEntityIdentity.swift SyncMetadata.swift CanonicalSyncPayloads.swift
+    SyncEntityIdentity.swift SyncMetadata.swift SyncOutbox.swift CanonicalSyncPayloads.swift
     SyncLocalStore.swift
   Data/Supabase/
     SupabaseClientProvider.swift SupabaseAuthService.swift SupabaseSyncTransport.swift
     SyncPushCoordinator.swift SyncPullCoordinator.swift SyncBootstrapCoordinator.swift
   Features/
-    Today/ Catalog/ Statistics/ Goals/
+    Today/ Catalog/ Statistics/ Goals/ Settings/
 ~~~
 
 ## Navigation
@@ -275,6 +326,9 @@ Paths are independent with one intentional exception: leaving the Today tab
 clears todayPath. This discards unfinished transient flows so returning shows
 Today root. The selected LocalDay lives in TodayViewModel, independent of the
 path, and is not reset.
+
+The Today-root gear presents Settings modally, so it is not an AppRouter route
+and does not affect the three bottom tabs or their reset rules.
 
 Completion callbacks use guarded router pop helpers: an async completion may pop
 only if its expected route is still at the top. This prevents stale callbacks
@@ -451,10 +505,10 @@ historical Recipe and DiaryEntry resolution.
 
 ## SwiftData persistence
 
-CaloriesTrackerSchemaV3 is the active explicit VersionedSchema. AppDependencies
+CaloriesTrackerSchemaV4 is the active explicit VersionedSchema. AppDependencies
 creates the container with CaloriesTrackerMigrationPlan, which uses lightweight
-V1→V2 and V2→V3 migrations. V3 is additive: it does not rewrite existing user
-records or SyncOutbox rows, and starts with no remote or pull metadata.
+V1→V2, V2→V3 and V3→V4 migrations. V4 is additive: it does not rewrite existing
+user records, outbox rows or account metadata.
 
 | Record group | Purpose |
 | --- | --- |
@@ -465,6 +519,7 @@ records or SyncOutbox rows, and starts with no remote or pull metadata.
 | SyncOutboxRecord | Coalesced local mutation marker (added by V2) |
 | SyncRemoteStateRecord | Account + entity known positive server revision (added by V3) |
 | SyncPullStateRecord | Account's fully processed incremental-pull cursor (added by V3) |
+| SyncBootstrapStateRecord | Account's completed remote-first bootstrap marker (added by V4) |
 
 Every record has a unique UUID; enum values are scalar string raw values.
 Record relationships support local traversal, but UUID fields are authoritative
@@ -529,16 +584,16 @@ presented to the user only through a stable context-specific message.
 ## Current and deferred capabilities
 
 SwiftData remains the only persistence implementation and the local source of
-truth. Supabase provides an internal, optional email-OTP and typed transport
-foundation, including persistent account-scoped revision and pull-cursor metadata
-and explicit manual outbox push, incremental pull and initial-bootstrap APIs.
-There is no sync UI, automatic worker, realtime or automatic orchestration.
-staging queue, web migration, barcode scanner wrapper or external product API.
+truth. Supabase provides optional email-OTP, typed transport and automatic
+foreground-only orchestration with persistent account-scoped revision,
+pull-cursor and bootstrap metadata. A compact Settings → Sync UI supports OTP,
+status, Sync now and sign-out; there is no Realtime, background worker, staging
+queue, web migration, barcode scanner wrapper or external product API.
 Canonical payload export and direct local remote-merge support remain internal
 foundation rather than a user-facing import/export feature.
 
-If future sync is approved, it must remain behind repositories, use explicit
-DTOs/merge transactions and preserve immutable versions and Diary snapshots.
+Sync extensions must remain behind repositories, use explicit DTOs/merge
+transactions and preserve immutable versions and Diary snapshots.
 Camera barcode scanning likewise requires a separately approved isolated
 feature; it must not be presented as current architecture.
 
