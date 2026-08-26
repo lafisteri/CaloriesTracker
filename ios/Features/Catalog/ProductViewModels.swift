@@ -204,6 +204,7 @@ final class ProductEditorViewModel {
     private(set) var isLoading = false
     private(set) var isSaving = false
     var errorMessage: String?
+    private var loadedVersion: ProductVersion?
 
     init(productID: UUID?, productService: ProductService) {
         self.productID = productID
@@ -231,6 +232,7 @@ final class ProductEditorViewModel {
             protein = EditableDecimal.string(from: details.currentVersion.nutrition.protein)
             fat = EditableDecimal.string(from: details.currentVersion.nutrition.fat)
             carbs = EditableDecimal.string(from: details.currentVersion.nutrition.carbs)
+            loadedVersion = details.currentVersion
         } catch {
             errorMessage = productErrorMessage(error, fallback: "Не удалось загрузить продукт.")
         }
@@ -262,18 +264,45 @@ final class ProductEditorViewModel {
     }
 
     private func makeDraft() throws -> ProductDraft {
-        ProductDraft(
+        let versionedValues: (baseUnit: ProductBaseUnit, baseAmount: Double, nutrition: Nutrition)
+        if let loadedVersion, versionedInputsMatch(loadedVersion) {
+            // The editor intentionally displays at most two fractional digits.
+            // Preserve the stored values when those inputs were not touched so a
+            // name or barcode edit cannot manufacture a ProductVersion.
+            versionedValues = (
+                baseUnit: loadedVersion.baseUnit,
+                baseAmount: loadedVersion.baseAmount,
+                nutrition: loadedVersion.nutrition,
+            )
+        } else {
+            versionedValues = (
+                baseUnit: baseUnit,
+                baseAmount: try numericValue(baseAmount, field: "Количество"),
+                nutrition: Nutrition(
+                    calories: try numericValue(calories, field: "Калории"),
+                    protein: try numericValue(protein, field: "Белки"),
+                    fat: try numericValue(fat, field: "Жиры"),
+                    carbs: try numericValue(carbs, field: "Углеводы"),
+                ),
+            )
+        }
+
+        return ProductDraft(
             name: name,
             barcode: barcode,
-            baseUnit: baseUnit,
-            baseAmount: try numericValue(baseAmount, field: "Количество"),
-            nutrition: Nutrition(
-                calories: try numericValue(calories, field: "Калории"),
-                protein: try numericValue(protein, field: "Белки"),
-                fat: try numericValue(fat, field: "Жиры"),
-                carbs: try numericValue(carbs, field: "Углеводы"),
-            ),
+            baseUnit: versionedValues.baseUnit,
+            baseAmount: versionedValues.baseAmount,
+            nutrition: versionedValues.nutrition,
         )
+    }
+
+    private func versionedInputsMatch(_ version: ProductVersion) -> Bool {
+        baseUnit == version.baseUnit
+            && baseAmount == EditableDecimal.string(from: version.baseAmount)
+            && calories == EditableDecimal.string(from: version.nutrition.calories)
+            && protein == EditableDecimal.string(from: version.nutrition.protein)
+            && fat == EditableDecimal.string(from: version.nutrition.fat)
+            && carbs == EditableDecimal.string(from: version.nutrition.carbs)
     }
 
     private func numericValue(_ text: String, field: String) throws -> Double {

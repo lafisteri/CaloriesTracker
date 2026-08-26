@@ -220,6 +220,11 @@ final class RecipeDetailViewModel {
 @MainActor
 @Observable
 final class RecipeEditorViewModel {
+    private struct OutputValues {
+        let cookedWeight: Double?
+        let servingsCount: Double?
+    }
+
     private let recipeService: RecipeService
     let recipeID: UUID?
 
@@ -257,6 +262,7 @@ final class RecipeEditorViewModel {
     private var compositionRequestID = 0
     private var isRefreshingComposition = false
     private var hasLoadedInitialDraft = false
+    private var loadedOutputValues: OutputValues?
 
     init(recipeID: UUID?, recipeService: RecipeService) {
         self.recipeID = recipeID
@@ -285,6 +291,10 @@ final class RecipeEditorViewModel {
             cookedWeightText = draft.cookedWeight.map { EditableDecimal.string(from: $0) } ?? ""
             servingsCountText = draft.servingsCount.map { EditableDecimal.string(from: $0) } ?? ""
             outputUnit = draft.cookedWeight == nil && draft.servingsCount != nil ? .serving : .grams
+            loadedOutputValues = OutputValues(
+                cookedWeight: draft.cookedWeight,
+                servingsCount: draft.servingsCount,
+            )
             let nutritionByDraftID = Dictionary(
                 uniqueKeysWithValues: editorData.composition.ingredientCalculations.map { ($0.draftID, $0.nutrition) },
             )
@@ -489,12 +499,29 @@ final class RecipeEditorViewModel {
     }
 
     private func makeDraft() throws -> RecipeDraft {
-        RecipeDraft(
+        let outputValues: OutputValues
+        if let loadedOutputValues, outputInputsMatch(loadedOutputValues) {
+            // Preserve unedited stored values rather than round-tripping through
+            // the editor's two-decimal display representation.
+            outputValues = loadedOutputValues
+        } else {
+            outputValues = OutputValues(
+                cookedWeight: try recipeOptionalNumber(cookedWeightText, field: "Количество"),
+                servingsCount: try recipeOptionalNumber(servingsCountText, field: "Количество"),
+            )
+        }
+
+        return RecipeDraft(
             name: name,
             ingredients: ingredients.map(\.draft),
-            cookedWeight: try recipeOptionalNumber(cookedWeightText, field: "Количество"),
-            servingsCount: try recipeOptionalNumber(servingsCountText, field: "Количество"),
+            cookedWeight: outputValues.cookedWeight,
+            servingsCount: outputValues.servingsCount,
         )
+    }
+
+    private func outputInputsMatch(_ values: OutputValues) -> Bool {
+        cookedWeightText == (values.cookedWeight.map { EditableDecimal.string(from: $0) } ?? "")
+            && servingsCountText == (values.servingsCount.map { EditableDecimal.string(from: $0) } ?? "")
     }
 }
 
