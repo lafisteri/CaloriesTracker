@@ -94,8 +94,8 @@ WeeklyGoal and its seven DailyMacroGoal values are a write-once aggregate for
 one `effectiveFrom` key. It has a stable UUID and `createdAt` records its sole
 local mutation; goals are not edited or deleted in place.
 
-Business timestamps are distinct from future sync operational metadata. That
-metadata belongs to future sync infrastructure, not domain or SwiftData records.
+Business timestamps are distinct from sync operational metadata. That metadata
+is infrastructure-only and never appears in domain values or canonical payloads.
 
 For a local user mutation, the affected domain record and its persistent,
 local-only outbox marker are committed by the same `ModelContext.save()`. Outbox
@@ -108,6 +108,23 @@ Product, Recipe and DiaryEntry tombstones are synchronized as the current
 entity state. RecipeVersion includes its ingredient composition and WeeklyGoal
 includes its daily values as their respective sync aggregates. The V2 migration
 adds an empty outbox table only; existing local records are not backfilled.
+
+The V3 migration adds empty, account-scoped Supabase metadata only. Server
+revisions are monotonic per Supabase account: `SyncRemoteStateRecord` maps
+`accountID + SyncEntityKey` to a known positive `serverRevision`, while
+`SyncPullStateRecord` maps an account to its fully processed incremental-pull
+cursor (default `0`). The deterministic remote-state
+key is `<account UUID>:<entity type>:<entity UUID>`. `SyncMetadataStore` uses
+targeted predicate queries and permits callers to combine metadata mutation
+with other changes in one `ModelContext.save()`; it never saves internally.
+Revisions and cursors are monotonic and reject regression rather than silently
+using a maximum. A pushed entity revision never advances the pull cursor: other
+account changes may still exist before that revision.
+
+Signing out retains local data, outbox rows and account-scoped metadata. A later
+sign-in to the same account can reuse its metadata, while another account gets
+an isolated namespace. No migration backfills revisions or treats current local
+records as uploaded.
 
 Outbox marking is explicit at local mutation save boundaries, rather than an
 automatic SwiftData side effect. A future remote-import path can therefore write
@@ -169,7 +186,8 @@ ios/
     Statistics/StatisticsService.swift
   Data/SwiftData/
     Models/ Mappers/ Repositories/ SchemaV1.swift MigrationPlan.swift
-    SyncEntityIdentity.swift CanonicalSyncPayloads.swift SyncLocalStore.swift
+    SyncEntityIdentity.swift SyncMetadata.swift CanonicalSyncPayloads.swift
+    SyncLocalStore.swift
   Data/Supabase/
     SupabaseClientProvider.swift SupabaseAuthService.swift SupabaseSyncTransport.swift
   Features/
@@ -374,10 +392,10 @@ historical Recipe and DiaryEntry resolution.
 
 ## SwiftData persistence
 
-CaloriesTrackerSchemaV1 is an explicit VersionedSchema. AppDependencies creates
-the container with CaloriesTrackerMigrationPlan. The plan currently contains
-only V1 and no stages; a future schema change must add a version and migration
-stage rather than discard user data.
+CaloriesTrackerSchemaV3 is the active explicit VersionedSchema. AppDependencies
+creates the container with CaloriesTrackerMigrationPlan, which uses lightweight
+V1→V2 and V2→V3 migrations. V3 is additive: it does not rewrite existing user
+records or SyncOutbox rows, and starts with no remote or pull metadata.
 
 | Record group | Purpose |
 | --- | --- |
@@ -386,6 +404,8 @@ stage rather than discard user data.
 | DiaryEntryRecord | Historical source and nutrition snapshot |
 | WeeklyGoalRecord, DailyMacroGoalRecord | Effective goal and seven daily values |
 | SyncOutboxRecord | Coalesced local mutation marker (added by V2) |
+| SyncRemoteStateRecord | Account + entity known positive server revision (added by V3) |
+| SyncPullStateRecord | Account's fully processed incremental-pull cursor (added by V3) |
 
 Every record has a unique UUID; enum values are scalar string raw values.
 Record relationships support local traversal, but UUID fields are authoritative
@@ -451,8 +471,9 @@ presented to the user only through a stable context-specific message.
 
 SwiftData remains the only persistence implementation and the local source of
 truth. Supabase provides an internal, optional email-OTP and typed transport
-foundation, but there is no sync UI, automatic worker, outbox bridge,
-acknowledgement, initial upload, cursor persistence, remote merge application,
+foundation, including persistent account-scoped revision and pull-cursor metadata,
+but there is no sync UI, automatic worker, outbox bridge, acknowledgement,
+initial upload, remote merge application,
 staging queue, web migration, barcode scanner wrapper or external product API.
 Canonical payload export and direct local remote-merge support remain internal
 foundation rather than a user-facing import/export feature.

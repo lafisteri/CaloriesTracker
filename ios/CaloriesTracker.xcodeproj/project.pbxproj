@@ -59,6 +59,8 @@
 		A10000000000000000000058 /* SupabaseClientProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* SupabaseClientProvider.swift */; };
 		A10000000000000000000059 /* SupabaseAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* SupabaseAuthService.swift */; };
 		A10000000000000000000060 /* SupabaseSyncTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* SupabaseSyncTransport.swift */; };
+		A10000000000000000000061 /* SyncMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000061 /* SyncMetadata.swift */; };
+		A10000000000000000000062 /* SchemaV3.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000062 /* SchemaV3.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -116,6 +118,8 @@
 		A20000000000000000000058 /* SupabaseClientProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClientProvider.swift; sourceTree = "<group>"; };
 		A20000000000000000000059 /* SupabaseAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAuthService.swift; sourceTree = "<group>"; };
 		A20000000000000000000060 /* SupabaseSyncTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseSyncTransport.swift; sourceTree = "<group>"; };
+		A20000000000000000000061 /* SyncMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMetadata.swift; sourceTree = "<group>"; };
+		A20000000000000000000062 /* SchemaV3.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV3.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -387,8 +391,10 @@
 				A40000000000000000000012 /* Repositories */,
 				A20000000000000000000019 /* SchemaV1.swift */,
 				A20000000000000000000049 /* SchemaV2.swift */,
+				A20000000000000000000062 /* SchemaV3.swift */,
 				A20000000000000000000020 /* MigrationPlan.swift */,
 				A20000000000000000000050 /* SyncOutbox.swift */,
+				A20000000000000000000061 /* SyncMetadata.swift */,
 				A20000000000000000000051 /* SyncEntityIdentity.swift */,
 				A20000000000000000000052 /* CanonicalSyncPayloads.swift */,
 				A20000000000000000000053 /* SyncLocalStore.swift */,
@@ -541,8 +547,10 @@
 				A10000000000000000000018 /* SwiftDataRecords.swift in Sources */,
 				A10000000000000000000019 /* SchemaV1.swift in Sources */,
 				A10000000000000000000049 /* SchemaV2.swift in Sources */,
+				A10000000000000000000062 /* SchemaV3.swift in Sources */,
 				A10000000000000000000020 /* MigrationPlan.swift in Sources */,
 				A10000000000000000000050 /* SyncOutbox.swift in Sources */,
+				A10000000000000000000061 /* SyncMetadata.swift in Sources */,
 				A10000000000000000000051 /* SyncEntityIdentity.swift in Sources */,
 				A10000000000000000000052 /* CanonicalSyncPayloads.swift in Sources */,
 				A10000000000000000000053 /* SyncLocalStore.swift in Sources */,

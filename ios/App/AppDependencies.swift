@@ -17,7 +17,7 @@ final class AppDependencies {
     let supabaseSyncTransport: SupabaseSyncTransport?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
-        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV2.self)
+        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV3.self)
         let configuration = ModelConfiguration(
             "CaloriesTracker",
             schema: schema,
