@@ -357,10 +357,9 @@ final class RecipeEditorViewModel {
     }
 
     func appendIngredients(_ drafts: [RecipeIngredientDraft]) async throws {
-        var newItems: [RecipeIngredientEditorItem] = []
-        for draft in drafts {
-            let source = try await recipeService.ingredientSource(for: draft)
-            newItems.append(RecipeIngredientEditorItem(draft: draft, productName: source.productName, nutrition: nil))
+        let sources = try await recipeService.ingredientSources(for: drafts)
+        let newItems = zip(drafts, sources).map { draft, source in
+            RecipeIngredientEditorItem(draft: draft, productName: source.productName, nutrition: nil)
         }
         ingredients.append(contentsOf: newItems)
         invalidateComposition()

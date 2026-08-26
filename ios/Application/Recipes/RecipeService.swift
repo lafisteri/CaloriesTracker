@@ -272,6 +272,35 @@ final class RecipeService {
         )
     }
 
+    func ingredientSources(for drafts: [RecipeIngredientDraft]) async throws -> [RecipeIngredientSource] {
+        let versionIDs = Set(drafts.map(\.productVersionID))
+        let versions = try await productRepository.versions(ids: versionIDs)
+        let versionsByID = Dictionary(uniqueKeysWithValues: versions.map { ($0.id, $0) })
+
+        let resolvedVersions = try drafts.map { draft in
+            guard let version = versionsByID[draft.productVersionID],
+                  version.productID == draft.productID
+            else {
+                throw RecipeServiceError.pinnedProductVersionNotFound
+            }
+            return version
+        }
+        let productIDs = Set(resolvedVersions.map(\.productID))
+        let products = try await productRepository.products(ids: productIDs, includingDeleted: true)
+        let productsByID = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
+
+        return zip(drafts, resolvedVersions).map { draft, version in
+            RecipeIngredientSource(
+                productID: draft.productID,
+                productName: productsByID[draft.productID]?.name ?? "Удалённый продукт",
+                version: version,
+                unitOptions: unitOptions(for: version),
+                initialAmount: draft.amount,
+                initialUnitToken: draft.unitToken,
+            )
+        }
+    }
+
     func makeIngredientDraft(
         source: RecipeIngredientSource,
         amount: Double,
@@ -432,11 +461,25 @@ final class RecipeService {
             }
         var changed = false
 
+        let productIDs = Set(ingredients.map(\.productID))
+        let products = try await productRepository.products(ids: productIDs, includingDeleted: false)
+        let productsByID = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
+        let currentVersionIDs: Set<UUID> = Set(ingredients.compactMap { ingredient -> UUID? in
+            guard let product = productsByID[ingredient.productID],
+                  product.currentVersionID != ingredient.productVersionID
+            else {
+                return nil
+            }
+            return product.currentVersionID
+        })
+        let currentVersions = try await productRepository.versions(ids: currentVersionIDs)
+        let currentVersionsByID = Dictionary(uniqueKeysWithValues: currentVersions.map { ($0.id, $0) })
+
         for index in ingredients.indices {
             let ingredient = ingredients[index]
-            guard let product = try await productRepository.product(id: ingredient.productID, includingDeleted: false),
+            guard let product = productsByID[ingredient.productID],
                   product.currentVersionID != ingredient.productVersionID,
-                  let nextVersion = try await productRepository.version(id: product.currentVersionID),
+                  let nextVersion = currentVersionsByID[product.currentVersionID],
                   nextVersion.productID == product.id,
                   unitToken(ingredient.unitToken, isCompatibleWith: nextVersion)
             else {
