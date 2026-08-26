@@ -80,6 +80,18 @@ strictly ascending for incremental pulls; it is not part of canonical payloads.
 The transport returns accepted, conflict or missing results, including the
 authoritative conflict payload, but does not apply a local merge.
 
+`SyncPushCoordinator` is the only current connection from the persistent
+outbox to the transport, and it is an explicit manual API: it is not run on
+launch, foreground, edit, login or a timer. It reads at most 50 immutable outbox
+snapshots in `enqueuedAt ASC, key ASC` order, exports each canonical envelope,
+uses that entity's account-scoped remote revision for optimistic concurrency,
+and pushes items sequentially. For an accepted response it persists the new
+entity revision and acknowledges only the snapshot's exact outbox token in one
+`ModelContext.save()`. If an edit changes that token while the request awaits,
+the new outbox item remains pending while the accepted remote revision is kept.
+Conflicts and missing remote records remain pending without merge, retry,
+metadata rewrite or recovery. Pushes never change the pull cursor.
+
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
 
@@ -190,6 +202,7 @@ ios/
     SyncLocalStore.swift
   Data/Supabase/
     SupabaseClientProvider.swift SupabaseAuthService.swift SupabaseSyncTransport.swift
+    SyncPushCoordinator.swift
   Features/
     Today/ Catalog/ Statistics/ Goals/
 ~~~
@@ -471,9 +484,9 @@ presented to the user only through a stable context-specific message.
 
 SwiftData remains the only persistence implementation and the local source of
 truth. Supabase provides an internal, optional email-OTP and typed transport
-foundation, including persistent account-scoped revision and pull-cursor metadata,
-but there is no sync UI, automatic worker, outbox bridge, acknowledgement,
-initial upload, remote merge application,
+foundation, including persistent account-scoped revision and pull-cursor metadata
+and an explicit manual outbox push API. There is no sync UI, automatic worker,
+initial upload, pull, remote merge application,
 staging queue, web migration, barcode scanner wrapper or external product API.
 Canonical payload export and direct local remote-merge support remain internal
 foundation rather than a user-facing import/export feature.

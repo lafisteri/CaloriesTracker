@@ -1,6 +1,13 @@
 import Foundation
 import SwiftData
 
+struct SyncOutboxItem: Equatable, Sendable {
+    let key: String
+    let entityKey: SyncEntityKey
+    let changeToken: UUID
+    let enqueuedAt: Date
+}
+
 @Model
 final class SyncOutboxRecord {
     @Attribute(.unique) var key: String
@@ -51,6 +58,8 @@ enum SyncOutboxError: Error, LocalizedError {
 
 @MainActor
 enum SyncOutboxStore {
+    static let defaultPendingLimit = 50
+
     static func markChanged(
         type: SyncEntityType,
         id: UUID,
@@ -91,6 +100,31 @@ enum SyncOutboxStore {
             sortBy: [SortDescriptor(\SyncOutboxRecord.enqueuedAt)],
         )
         return try modelContext.fetch(descriptor)
+    }
+
+    static func pending(
+        limit: Int = defaultPendingLimit,
+        in modelContext: ModelContext,
+    ) throws -> [SyncOutboxItem] {
+        guard limit > 0 else {
+            return []
+        }
+
+        var descriptor = FetchDescriptor<SyncOutboxRecord>(
+            sortBy: [
+                SortDescriptor(\SyncOutboxRecord.enqueuedAt),
+                SortDescriptor(\SyncOutboxRecord.key),
+            ],
+        )
+        descriptor.fetchLimit = limit
+        return try modelContext.fetch(descriptor).map { record in
+            SyncOutboxItem(
+                key: record.key,
+                entityKey: try record.syncEntityKey(),
+                changeToken: record.changeToken,
+                enqueuedAt: record.enqueuedAt,
+            )
+        }
     }
 
     @discardableResult

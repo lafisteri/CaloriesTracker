@@ -61,6 +61,7 @@
 		A10000000000000000000060 /* SupabaseSyncTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* SupabaseSyncTransport.swift */; };
 		A10000000000000000000061 /* SyncMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000061 /* SyncMetadata.swift */; };
 		A10000000000000000000062 /* SchemaV3.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000062 /* SchemaV3.swift */; };
+		A10000000000000000000063 /* SyncPushCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000063 /* SyncPushCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +121,7 @@
 		A20000000000000000000060 /* SupabaseSyncTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseSyncTransport.swift; sourceTree = "<group>"; };
 		A20000000000000000000061 /* SyncMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMetadata.swift; sourceTree = "<group>"; };
 		A20000000000000000000062 /* SchemaV3.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV3.swift; sourceTree = "<group>"; };
+		A20000000000000000000063 /* SyncPushCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPushCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -408,6 +410,7 @@
 				A20000000000000000000058 /* SupabaseClientProvider.swift */,
 				A20000000000000000000059 /* SupabaseAuthService.swift */,
 				A20000000000000000000060 /* SupabaseSyncTransport.swift */,
+				A20000000000000000000063 /* SyncPushCoordinator.swift */,
 			);
 			path = Supabase;
 			sourceTree = "<group>";
@@ -557,6 +560,7 @@
 				A10000000000000000000058 /* SupabaseClientProvider.swift in Sources */,
 				A10000000000000000000059 /* SupabaseAuthService.swift in Sources */,
 				A10000000000000000000060 /* SupabaseSyncTransport.swift in Sources */,
+				A10000000000000000000063 /* SyncPushCoordinator.swift in Sources */,
 				A10000000000000000000021 /* RecordMappers.swift in Sources */,
 				A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */,
 				A10000000000000000000023 /* ProductService.swift in Sources */,

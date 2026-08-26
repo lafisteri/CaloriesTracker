@@ -15,6 +15,8 @@ final class AppDependencies {
     let supabaseClientProvider: SupabaseClientProvider?
     let supabaseAuth: SupabaseAuthService?
     let supabaseSyncTransport: SupabaseSyncTransport?
+    let syncLocalStore: SyncLocalStore
+    let syncPushCoordinator: SyncPushCoordinator?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema(versionedSchema: CaloriesTrackerSchemaV3.self)
@@ -31,6 +33,8 @@ final class AppDependencies {
         )
 
         self.modelContainer = modelContainer
+        let syncLocalStore = SyncLocalStore(modelContainer: modelContainer)
+        self.syncLocalStore = syncLocalStore
         productRepository = SwiftDataProductRepository(modelContainer: modelContainer)
         recipeRepository = SwiftDataRecipeRepository(modelContainer: modelContainer)
         diaryRepository = SwiftDataDiaryRepository(modelContainer: modelContainer)
@@ -53,8 +57,20 @@ final class AppDependencies {
         )
 
         let supabaseClientProvider = SupabaseClientProvider.makeFromMainBundle()
+        let supabaseAuth = supabaseClientProvider.map { SupabaseAuthService(client: $0.client) }
+        let supabaseSyncTransport = supabaseClientProvider.map { SupabaseSyncTransport(client: $0.client) }
         self.supabaseClientProvider = supabaseClientProvider
-        supabaseAuth = supabaseClientProvider.map { SupabaseAuthService(client: $0.client) }
-        supabaseSyncTransport = supabaseClientProvider.map { SupabaseSyncTransport(client: $0.client) }
+        self.supabaseAuth = supabaseAuth
+        self.supabaseSyncTransport = supabaseSyncTransport
+        if let supabaseAuth, let supabaseSyncTransport {
+            syncPushCoordinator = SyncPushCoordinator(
+                modelContainer: modelContainer,
+                localStore: syncLocalStore,
+                authService: supabaseAuth,
+                transport: supabaseSyncTransport,
+            )
+        } else {
+            syncPushCoordinator = nil
+        }
     }
 }
