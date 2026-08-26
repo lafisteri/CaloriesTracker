@@ -176,7 +176,10 @@ struct RecipeListView: View {
         do {
             try await context.onQuickAddRecipe(recipeID, defaultValue)
         } catch {
-            model.errorMessage = error.localizedDescription
+            model.errorMessage = catalogQuickAddErrorMessage(
+                error,
+                fallback: "Не удалось добавить запись.",
+            )
         }
     }
 

@@ -1,7 +1,7 @@
 # Native iOS architecture and data design
 
 **Status:** Current native iOS architecture
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-26
 **Scope:** the Swift / SwiftUI application. PRODUCT_SPEC.md defines user-visible
 behaviour; this document defines technical boundaries and invariants.
 
@@ -27,8 +27,10 @@ SwiftUI View
 ViewModel / feature state
     ↓ commands and read models
 Application Service
-    ↓ domain values, calculators, repository protocols
+    ↓ domain values and calculators
 Domain
+    ↓ repository protocol
+Repository protocol
     ↓
 SwiftData Repository
     ↓
@@ -99,6 +101,14 @@ Completion callbacks use guarded router pop helpers: an async completion may pop
 only if its expected route is still at the top. This prevents stale callbacks
 from removing an unrelated screen.
 
+### Today request lifecycle
+
+Today loading is request-scoped. A day navigation action captures the selected
+`LocalDay`; only the most recent request may publish its success, failure or
+loading completion. An older request therefore cannot show the entries or goal
+of a different day after the user has moved on. This is a feature-state
+correctness rule, independent of any future cancellation optimisation.
+
 ### Shared selection flow
 
 ~~~text
@@ -115,6 +125,16 @@ they do not require separate Catalog screens.
 CatalogQuickAddState is scoped to one selection flow. Only one Product or
 Recipe quick-add command may be active in that flow. It is not a global app
 lock.
+
+Quick-add orchestration belongs to the receiving feature, not Catalog:
+
+~~~text
+TodayView → TodayViewModel → DiaryService
+RecipeEditorView → RecipeEditorViewModel → RecipeService
+~~~
+
+Catalog remains a reusable presentation layer. Its typed selection context and
+callbacks carry the intent; it does not resolve sources or write persistence.
 
 ## Shared UI boundaries
 
@@ -311,6 +331,19 @@ Changing only output fields recomputes projection from the existing composition;
 it must not resolve the ingredient graph from repositories again. Formulae
 belong in the domain/application calculation layer, never in SwiftUI views.
 
+### Numeric and error integrity
+
+Manual editable decimal text accepts at most two fractional digits and accepts
+both `.` and `,`. This input constraint does not round or reduce internal
+calculation precision. Nutrition scaling and aggregation reject non-finite
+operands, factors and results; a derived numeric value used for Product/Recipe,
+RecipeIngredient or Diary snapshot persistence must be finite. NaN and ±Infinity
+are rejected rather than clamped or silently substituted.
+
+Feature error state preserves useful domain validation messages. Unknown
+infrastructure, mapping or system errors are logged with technical detail and
+presented to the user only through a stable context-specific message.
+
 ## Current and deferred capabilities
 
 SwiftData is the only current persistence implementation. There is no CloudKit,
@@ -345,3 +378,9 @@ feature; it must not be presented as current architecture.
   to Ingredient Catalog and are not layout measurements.
 - **ADR-013 — Amount focus:** restore focus only to the current Amount route
   after its child editor dismisses.
+- **ADR-014 — Request-safe Today:** only the latest selected-day request may
+  update Today state.
+- **ADR-015 — Numeric integrity:** persisted calculated nutrition is finite;
+  manual-input precision and calculation precision are separate concerns.
+- **ADR-016 — Error boundary:** user-facing feature errors are mapped; raw
+  persistence and system messages stay in diagnostics.

@@ -85,21 +85,21 @@ final class DiaryService {
 
     func day(for day: LocalDay) async throws -> DiaryDayReadModel {
         let entries = try await diaryRepository.entries(on: day)
-        let meals = MealType.allCases.map { mealType in
+        let meals = try MealType.allCases.map { mealType in
             let mealEntries = entries
                 .filter { $0.mealType == mealType }
                 .sorted(by: diaryEntryOrder)
             return DiaryMealReadModel(
                 mealType: mealType,
                 entries: mealEntries,
-                totalNutrition: nutritionTotal(for: mealEntries),
+                totalNutrition: try nutritionTotal(for: mealEntries),
             )
         }
 
         return DiaryDayReadModel(
             day: day,
             meals: meals,
-            totalNutrition: nutritionTotal(for: entries),
+            totalNutrition: try nutritionTotal(for: entries),
         )
     }
 
@@ -552,9 +552,9 @@ final class DiaryService {
         value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 2)))
     }
 
-    private func nutritionTotal(for entries: [DiaryEntry]) -> Nutrition {
-        entries.reduce(.zero) { partial, entry in
-            partial.adding(entry.nutrition)
+    private func nutritionTotal(for entries: [DiaryEntry]) throws -> Nutrition {
+        try entries.reduce(.zero) { partial, entry in
+            try partial.adding(entry.nutrition)
         }
     }
 

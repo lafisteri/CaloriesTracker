@@ -79,7 +79,7 @@ enum RecipeCalculator {
                     nutrition: nutrition,
                 ),
             )
-            total = total.adding(nutrition)
+            total = try total.adding(nutrition)
         }
 
         return RecipeCalculation(totalNutrition: total, ingredientCalculations: calculations)
@@ -111,7 +111,7 @@ enum RecipeCalculator {
             guard cookedWeight.isFinite, cookedWeight > 0 else {
                 throw RecipeCalculatorError.invalidCookedWeight
             }
-            nutritionPer100Grams = totalNutrition.scaled(by: 100 / cookedWeight)
+            nutritionPer100Grams = try totalNutrition.scaled(by: 100 / cookedWeight)
         } else {
             nutritionPer100Grams = nil
         }
@@ -121,7 +121,7 @@ enum RecipeCalculator {
             guard servingsCount.isFinite, servingsCount > 0 else {
                 throw RecipeCalculatorError.invalidServingsCount
             }
-            nutritionPerServing = totalNutrition.scaled(by: 1 / servingsCount)
+            nutritionPerServing = try totalNutrition.scaled(by: 1 / servingsCount)
         } else {
             nutritionPerServing = nil
         }
@@ -154,7 +154,7 @@ enum RecipeCalculator {
             else {
                 throw RecipeCalculatorError.unavailableDiaryUnit
             }
-            return version.totalNutrition.scaled(by: amount / cookedWeight)
+            return try version.totalNutrition.scaled(by: amount / cookedWeight)
         case .serving:
             guard let servingsCount = version.servingsCount,
                   servingsCount.isFinite,
@@ -162,7 +162,7 @@ enum RecipeCalculator {
             else {
                 throw RecipeCalculatorError.unavailableDiaryUnit
             }
-            return version.totalNutrition.scaled(by: amount / servingsCount)
+            return try version.totalNutrition.scaled(by: amount / servingsCount)
         }
     }
 

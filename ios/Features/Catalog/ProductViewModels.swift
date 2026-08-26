@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 struct FoodSelectionAmountDefault: Hashable, Sendable {
     let amount: Double
@@ -49,7 +50,7 @@ final class ProductListViewModel {
             }
             refreshSelectionDisplays(for: items)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось загрузить продукты.")
         }
 
         isLoading = false
@@ -62,7 +63,7 @@ final class ProductListViewModel {
             try await productService.softDelete(productID: productID)
             await load(matching: currentQuery)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось удалить продукт.")
         }
     }
 
@@ -120,7 +121,10 @@ final class ProductListViewModel {
             } catch {
                 nutrition = nil
                 if calculationErrorMessage == nil {
-                    calculationErrorMessage = error.localizedDescription
+                    calculationErrorMessage = productErrorMessage(
+                        error,
+                        fallback: "Не удалось рассчитать КБЖУ.",
+                    )
                 }
             }
 
@@ -163,7 +167,7 @@ final class ProductDetailViewModel {
         do {
             details = try await productService.details(id: productID)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось загрузить продукт.")
         }
 
         isLoading = false
@@ -177,7 +181,7 @@ final class ProductDetailViewModel {
             try await productService.softDelete(productID: productID)
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось удалить продукт.")
             return false
         }
     }
@@ -228,7 +232,7 @@ final class ProductEditorViewModel {
             fat = EditableDecimal.string(from: details.currentVersion.nutrition.fat)
             carbs = EditableDecimal.string(from: details.currentVersion.nutrition.carbs)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось загрузить продукт.")
         }
 
         isLoading = false
@@ -252,7 +256,7 @@ final class ProductEditorViewModel {
             return true
         } catch {
             isSaving = false
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось сохранить продукт.")
             return false
         }
     }
@@ -307,7 +311,7 @@ final class ProductVersionHistoryViewModel {
             currentVersionID = details.product.currentVersionID
             versions = try await productService.versions(for: productID)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = productErrorMessage(error, fallback: "Не удалось загрузить версии продукта.")
         }
 
         isLoading = false
@@ -322,5 +326,28 @@ private enum ProductEditorError: LocalizedError {
         case let .invalidNumber(field):
             "Введите корректное значение для поля «\(field)»."
         }
+    }
+}
+
+private let productErrorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "Product")
+
+func productErrorMessage(_ error: Error, fallback: String) -> String {
+    productErrorLogger.error(
+        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+    )
+
+    return switch error {
+    case let error as ProductServiceError:
+        error.errorDescription ?? fallback
+    case let error as ProductEditorError:
+        error.errorDescription ?? fallback
+    case let error as DiaryServiceError:
+        error.errorDescription ?? fallback
+    case let error as NutritionCalculatorError:
+        error.errorDescription ?? fallback
+    case let error as NutritionError:
+        error.errorDescription ?? fallback
+    default:
+        fallback
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 @MainActor
 @Observable
@@ -27,6 +28,9 @@ final class StatisticsViewModel {
         do {
             statistics = try await statisticsService.week(containing: selectedDay)
         } catch {
+            statisticsErrorLogger.error(
+                "user_facing_error technical_error=\(String(reflecting: error), privacy: .public)",
+            )
             errorMessage = "Не удалось загрузить статистику."
         }
 
@@ -48,3 +52,5 @@ final class StatisticsViewModel {
         await load()
     }
 }
+
+private let statisticsErrorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "Statistics")

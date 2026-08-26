@@ -1,7 +1,7 @@
 # PRODUCT_SPEC
 
 **Status:** Current native iOS product specification
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-26
 
 This document describes accepted user-visible behaviour of the native iOS
 application. `IOS_ARCHITECTURE.md` describes implementation constraints; older
@@ -57,6 +57,8 @@ web/PWA documents and historical prompts are not a source of current behaviour.
 
 **Сегодня** — дневник выбранного локального календарного дня. Пользователь
 может перейти на прошлый или будущий день и вернуться к сегодняшнему.
+Данные на экране всегда относятся к выбранному `LocalDay`: завершившаяся позже
+загрузка предыдущего дня не может заменить данные уже выбранного нового дня.
 
 Дневник содержит:
 
@@ -157,9 +159,10 @@ Soft-deleted Product и Recipe не показываются в Catalog. При 
 `servingsCount = 5` не делает default потребления равным пяти порциям: fallback
 по-прежнему равен одной порции.
 
-В selection context сумма, отображённые amount/unit и calories в строке Catalog
-должны соответствовать initial amount/unit и preview в Amount, а quick-add
-должен сохранять то же значение.
+В selection context действует единый инвариант: preview в Catalog, initial
+amount/unit и preview в Amount, а также семантические amount/unit quick-add
+соответствуют одному и тому же значению. Quick-add не является скрытой
+конвертацией или отдельным default flow.
 
 ### Amount and units
 
@@ -216,7 +219,9 @@ fat или carbs — создаёт новую `ProductVersion`; старая в
 обновляется, а `sourceVersionID` меняется только при смене current ProductVersion.
 
 Удаление Product выполняется без дополнительного confirmation dialog и убирает
-его из обычного Catalog, не разрушая исторические Recipe и DiaryEntry.
+его из обычного Catalog, не разрушая исторические Recipe и DiaryEntry. Полный
+swipe не выполняет destructive delete: удаление требует явного tap по красной
+корзине.
 
 ## 7. Recipes
 
@@ -260,13 +265,19 @@ Product → Amount → один Product ingredient draft
 Recipe  → Amount → пропорционально развёрнутые Product ingredient drafts
 ```
 
+После confirm в Amount draft или развёрнутые drafts добавляются в текущий
+черновик Recipe, и его nutrition пересчитывается. Это обычный row-tap flow.
+Quick-add — отдельное действие `+`: оно использует тот же default amount/unit,
+но добавляет один Product draft или развёрнутые Recipe drafts без экрана Amount.
+
 Выбор Recipe как ингредиента не создаёт вложенную сохранённую связь
 Recipe→Recipe. Его текущий состав разворачивается в Product ingredients с
 закреплёнными версиями продуктов. Поэтому последующее изменение рецепта-источника
 не меняет уже добавленный черновик или сохранённый Recipe.
 
 Удаление Recipe выполняется без отдельного confirmation dialog и скрывает его
-из обычного Catalog, сохраняя данные, нужные для истории.
+из обычного Catalog, сохраняя данные, нужные для истории. Полный swipe не
+выполняет destructive delete: удаление требует явного tap по красной корзине.
 
 ## 8. Barcode
 
@@ -346,6 +357,9 @@ manifest, service worker, Home Screen installation и browser routes не явл
 - Длинные названия не должны создавать horizontal scroll.
 - Ошибки формулируются человеческим языком и не показывают технические
   исключения.
+- Ошибки валидации остаются конкретными и помогают исправить ввод. Ошибки
+  хранения или системы показываются как стабильное понятное сообщение, без
+  деталей SwiftData, путей или системного текста.
 - Destructive actions используют красную корзину и не выполняются одним swipe.
 
 ## 15. Out of scope

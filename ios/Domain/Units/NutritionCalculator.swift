@@ -28,6 +28,6 @@ enum NutritionCalculator {
             throw NutritionCalculatorError.invalidNormalizedAmount
         }
 
-        return nutrition.scaled(by: normalizedAmount / baseAmount)
+        return try nutrition.scaled(by: normalizedAmount / baseAmount)
     }
 }

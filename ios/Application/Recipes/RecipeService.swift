@@ -228,7 +228,9 @@ final class RecipeService {
         amount: Double,
         unitToken: String,
     ) throws -> Nutrition {
-        source.version.totalNutrition.scaled(by: try compositionFactor(for: source, amount: amount, unitToken: unitToken))
+        try source.version.totalNutrition.scaled(
+            by: compositionFactor(for: source, amount: amount, unitToken: unitToken),
+        )
     }
 
     func makeIngredientDrafts(

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 struct GoalDayForm: Identifiable, Hashable {
     let weekday: LocalDay.Weekday
@@ -110,7 +111,11 @@ private enum GoalEditorError: LocalizedError {
 }
 
 func goalErrorMessage(_ error: Error, fallback: String) -> String {
-    switch error {
+    goalErrorLogger.error(
+        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+    )
+
+    return switch error {
     case let error as GoalServiceError:
         error.errorDescription ?? fallback
     case let error as GoalEditorError:
@@ -119,3 +124,5 @@ func goalErrorMessage(_ error: Error, fallback: String) -> String {
         fallback
     }
 }
+
+private let goalErrorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "Goals")

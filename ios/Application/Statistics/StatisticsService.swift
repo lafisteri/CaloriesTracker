@@ -21,8 +21,8 @@ final class StatisticsService {
         let entriesByDay = Dictionary(grouping: entries, by: \.day)
         let today = LocalDay.current()
 
-        let dayStatistics = days.map { day in
-            let consumedNutrition = nutritionTotal(for: entriesByDay[day] ?? [])
+        let dayStatistics = try days.map { day in
+            let consumedNutrition = try nutritionTotal(for: entriesByDay[day] ?? [])
             let calorieGoal = goals[day]?.dailyGoals[day.weekday()]?.calories
             let isFuture = day > today
             let calorieBalance = isFuture ? nil : calorieGoal.map { consumedNutrition.calories - $0 }
@@ -42,7 +42,7 @@ final class StatisticsService {
             .reduce(nil as Double?) { partial, balance in
                 (partial ?? 0) + balance
             }
-        let weeklyNutrition = nutritionTotal(for: entries)
+        let weeklyNutrition = try nutritionTotal(for: entries)
 
         return WeekStatistics(
             selectedDay: selectedDay,
@@ -53,9 +53,9 @@ final class StatisticsService {
         )
     }
 
-    private func nutritionTotal(for entries: [DiaryEntry]) -> Nutrition {
-        entries.reduce(.zero) { total, entry in
-            total.adding(entry.nutrition)
+    private func nutritionTotal(for entries: [DiaryEntry]) throws -> Nutrition {
+        try entries.reduce(.zero) { total, entry in
+            try total.adding(entry.nutrition)
         }
     }
 

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 @MainActor
 @Observable
@@ -355,16 +356,22 @@ final class AmountViewModel {
 }
 
 private func diaryErrorMessage(_ error: Error, fallback: String) -> String {
-    switch error {
+    diaryErrorLogger.error(
+        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+    )
+
+    return switch error {
     case let error as DiaryServiceError:
         error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
         error.errorDescription ?? fallback
     case let error as RecipeCalculatorError:
         error.errorDescription ?? fallback
-    case let error as RecordMappingError:
+    case let error as NutritionError:
         error.errorDescription ?? fallback
     default:
         fallback
     }
 }
+
+private let diaryErrorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "Diary")

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 struct RecipeIngredientEditorItem: Identifiable, Hashable, Sendable {
     let draft: RecipeIngredientDraft
@@ -713,18 +714,24 @@ private enum RecipeEditorError: LocalizedError {
 }
 
 func recipeErrorMessage(_ error: Error, fallback: String) -> String {
-    switch error {
+    recipeErrorLogger.error(
+        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+    )
+
+    return switch error {
     case let error as RecipeServiceError:
         error.errorDescription ?? fallback
     case let error as RecipeCalculatorError:
         error.errorDescription ?? fallback
     case let error as NutritionCalculatorError:
         error.errorDescription ?? fallback
-    case let error as RecipeEditorError:
+    case let error as NutritionError:
         error.errorDescription ?? fallback
-    case let error as RecordMappingError:
+    case let error as RecipeEditorError:
         error.errorDescription ?? fallback
     default:
         fallback
     }
 }
+
+private let recipeErrorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "Recipe")

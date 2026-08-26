@@ -57,10 +57,11 @@ final class SwiftDataProductRepository: ProductRepository {
     }
 
     func product(withBarcode barcode: String) async throws -> Product? {
-        try modelContext
-            .fetch(FetchDescriptor<ProductRecord>())
-            .map { $0.toDomain() }
-            .first { $0.barcode == barcode }
+        var descriptor = FetchDescriptor<ProductRecord>(
+            predicate: #Predicate { $0.barcode == barcode }
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first.map { $0.toDomain() }
     }
 
     func version(id: UUID) async throws -> ProductVersion? {
@@ -80,9 +81,11 @@ final class SwiftDataProductRepository: ProductRepository {
     }
 
     func versions(for productID: UUID) async throws -> [ProductVersion] {
-        try modelContext
-            .fetch(FetchDescriptor<ProductVersionRecord>())
-            .filter { $0.productID == productID }
+        let descriptor = FetchDescriptor<ProductVersionRecord>(
+            predicate: #Predicate { $0.productID == productID }
+        )
+        return try modelContext
+            .fetch(descriptor)
             .map { try $0.toDomain() }
     }
 
@@ -301,9 +304,11 @@ final class SwiftDataRecipeRepository: RecipeRepository {
     }
 
     func versions(for recipeID: UUID) async throws -> [RecipeVersion] {
-        try modelContext
-            .fetch(FetchDescriptor<RecipeVersionRecord>())
-            .filter { $0.recipeID == recipeID }
+        let descriptor = FetchDescriptor<RecipeVersionRecord>(
+            predicate: #Predicate { $0.recipeID == recipeID }
+        )
+        return try modelContext
+            .fetch(descriptor)
             .map { $0.toDomain() }
     }
 
@@ -824,13 +829,21 @@ final class SwiftDataGoalRepository: GoalRepository {
     }
 
     func latestGoal() async throws -> WeeklyGoal? {
-        try allGoals().max { $0.effectiveFrom < $1.effectiveFrom }
+        var descriptor = FetchDescriptor<WeeklyGoalRecord>(
+            sortBy: [SortDescriptor(\WeeklyGoalRecord.effectiveFromKey, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
     }
 
     func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal? {
-        try allGoals()
-            .filter { $0.effectiveFrom <= day }
-            .max { $0.effectiveFrom < $1.effectiveFrom }
+        let effectiveFromKey = day.rawValue
+        var descriptor = FetchDescriptor<WeeklyGoalRecord>(
+            predicate: #Predicate { $0.effectiveFromKey <= effectiveFromKey },
+            sortBy: [SortDescriptor(\WeeklyGoalRecord.effectiveFromKey, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
     }
 
     func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal] {

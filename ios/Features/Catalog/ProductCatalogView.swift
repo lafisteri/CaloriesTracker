@@ -1,4 +1,5 @@
 import Observation
+import OSLog
 import SwiftUI
 
 @MainActor
@@ -379,12 +380,41 @@ private struct ProductListView: View {
         do {
             try await context.onQuickAddProduct(productID, defaultValue)
         } catch {
-            model.errorMessage = error.localizedDescription
+            model.errorMessage = catalogQuickAddErrorMessage(
+                error,
+                fallback: "Не удалось добавить запись.",
+            )
         }
     }
 
     private func isQuickAdding(source: FoodSourceReference, context: FoodSelectionContext) -> Bool {
         context.quickAddState?.activeSource == source || quickAddingProductID == source.sourceID
+    }
+}
+
+private let catalogQuickAddErrorLogger = Logger(
+    subsystem: "com.caloriestracker.ios",
+    category: "CatalogQuickAdd",
+)
+
+func catalogQuickAddErrorMessage(_ error: Error, fallback: String) -> String {
+    catalogQuickAddErrorLogger.error(
+        "user_facing_error fallback=\(fallback, privacy: .public) technical_error=\(String(reflecting: error), privacy: .public)",
+    )
+
+    return switch error {
+    case let error as DiaryServiceError:
+        error.errorDescription ?? fallback
+    case let error as RecipeServiceError:
+        error.errorDescription ?? fallback
+    case let error as RecipeCalculatorError:
+        error.errorDescription ?? fallback
+    case let error as NutritionCalculatorError:
+        error.errorDescription ?? fallback
+    case let error as NutritionError:
+        error.errorDescription ?? fallback
+    default:
+        fallback
     }
 }
 
