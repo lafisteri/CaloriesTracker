@@ -104,7 +104,6 @@ final class SyncPushCoordinator {
             throw SyncPushCoordinatorError.pendingReadFailed
         }
 
-        syncPushLogger.debug("Sync push run started with \(pendingItems.count, privacy: .public) items")
         var outcomes: [SyncPushItemOutcome] = []
         outcomes.reserveCapacity(pendingItems.count)
 
@@ -283,11 +282,9 @@ final class SyncPushCoordinator {
             )
             try modelContext.save()
             if acknowledged {
-                syncPushLogger.debug("Sync push item accepted")
                 return .accepted(key: item.entityKey, serverRevision: remoteRecord.serverRevision)
             }
 
-            syncPushLogger.debug("Sync push item accepted but remains pending after a concurrent edit")
             return .acceptedButStillPending(
                 key: item.entityKey,
                 serverRevision: remoteRecord.serverRevision,

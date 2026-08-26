@@ -193,7 +193,11 @@ struct SettingsView: View {
         case .signedOut:
             "Не выполнен вход"
         case .idle:
-            "Синхронизировано"
+            if syncStatus?.lastSuccessfulSyncAt != nil, syncStatus?.lastErrorCategory == nil {
+                "Синхронизировано"
+            } else {
+                "Ожидание синхронизации"
+            }
         case .syncing:
             "Синхронизация…"
         case .waitingForRetry:

@@ -71,6 +71,9 @@ Supabase authentication is passwordless email OTP (`requestOTP`, `verifyOTP`,
 restored `currentSession`, and `signOut`). It is optional: there is no login
 wall, and missing configuration, a missing session or network access never
 prevents normal local use of CaloriesTracker.
+`AuthClient` emits a locally stored session as its initial session event, but
+the app treats a session as authenticated only after its current-session read
+succeeds; an expired cached session therefore cannot start synchronization.
 
 `SupabaseSyncTransport` performs only typed network requests. Server writes go
 through the RLS-protected `push_sync_record` RPC, which derives ownership from
@@ -79,6 +82,10 @@ RLS on `sync_records`. `server_revision` is transport cursor metadata, ordered
 strictly ascending for incremental pulls; it is not part of canonical payloads.
 The transport returns accepted, conflict or missing results, including the
 authoritative conflict payload, but does not apply a local merge.
+`push_sync_record` is a PostgreSQL `RETURNS TABLE` RPC: the transport decodes
+its PostgREST body as an array and requires exactly one typed row before mapping
+it to `accepted`, `conflict` or `missing`. A successful HTTP response alone
+never acknowledges an outbox item.
 
 `SyncPushCoordinator` is the only connection from the persistent outbox to the
 transport. It remains a focused push-only coordinator; `SyncOrchestrator`
@@ -91,6 +98,9 @@ entity revision and acknowledges only the snapshot's exact outbox token in one
 the new outbox item remains pending while the accepted remote revision is kept.
 Conflicts and missing remote records remain pending without merge, retry,
 metadata rewrite or recovery. Pushes never change the pull cursor.
+Push, pull and bootstrap each emit one aggregate run summary. Accepted items do
+not produce per-record success logs; failure logs use only safe categories and
+diagnostic fields.
 
 `SyncPullCoordinator` is a separate pull-only coordinator, invoked by the
 orchestrator's normal cycle. It starts from the account-scoped
@@ -111,6 +121,11 @@ key remains pending without rotating an existing token. Idempotent records are
 safe to replay. Dependency deferrals, invalid payloads and immutable-content
 collisions never move the cursor past the blocking record. Pull never invokes
 push, bootstrap, realtime or a local mutation backfill.
+For a remote-apply failure, diagnostics record the server revision, typed
+identity, typed local-store failure category and a safe error description. An
+immutable collision additionally records a bounded field-level canonical
+difference summary (including ordered RecipeVersion ingredient identifiers and
+amount/unit values when relevant), never a full payload or authentication data.
 
 `SyncBootstrapCoordinator` is a third coordinator for an account that has no
 completed bootstrap marker. It reuses pull, push and the existing
@@ -168,7 +183,9 @@ rules: a final pull runs first and a later normal cycle may republish if local
 state wins. `SyncStatusStore` exposes `disabled`, `signedOut`, `idle`,
 `syncing`, `waitingForRetry` and `blocked`, together with the latest error
 category. It updates `lastSuccessfulSyncAt` only after a complete normal cycle
-has no pending outbox work or known pull blocker.
+has no pending outbox work or known pull blocker. Settings calls the idle state
+“Синхронизировано” only when such a successful cycle exists and no later error
+is retained; otherwise it shows that synchronization is waiting.
 
 Today root exposes the optional Sync settings sheet through its trailing
 `gearshape` toolbar button; it does not add a fourth tab or alter `todayPath`.
@@ -204,6 +221,9 @@ items coalesce by stable typed identity (`entityType:entityID`): a later local
 mutation replaces the change token and enqueue time instead of adding a second
 pending item. A future acknowledgement may remove an item only when its token
 still matches the uploaded token.
+Metadata-only Product saves (name or barcode) and Recipe saves (name) stage only
+their logical record. A new immutable ProductVersion or RecipeVersion is
+created and staged only for a real change to its versioned fields.
 
 Product, Recipe and DiaryEntry tombstones are synchronized as the current
 entity state. RecipeVersion includes its ingredient composition and WeeklyGoal

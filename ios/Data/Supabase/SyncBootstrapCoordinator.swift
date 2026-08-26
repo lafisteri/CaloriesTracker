@@ -111,7 +111,7 @@ final class SyncBootstrapCoordinator {
         let accountID: UUID
         do {
             guard let session = try await authService.currentSession() else {
-                return SyncBootstrapReport(
+                return report(
                     status: .notAuthenticated,
                     rounds: 0,
                     pulled: 0,
@@ -120,12 +120,12 @@ final class SyncBootstrapCoordinator {
                     remainingOutbox: nil,
                     startingCursor: nil,
                     endingCursor: nil,
-                    blockingReason: nil,
+                    reason: nil,
                 )
             }
             accountID = session.userID
         } catch let error as SupabaseInfrastructureError {
-            return SyncBootstrapReport(
+            return report(
                 status: .incompleteNeedsRetry,
                 rounds: 0,
                 pulled: 0,
@@ -134,10 +134,10 @@ final class SyncBootstrapCoordinator {
                 remainingOutbox: nil,
                 startingCursor: nil,
                 endingCursor: nil,
-                blockingReason: .transport(error),
+                reason: .transport(error),
             )
         } catch {
-            return SyncBootstrapReport(
+            return report(
                 status: .incompleteNeedsRetry,
                 rounds: 0,
                 pulled: 0,
@@ -146,7 +146,7 @@ final class SyncBootstrapCoordinator {
                 remainingOutbox: nil,
                 startingCursor: nil,
                 endingCursor: nil,
-                blockingReason: .transport(.server),
+                reason: .transport(.server),
             )
         }
 
@@ -155,7 +155,7 @@ final class SyncBootstrapCoordinator {
             let modelContext = ModelContext(modelContainer)
             startingCursor = try SyncMetadataStore.pullCursor(accountID: accountID, in: modelContext)
             if try SyncMetadataStore.bootstrapCompleted(accountID: accountID, in: modelContext) {
-                return SyncBootstrapReport(
+                return report(
                     status: .alreadyCompleted,
                     rounds: 0,
                     pulled: 0,
@@ -164,12 +164,12 @@ final class SyncBootstrapCoordinator {
                     remainingOutbox: nil,
                     startingCursor: startingCursor,
                     endingCursor: startingCursor,
-                    blockingReason: nil,
+                    reason: nil,
                 )
             }
         } catch {
             syncBootstrapLogger.error("Sync bootstrap could not read account metadata")
-            return SyncBootstrapReport(
+            return report(
                 status: .blocked,
                 rounds: 0,
                 pulled: 0,
@@ -178,7 +178,7 @@ final class SyncBootstrapCoordinator {
                 remainingOutbox: nil,
                 startingCursor: nil,
                 endingCursor: nil,
-                blockingReason: .metadata,
+                reason: .metadata,
             )
         }
 
@@ -188,8 +188,6 @@ final class SyncBootstrapCoordinator {
         var seeded = 0
         var remainingOutbox: Int?
         var lastReason: SyncBootstrapBlockingReason?
-
-        syncBootstrapLogger.debug("Sync bootstrap started at cursor \(startingCursor, privacy: .public)")
 
         for round in 1 ... maximumRounds {
             let initialPull: SyncPullReport
@@ -516,7 +514,7 @@ final class SyncBootstrapCoordinator {
         endingCursor: Int64?,
         reason: SyncBootstrapBlockingReason?,
     ) -> SyncBootstrapReport {
-        SyncBootstrapReport(
+        let bootstrapReport = SyncBootstrapReport(
             status: status,
             rounds: rounds,
             pulled: pulled,
@@ -527,5 +525,11 @@ final class SyncBootstrapCoordinator {
             endingCursor: endingCursor,
             blockingReason: reason,
         )
+        let remainingOutboxLabel = remainingOutbox.map(String.init) ?? "notScanned"
+        let reasonLabel = reason.map { String(describing: $0) } ?? "none"
+        syncBootstrapLogger.debug(
+            "Sync bootstrap summary status=\(String(describing: status), privacy: .public) rounds=\(rounds, privacy: .public) pulled=\(pulled, privacy: .public) pushed=\(pushed, privacy: .public) seeded=\(seeded, privacy: .public) remainingOutbox=\(remainingOutboxLabel, privacy: .public) reason=\(reasonLabel, privacy: .public)",
+        )
+        return bootstrapReport
     }
 }

@@ -1,23 +1,22 @@
 # CaloriesTracker Current Code Audit
 
 **Snapshot date:** 2026-08-26  
-**Scope:** Current native iOS source, SwiftData persistence, and the active
-documentation set. This is a technical baseline for a subsequent Sync Readiness
-Review, not a CloudKit design or a new refactoring programme.
+**Scope:** Current native iOS source, SwiftData persistence, the implemented
+optional Supabase synchronization path, and the active documentation set.
 
 ## 1. Executive Summary
 
 CaloriesTracker is a native, local-first iOS application with a clear feature →
-service → domain → repository boundary. Product and Recipe histories are
-append-only immutable versions; Diary entries hold independent historical
-snapshots. UUIDs, LocalDay keys, soft deletes and repository protocols give the
-application a solid starting point for a future sync discussion.
+service → domain → repository boundary and an optional foreground Supabase sync
+layer. Product and Recipe histories are append-only immutable versions; Diary
+entries hold independent historical snapshots. UUIDs, LocalDay keys, soft
+deletes, persistent outbox tokens and account-scoped metadata provide the
+implemented synchronization identity and recovery model.
 
-The correctness, performance and hardening work visible in current code is
-substantively complete. The remaining confirmed debt is narrow: Catalog view
-lifecycle duplication/search-task cancellation, focused accessibility labels,
-and the size of `RecipeViews.swift`. None is a reason to make sync decisions
-in this document.
+The synchronization audit is complete. Physical-device verification confirmed
+bootstrap convergence, idempotent immutable-version round trips, safe push
+acknowledgement and incremental pull application. The remaining non-sync code
+quality observations are recorded separately below and do not block sync.
 
 ## 2. Current Architecture
 
@@ -33,12 +32,12 @@ SwiftUI View
 → SwiftData records / ModelContainer
 ~~~
 
-`AppDependencies` is the composition root. It creates one versioned SwiftData
-`ModelContainer`, constructs the four repositories, then supplies
-`ProductService`, `RecipeService`, `DiaryService`, `GoalService` and
-`StatisticsService` to the feature roots. `AppRouter` owns the selected tab and
-three typed `NavigationStack` paths; routes carry IDs and explicit contexts,
-not SwiftData model objects.
+`AppDependencies` is the composition root. It creates one versioned local-only
+SwiftData `ModelContainer`, constructs the repositories and services, and,
+when configured, exactly one Supabase client, auth service, transport,
+coordinators, status store, change notifier and orchestrator. `AppRouter` owns
+the selected tab and three typed `NavigationStack` paths; routes carry IDs and
+explicit contexts, not SwiftData model objects.
 
 Views own presentation and transient navigation. View models own feature state
 and invoke services. Services resolve versions, validate, calculate and write
@@ -182,49 +181,77 @@ not implemented by this audit.
 | DEAD-01 | NO LONGER APPLICABLE | — | Current source review did not establish a concrete unused production member that justifies a cleanup-only change. No dead-code deletion is proposed. |
 | OBS-01 | ALREADY RESOLVED | — | High-volume navigation, focus and lifecycle telemetry was removed. Feature error mappers retain only unexpected technical failures for diagnostics. |
 
-## 9. Sync-Relevant Strengths
+## 9. Implemented Sync Audit
 
-- Stable client-generated UUIDs exist for every persistent root and owned child.
-- ProductVersion and RecipeVersion are immutable, append-only facts with
-  explicit lineage and creation time.
-- Recipe composition records exact ProductVersion pins rather than resolving
-  mutable current values later.
-- DiaryEntry is a self-contained historical snapshot with source IDs, version
-  ID, source name, amount/unit and nutrition.
-- Product, Recipe and DiaryEntry retain `deletedAt` tombstones through soft
-  delete; logical roots have `createdAt` and `updatedAt` where they are mutable.
-- Repository protocols isolate the local SwiftData implementation, and the
-  schema/migration plan is explicit and versioned.
-- Numeric/error hardening prevents newly derived invalid doubles and raw
-  infrastructure messages from crossing normal feature boundaries.
+- SwiftData remains the local source of truth and has CloudKit mirroring
+  disabled. Supabase is optional infrastructure; configuration and account
+  state cannot block local use.
+- One app-owned Supabase client uses OTP auth. A restored cached session is
+  emitted but must pass the current-session read before it can schedule sync;
+  an expired session is not treated as signed in.
+- `SyncOutboxRecord` coalesces local work by typed UUID identity. A changed
+  token is acknowledged only after a decoded accepted RPC response and only if
+  that exact token is still current. Push persists the account/entity remote
+  revision and acknowledgement in one save.
+- `push_sync_record` is decoded as exactly one row from its `RETURNS TABLE`
+  response, then mapped to typed accepted/conflict/missing outcomes. HTTP
+  success without a valid one-row response is not acceptance.
+- Account-scoped remote revisions, pull cursors and bootstrap markers are
+  monotonic and retained across sign-out. Pull advances only over a safe fully
+  handled range; deferred dependency rows, invalid payloads and immutable
+  collisions hold the cursor.
+- Bootstrap is remote-first, scans local identities only after a caught-up
+  pull, seeds only unknown remote states, pushes through the normal coordinator,
+  pulls again, and records completion only after convergence.
+- Canonical payloads normalize all domain sync `Date` fields to integer Unix
+  milliseconds for encoding, equality, fingerprints and LWW ordering. Local
+  SwiftData dates are not bulk-rewritten. Immutable ProductVersion and
+  RecipeVersion equality is exact after this canonicalization; a genuine same-
+  UUID content difference remains an invariant error.
+- Mutable Product, Recipe and DiaryEntry merge as whole records under canonical
+  millisecond LWW, with sticky tombstones and deterministic canonical-byte
+  tie-breaking. WeeklyGoal is a write-once aggregate keyed by `LocalDay`.
+- Product name/barcode-only and Recipe name-only saves create/stage only their
+  logical record. Versioned changes append and stage the logical record plus the
+  new immutable version.
+- The actor orchestrator is foreground-only, bounded and single-flight. It
+  performs `Pull → Push → Pull`, coalesces wakes, debounces committed local
+  changes, refreshes every 60 seconds while active and retries only network or
+  server failures with delays 2/5/15/30/60 seconds.
+- Sync logs retain one safe summary per push, pull and bootstrap run. Accepted
+  items are not logged individually. Remote-apply failures carry safe typed
+  context; immutable diagnostics use bounded field-level differences rather
+  than full payloads or credentials.
 
-## 10. Sync-Relevant Risks / Open Questions
+## 10. Physical-device Verification and Audit Result
 
-These are observations for the next review, not decisions:
+The following scenarios were verified on a physical iPhone during the sync
+hardening sequence:
 
-- The current schema has no sync metadata, change token, remote revision or
-  conflict policy. Product/Recipe/Diary timestamps alone do not define merge
-  behaviour.
-- Soft-delete tombstones exist for Product, Recipe and DiaryEntry, while
-  immutable versions and WeeklyGoal do not have equivalent delete metadata.
-  A future delete-vs-edit policy is therefore a product/architecture decision.
-- WeeklyGoal is keyed by one effective LocalDay and has `createdAt` but no
-  `updatedAt` or soft delete. Its multi-device semantics need an explicit
-  decision.
-- SwiftData relationships model local ownership, but IDs are authoritative for
-  historical references. Any remote representation must preserve this
-  distinction without relying on local object graph identity.
-- Current repositories and UI-facing services are MainActor/local-container
-  oriented. A sync/import transaction model must define isolation and UI update
-  boundaries.
-- No automated test target or test suite is present in this repository snapshot.
-  Sync design should establish verification for merge, tombstone and historical
-  snapshot scenarios before implementation.
+| Scenario | Observed result |
+| --- | --- |
+| Initial bootstrap | Remote-first bootstrap converged and stored its account marker only after pull/push/pull completion. |
+| Immutable round trip | ProductVersion and RecipeVersion replayed idempotently after canonical timestamp normalization. |
+| Push RPC | A 124-record push decoded and acknowledged all 124 accepted rows; the following pull processed all 124 revisions with no failures. |
+| Steady state | Repeated unchanged cycles produced Push 0 and Pull 0. |
+| Metadata-only edits | Product name-only and Recipe name-only edits each produced exactly one logical-record push, with no new or refreshed version marker. |
+| Pull application | Incremental pull applied valid rows, retained safe cursor semantics and did not echo remote imports through ordinary local mutation signalling. |
 
-## 11. Recommended Next Phase
+No server schema, RPC concurrency rule, cursor, bootstrap marker or local-data
+reset was required by this audit. No blocking sync work remains.
 
-Conduct a separate **Sync Readiness Review**. It should map the existing entity
-identities, immutable-version rules, historical snapshots and soft-delete
-semantics to sync requirements, then explicitly decide conflict handling,
-metadata, deletion policy, transaction boundaries and verification strategy.
-It should not assume a CloudKit record shape or merge algorithm from this audit.
+No automated sync test target is currently present; this audit intentionally
+used the prescribed physical-device evidence and no simulator/test run. Adding
+automated coverage is future quality work, not a blocker for the implemented
+sync behavior.
+
+## 11. Remaining Non-blocking Product Code Quality Work
+
+The existing non-sync findings remain separate from synchronization:
+
+- Catalog search lifecycle cancellation/request identity (LIFE-02).
+- Focused VoiceOver labels for date/week navigation (A11Y-01).
+- Optional physical split of the large `RecipeViews.swift` file (MAINT-01).
+
+They require separate product decisions and do not change the audited sync
+architecture or its completion status.

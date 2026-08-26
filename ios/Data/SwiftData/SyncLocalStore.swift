@@ -605,7 +605,10 @@ final class SyncLocalStore {
         var republish: Set<SyncEntityKey> = []
         for record in records where record.id != winner.id && record.barcode != nil {
             record.barcode = nil
-            if record.updatedAt < winner.updatedAt {
+            if let recordMilliseconds = SyncTimestamp.millisecondsSinceEpoch(record.updatedAt),
+               let winnerMilliseconds = SyncTimestamp.millisecondsSinceEpoch(winner.updatedAt),
+               recordMilliseconds < winnerMilliseconds
+            {
                 record.updatedAt = winner.updatedAt
             }
             republish.insert(SyncEntityKey(entityType: .product, entityID: record.id))

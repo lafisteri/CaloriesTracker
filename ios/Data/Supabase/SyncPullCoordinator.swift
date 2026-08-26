@@ -211,8 +211,6 @@ final class SyncPullCoordinator {
         var shouldContinue = true
         var caughtUpToRemoteState = false
 
-        syncPullLogger.debug("Sync pull run started at cursor \(startingCursor, privacy: .public)")
-
         while shouldContinue,
               pagesFetched < maximumPages,
               fetched < Self.maximumFetchedRecords

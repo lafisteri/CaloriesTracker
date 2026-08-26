@@ -73,6 +73,9 @@ actor SupabaseAuthService {
 
         do {
             let session = try await client.auth.session
+            guard !session.isExpired else {
+                return nil
+            }
             return SupabaseAuthSession(session: session)
         } catch {
             let categorized = SupabaseInfrastructureError.categorize(error)
