@@ -29,6 +29,8 @@ web/PWA documents and historical prompts are not a source of current behaviour.
 
 - Нативный, local-first интерфейс для iPhone.
 - Собственная управляемая пользователем база продуктов и рецептов.
+- The app remains fully usable offline. Synchronization must not block adding
+  or editing local data.
 - Минимум действий в ежедневном food-logging flow.
 - Версионирование пищевой ценности и состава.
 - Исторические записи не изменяются незаметно.

@@ -55,6 +55,18 @@ AppDependencies is the composition root: it creates one ModelContainer,
 repositories and services, then injects services into feature roots. The app
 intentionally remains one target rather than separate Swift packages.
 
+## Persistence and future sync
+
+SwiftData is the local source of truth. The production `ModelContainer` is
+explicitly local-only, with automatic SwiftData CloudKit mirroring disabled.
+
+Future CloudKit synchronization is custom and asynchronous, implemented outside
+SwiftData automatic CloudKit mirroring. Feature and Application layers continue
+to use repositories and services and do not depend directly on CloudKit.
+
+The app remains fully usable offline: synchronization must not block adding or
+editing local data.
+
 ## Project structure
 
 ~~~text

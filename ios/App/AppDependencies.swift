@@ -19,6 +19,7 @@ final class AppDependencies {
             "CaloriesTracker",
             schema: schema,
             isStoredInMemoryOnly: isStoredInMemoryOnly,
+            cloudKitDatabase: .none,
         )
         let modelContainer = try ModelContainer(
             for: schema,
