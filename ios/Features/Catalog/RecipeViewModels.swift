@@ -255,6 +255,7 @@ final class RecipeEditorViewModel {
     private var compositionRevision = 0
     private var compositionRequestID = 0
     private var isRefreshingComposition = false
+    private var hasLoadedInitialDraft = false
 
     init(recipeID: UUID?, recipeService: RecipeService) {
         self.recipeID = recipeID
@@ -262,7 +263,7 @@ final class RecipeEditorViewModel {
     }
 
     func loadForEditing() async {
-        guard let recipeID else {
+        guard let recipeID, !hasLoadedInitialDraft, !isLoading else {
             return
         }
 
@@ -300,6 +301,7 @@ final class RecipeEditorViewModel {
                 )
             }
             refreshOutputPreview()
+            hasLoadedInitialDraft = true
         } catch {
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить рецепт.")
         }
