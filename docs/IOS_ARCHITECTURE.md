@@ -14,7 +14,7 @@ behaviour; this document defines technical boundaries and invariants.
 | Local persistence | One SwiftData ModelContainer from a versioned schema. |
 | Concurrency | async/await; UI and SwiftData repositories are MainActor. |
 | Observation | Swift Observation is normal feature state. Combine is scoped to Recipe Editor keyboard lifecycle notifications. |
-| Data | Local-first, offline, no account and no implemented sync service. |
+| Data | Local-first SwiftData source of truth. Supabase auth and transport are optional infrastructure, not an automatic sync service. |
 
 The active implementation is the native iOS client. Web/PWA architecture is not
 a native implementation dependency.
@@ -55,14 +55,30 @@ AppDependencies is the composition root: it creates one ModelContainer,
 repositories and services, then injects services into feature roots. The app
 intentionally remains one target rather than separate Swift packages.
 
-## Persistence and future sync
+## Persistence and Supabase sync foundation
 
 SwiftData is the local source of truth. The production `ModelContainer` is
-explicitly local-only, with automatic SwiftData CloudKit mirroring disabled.
+explicitly local-only, with automatic cloud mirroring disabled.
 
-Future CloudKit synchronization is custom and asynchronous, implemented outside
-SwiftData automatic CloudKit mirroring. Feature and Application layers continue
-to use repositories and services and do not depend directly on CloudKit.
+Supabase is the current network transport foundation and remains outside
+SwiftData. `AppDependencies` optionally owns one `SupabaseClient` through
+`SupabaseClientProvider`; no client is made by a view, repository or request.
+The client uses the project URL and a publishable key from `Supabase.xcconfig`
+(with an ignored private override for local or CI configuration). No service
+role, database, PAT, SMTP or other secret credential belongs in the iOS app.
+
+Supabase authentication is passwordless email OTP (`requestOTP`, `verifyOTP`,
+restored `currentSession`, and `signOut`). It is optional: there is no login
+wall, and missing configuration, a missing session or network access never
+prevents normal local use of CaloriesTracker.
+
+`SupabaseSyncTransport` performs only typed network requests. Server writes go
+through the RLS-protected `push_sync_record` RPC, which derives ownership from
+the authenticated user rather than an iOS-supplied owner identifier. Reads use
+RLS on `sync_records`. `server_revision` is transport cursor metadata, ordered
+strictly ascending for incremental pulls; it is not part of canonical payloads.
+The transport returns accepted, conflict or missing results, including the
+authoritative conflict payload, but does not apply a local merge.
 
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
@@ -99,7 +115,7 @@ remote state without creating another pending local change.
 
 ### Canonical payload and remote merge foundation
 
-The sync boundary is independent of both SwiftData and CloudKit. Every transfer
+The sync boundary is independent of SwiftData and any network transport. Every transfer
 uses a `SyncPayloadEnvelope` with `schemaVersion: 1`, an explicit entity type
 (`product`, `productVersion`, `recipe`, `recipeVersion`, `diaryEntry`, or
 `weeklyGoal`) and a UUID. The same `SyncEntityKey` is used by the outbox and
@@ -135,7 +151,7 @@ Barcode uniqueness includes deleted Products. A collision keeps the newer
 Product by the same timestamp/canonical rule, clears only the losing barcode and
 returns that Product as a `needsRepublish` effect. Local-wins outcomes also
 return explicit republish effects; neither path writes an outbox row. There is
-no persistent schema change, staging queue, networking or CloudKit dependency in
+no persistent schema change, staging queue or networking dependency in
 this foundation.
 
 ## Project structure
@@ -154,6 +170,8 @@ ios/
   Data/SwiftData/
     Models/ Mappers/ Repositories/ SchemaV1.swift MigrationPlan.swift
     SyncEntityIdentity.swift CanonicalSyncPayloads.swift SyncLocalStore.swift
+  Data/Supabase/
+    SupabaseClientProvider.swift SupabaseAuthService.swift SupabaseSyncTransport.swift
   Features/
     Today/ Catalog/ Statistics/ Goals/
 ~~~
@@ -431,11 +449,13 @@ presented to the user only through a stable context-specific message.
 
 ## Current and deferred capabilities
 
-SwiftData is the only current persistence implementation. There is no CloudKit,
-Supabase, backend, authentication, network sync worker, staging queue, web
-migration, barcode scanner wrapper or external product API in the native app.
-Canonical payload export and direct local remote-merge support are internal sync
-foundation only, not a user-facing import/export or transport feature.
+SwiftData remains the only persistence implementation and the local source of
+truth. Supabase provides an internal, optional email-OTP and typed transport
+foundation, but there is no sync UI, automatic worker, outbox bridge,
+acknowledgement, initial upload, cursor persistence, remote merge application,
+staging queue, web migration, barcode scanner wrapper or external product API.
+Canonical payload export and direct local remote-merge support remain internal
+foundation rather than a user-facing import/export feature.
 
 If future sync is approved, it must remain behind repositories, use explicit
 DTOs/merge transactions and preserve immutable versions and Diary snapshots.

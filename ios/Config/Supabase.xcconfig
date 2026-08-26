@@ -1,0 +1,4 @@
+// The publishable key is supplied locally or by CI, never from Swift source.
+SUPABASE_URL = https://gzlebblytsnmmfxadezf.supabase.co
+SUPABASE_PUBLISHABLE_KEY =
+#include? "Supabase.private.xcconfig"

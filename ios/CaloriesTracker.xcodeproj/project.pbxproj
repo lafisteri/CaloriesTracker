@@ -55,6 +55,10 @@
 		A10000000000000000000044 /* StatisticsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* StatisticsViewModels.swift */; };
 		A10000000000000000000045 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000046 /* StatisticsView.swift */; };
 		A10000000000000000000046 /* EditableDecimal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* EditableDecimal.swift */; };
+		A10000000000000000000057 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000002 /* Supabase */; };
+		A10000000000000000000058 /* SupabaseClientProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* SupabaseClientProvider.swift */; };
+		A10000000000000000000059 /* SupabaseAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* SupabaseAuthService.swift */; };
+		A10000000000000000000060 /* SupabaseSyncTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* SupabaseSyncTransport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -108,6 +112,10 @@
 		A20000000000000000000046 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		A20000000000000000000047 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000048 /* EditableDecimal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableDecimal.swift; sourceTree = "<group>"; };
+		A20000000000000000000057 /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
+		A20000000000000000000058 /* SupabaseClientProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClientProvider.swift; sourceTree = "<group>"; };
+		A20000000000000000000059 /* SupabaseAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAuthService.swift; sourceTree = "<group>"; };
+		A20000000000000000000060 /* SupabaseSyncTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseSyncTransport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,6 +123,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000057 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +139,7 @@
 				A40000000000000000000006 /* Domain */,
 				A4000000000000000000000E /* Data */,
 				A4000000000000000000001E /* Shared */,
+				A4000000000000000000001F /* Config */,
 				A40000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -344,6 +354,14 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		A4000000000000000000001F /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000057 /* Supabase.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
 		A4000000000000000000000D /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
@@ -356,6 +374,7 @@
 			isa = PBXGroup;
 			children = (
 				A4000000000000000000000F /* SwiftData */,
+				A40000000000000000000020 /* Supabase */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -375,6 +394,16 @@
 				A20000000000000000000053 /* SyncLocalStore.swift */,
 			);
 			path = SwiftData;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000020 /* Supabase */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000058 /* SupabaseClientProvider.swift */,
+				A20000000000000000000059 /* SupabaseAuthService.swift */,
+				A20000000000000000000060 /* SupabaseSyncTransport.swift */,
+			);
+			path = Supabase;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000010 /* Models */ = {
@@ -417,6 +446,9 @@
 			dependencies = (
 			);
 			name = CaloriesTracker;
+			packageProductDependencies = (
+				A90000000000000000000002 /* Supabase */,
+			);
 			productName = CaloriesTracker;
 			productReference = A20000000000000000000023 /* CaloriesTracker.app */;
 			productType = "com.apple.product-type.application";
@@ -446,6 +478,9 @@
 			);
 			mainGroup = A40000000000000000000001;
 			productRefGroup = A40000000000000000000003 /* Products */;
+			packageReferences = (
+				A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -453,6 +488,25 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.54.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A90000000000000000000002 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A30000000000000000000003 /* Resources */ = {
@@ -492,6 +546,9 @@
 				A10000000000000000000051 /* SyncEntityIdentity.swift in Sources */,
 				A10000000000000000000052 /* CanonicalSyncPayloads.swift in Sources */,
 				A10000000000000000000053 /* SyncLocalStore.swift in Sources */,
+				A10000000000000000000058 /* SupabaseClientProvider.swift in Sources */,
+				A10000000000000000000059 /* SupabaseAuthService.swift in Sources */,
+				A10000000000000000000060 /* SupabaseSyncTransport.swift in Sources */,
 				A10000000000000000000021 /* RecordMappers.swift in Sources */,
 				A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */,
 				A10000000000000000000023 /* ProductService.swift in Sources */,
@@ -619,6 +676,7 @@
 			name = Release;
 		};
 		A80000000000000000000003 /* Debug */ = {
+			baseConfigurationReference = A20000000000000000000057 /* Supabase.xcconfig */;
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
@@ -642,6 +700,7 @@
 			name = Debug;
 		};
 		A80000000000000000000004 /* Release */ = {
+			baseConfigurationReference = A20000000000000000000057 /* Supabase.xcconfig */;
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";

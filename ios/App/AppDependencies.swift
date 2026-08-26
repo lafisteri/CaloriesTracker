@@ -12,6 +12,9 @@ final class AppDependencies {
     let diaryService: DiaryService
     let goalService: GoalService
     let statisticsService: StatisticsService
+    let supabaseClientProvider: SupabaseClientProvider?
+    let supabaseAuth: SupabaseAuthService?
+    let supabaseSyncTransport: SupabaseSyncTransport?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema(versionedSchema: CaloriesTrackerSchemaV2.self)
@@ -48,5 +51,10 @@ final class AppDependencies {
             diaryRepository: diaryRepository,
             goalService: goalService,
         )
+
+        let supabaseClientProvider = SupabaseClientProvider.makeFromMainBundle()
+        self.supabaseClientProvider = supabaseClientProvider
+        supabaseAuth = supabaseClientProvider.map { SupabaseAuthService(client: $0.client) }
+        supabaseSyncTransport = supabaseClientProvider.map { SupabaseSyncTransport(client: $0.client) }
     }
 }
