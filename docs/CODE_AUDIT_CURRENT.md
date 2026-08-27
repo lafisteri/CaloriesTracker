@@ -53,7 +53,7 @@ through Domain repository protocols. SwiftData records remain inside Data.
 | RecipeVersion | UUID, `recipeID`, optional lineage and version number; immutable ingredient composition, output and total nutrition. | `createdAt`; never edited or soft-deleted. | `RecipeRepository`; append-only history. |
 | RecipeIngredient | UUID owned by one RecipeVersion; immutable position, logical Product ID, exact ProductVersion ID, amount/unit and normalized amount. | No independent audit/deletion fields; replaced only by a new RecipeVersion. | Persisted RecipeVersion child; no persisted Recipe → Recipe edge. |
 | DiaryEntry | UUID; mutable only through constrained amount/unit update, explicit source rebase, or move/reorder. | `createdAt`, `updatedAt`, `deletedAt`; user delete is soft. | `DiaryRepository`; stores source and nutrition snapshots rather than a live relationship. |
-| WeeklyGoal / DailyMacroGoal | UUID weekly goal with a unique effective LocalDay and seven owned daily values. Goals are created for effective dates rather than edited in place. | Weekly goal has `createdAt`; current schema has no goal soft delete or `updatedAt`. | `GoalRepository`; effective-date lookup selects the historical goal. |
+| WeeklyGoal / DailyMacroGoal | UUID weekly goal with a unique effective LocalDay and seven owned daily values. Repeated saves for the same effective day update that aggregate in place; a new effective day creates a new UUID. | `createdAt` is immutable; `updatedAt` changes with a same-day aggregate save. No goal soft delete. | `GoalRepository`; effective-date lookup selects the historical goal. |
 
 All persistent identities are UUIDs. `LocalDay` is a validated `YYYY-MM-DD`
 civil-date key, not a persisted timestamp. SwiftData relationships help local
@@ -180,6 +180,7 @@ not implemented by this audit.
 | MAINT-01 | CONFIRMED | Low | `RecipeViews.swift` is about 1,040 lines and contains list, detail, editor, ingredient Amount and composition Amount view types. Its physical split is deferred. |
 | DEAD-01 | NO LONGER APPLICABLE | — | Current source review did not establish a concrete unused production member that justifies a cleanup-only change. No dead-code deletion is proposed. |
 | OBS-01 | ALREADY RESOLVED | — | High-volume navigation, focus and lifecycle telemetry was removed. Feature error mappers retain only unexpected technical failures for diagnostics. |
+| GOAL-02 | CONFIRMED | Medium | Two offline devices can still independently create different WeeklyGoal UUIDs for one `effectiveFrom`. Current merge arbitrates the local collision, but this is not a shared deterministic identity design. |
 
 ## 9. Implemented Sync Audit
 
@@ -208,9 +209,13 @@ not implemented by this audit.
   SwiftData dates are not bulk-rewritten. Immutable ProductVersion and
   RecipeVersion equality is exact after this canonicalization; a genuine same-
   UUID content difference remains an invariant error.
-- Mutable Product, Recipe and DiaryEntry merge as whole records under canonical
-  millisecond LWW, with sticky tombstones and deterministic canonical-byte
-  tie-breaking. WeeklyGoal is a write-once aggregate keyed by `LocalDay`.
+- Mutable Product, Recipe, DiaryEntry and WeeklyGoal merge as whole records
+  under canonical millisecond LWW, with sticky tombstones where applicable and
+  deterministic canonical-byte tie-breaking. WeeklyGoal same-day saves retain
+  the UUID and immutable `createdAt`, replace the full seven-day aggregate and
+  advance `updatedAt`; old remote payloads fall back to `createdAt` when that
+  additive field is absent. This resolves the P1 duplicate-effective-date UI /
+  persistence mismatch.
 - Product name/barcode-only and Recipe name-only saves create/stage only their
   logical record. Versioned changes append and stage the logical record plus the
   new immutable version.

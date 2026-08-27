@@ -24,7 +24,7 @@ final class AppDependencies {
     let syncOrchestrator: SyncOrchestrator?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
-        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV4.self)
+        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV5.self)
         let configuration = ModelConfiguration(
             "CaloriesTracker",
             schema: schema,

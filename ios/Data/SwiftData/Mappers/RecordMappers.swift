@@ -155,6 +155,7 @@ extension WeeklyGoalRecord {
             effectiveFrom: effectiveFrom,
             dailyGoals: mappedGoals,
             createdAt: createdAt,
+            updatedAt: updatedAt ?? createdAt,
         )
     }
 }

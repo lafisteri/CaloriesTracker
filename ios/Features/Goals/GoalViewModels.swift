@@ -35,13 +35,13 @@ final class GoalEditorViewModel {
         defer { isLoading = false }
 
         do {
-            guard let latestGoal = try await goalService.latestGoal() else {
+            guard let currentGoal = try await goalService.goal(for: .current()) else {
                 return
             }
 
-            originalDailyGoals = latestGoal.dailyGoals
+            originalDailyGoals = currentGoal.dailyGoals
             days = LocalDay.Weekday.allCases.map { weekday in
-                guard let goal = latestGoal.dailyGoals[weekday] else {
+                guard let goal = currentGoal.dailyGoals[weekday] else {
                     return GoalDayForm(weekday: weekday)
                 }
 
@@ -82,7 +82,7 @@ final class GoalEditorViewModel {
             }
 
             isSaving = true
-            try await goalService.create(draft: draft)
+            try await goalService.save(draft: draft)
             isSaving = false
             return true
         } catch {

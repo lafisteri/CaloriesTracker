@@ -7,6 +7,7 @@ enum CaloriesTrackerMigrationPlan: SchemaMigrationPlan {
             CaloriesTrackerSchemaV2.self,
             CaloriesTrackerSchemaV3.self,
             CaloriesTrackerSchemaV4.self,
+            CaloriesTrackerSchemaV5.self,
         ]
     }
 
@@ -23,6 +24,10 @@ enum CaloriesTrackerMigrationPlan: SchemaMigrationPlan {
             .lightweight(
                 fromVersion: CaloriesTrackerSchemaV3.self,
                 toVersion: CaloriesTrackerSchemaV4.self,
+            ),
+            .lightweight(
+                fromVersion: CaloriesTrackerSchemaV4.self,
+                toVersion: CaloriesTrackerSchemaV5.self,
             ),
         ]
     }

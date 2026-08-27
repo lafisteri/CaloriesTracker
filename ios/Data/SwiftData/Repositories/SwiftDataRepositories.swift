@@ -911,49 +911,58 @@ final class SwiftDataGoalRepository: GoalRepository {
         return result
     }
 
-    func create(_ goal: WeeklyGoal) async throws {
-        try validate(goal)
+    func save(draft: WeeklyGoalDraft, at timestamp: Date) async throws -> WeeklyGoal {
+        try validate(draft)
 
-        let effectiveFromKey = goal.effectiveFrom.rawValue
-        let duplicateDescriptor = FetchDescriptor<WeeklyGoalRecord>(
+        let effectiveFromKey = draft.effectiveFrom.rawValue
+        var descriptor = FetchDescriptor<WeeklyGoalRecord>(
             predicate: #Predicate { $0.effectiveFromKey == effectiveFromKey },
         )
-        guard try modelContext.fetch(duplicateDescriptor).isEmpty else {
-            throw GoalRepositoryError.duplicateEffectiveDate
-        }
-
-        let goalRecord = WeeklyGoalRecord(
-            id: goal.id,
-            effectiveFromKey: goal.effectiveFrom.rawValue,
-            createdAt: goal.createdAt,
-        )
-        let dailyGoalRecords = try LocalDay.Weekday.allCases.enumerated().map { position, weekday in
-            guard let dailyGoal = goal.dailyGoals[weekday] else {
-                throw GoalRepositoryError.invalidGoal
-            }
-            return DailyMacroGoalRecord(
-                id: UUID(),
-                weeklyGoalID: goal.id,
-                weekdayRaw: weekday.rawValue,
-                position: position,
-                calories: dailyGoal.calories,
-                protein: dailyGoal.protein,
-                fat: dailyGoal.fat,
-                carbs: dailyGoal.carbs,
-            )
-        }
-        goalRecord.dailyGoals = dailyGoalRecords
-        for dailyGoalRecord in dailyGoalRecords {
-            dailyGoalRecord.weeklyGoal = goalRecord
-        }
+        descriptor.fetchLimit = 1
 
         do {
+            if let goalRecord = try modelContext.fetch(descriptor).first {
+                try apply(draft, to: goalRecord)
+                goalRecord.updatedAt = timestamp
+                try SyncOutboxStore.markChanged(type: .weeklyGoal, id: goalRecord.id, in: modelContext)
+                try commitSyncableMutation()
+                return try goalRecord.toDomain()
+            }
+
+            let goalID = UUID()
+            let goalRecord = WeeklyGoalRecord(
+                id: goalID,
+                effectiveFromKey: effectiveFromKey,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            )
+            let dailyGoalRecords = try LocalDay.Weekday.allCases.enumerated().map { position, weekday in
+                guard let dailyGoal = draft.dailyGoals[weekday] else {
+                    throw GoalRepositoryError.invalidGoal
+                }
+                return DailyMacroGoalRecord(
+                    id: UUID(),
+                    weeklyGoalID: goalID,
+                    weekdayRaw: weekday.rawValue,
+                    position: position,
+                    calories: dailyGoal.calories,
+                    protein: dailyGoal.protein,
+                    fat: dailyGoal.fat,
+                    carbs: dailyGoal.carbs,
+                )
+            }
+            goalRecord.dailyGoals = dailyGoalRecords
+            for dailyGoalRecord in dailyGoalRecords {
+                dailyGoalRecord.weeklyGoal = goalRecord
+            }
+
             modelContext.insert(goalRecord)
             for dailyGoalRecord in dailyGoalRecords {
                 modelContext.insert(dailyGoalRecord)
             }
-            try SyncOutboxStore.markChanged(type: .weeklyGoal, id: goal.id, in: modelContext)
+            try SyncOutboxStore.markChanged(type: .weeklyGoal, id: goalID, in: modelContext)
             try commitSyncableMutation()
+            return try goalRecord.toDomain()
         } catch {
             modelContext.rollback()
             throw error
@@ -969,26 +978,55 @@ final class SwiftDataGoalRepository: GoalRepository {
         try modelContext.fetch(FetchDescriptor<WeeklyGoalRecord>()).map { try $0.toDomain() }
     }
 
-    private func validate(_ goal: WeeklyGoal) throws {
+    private func validate(_ draft: WeeklyGoalDraft) throws {
         let weekdays = Set(LocalDay.Weekday.allCases)
-        guard Set(goal.dailyGoals.keys) == weekdays,
-              goal.dailyGoals.values.allSatisfy(\.isValid)
+        guard Set(draft.dailyGoals.keys) == weekdays,
+              draft.dailyGoals.values.allSatisfy(\.isValid)
         else {
             throw GoalRepositoryError.invalidGoal
+        }
+    }
+
+    private func apply(_ draft: WeeklyGoalDraft, to record: WeeklyGoalRecord) throws {
+        var dailyGoalsByWeekday: [LocalDay.Weekday: DailyMacroGoalRecord] = [:]
+        for dailyGoalRecord in record.dailyGoals {
+            guard let weekday = LocalDay.Weekday(rawValue: dailyGoalRecord.weekdayRaw),
+                  dailyGoalsByWeekday[weekday] == nil
+            else {
+                throw GoalRepositoryError.invalidGoal
+            }
+            dailyGoalsByWeekday[weekday] = dailyGoalRecord
+        }
+
+        guard Set(dailyGoalsByWeekday.keys) == Set(LocalDay.Weekday.allCases) else {
+            throw GoalRepositoryError.invalidGoal
+        }
+
+        for (position, weekday) in LocalDay.Weekday.allCases.enumerated() {
+            guard let draftGoal = draft.dailyGoals[weekday],
+                  let dailyGoalRecord = dailyGoalsByWeekday[weekday]
+            else {
+                throw GoalRepositoryError.invalidGoal
+            }
+
+            dailyGoalRecord.weeklyGoalID = record.id
+            dailyGoalRecord.weekdayRaw = weekday.rawValue
+            dailyGoalRecord.position = position
+            dailyGoalRecord.calories = draftGoal.calories
+            dailyGoalRecord.protein = draftGoal.protein
+            dailyGoalRecord.fat = draftGoal.fat
+            dailyGoalRecord.carbs = draftGoal.carbs
         }
     }
 }
 
 enum GoalRepositoryError: LocalizedError {
     case invalidGoal
-    case duplicateEffectiveDate
 
     var errorDescription: String? {
         switch self {
         case .invalidGoal:
             "Цель недели должна содержать семь корректных дней."
-        case .duplicateEffectiveDate:
-            "Цели с этой датой уже существуют."
         }
     }
 }

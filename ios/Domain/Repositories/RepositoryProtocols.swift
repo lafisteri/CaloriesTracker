@@ -48,5 +48,5 @@ protocol GoalRepository: Sendable {
     func latestGoal() async throws -> WeeklyGoal?
     func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal?
     func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal]
-    func create(_ goal: WeeklyGoal) async throws
+    func save(draft: WeeklyGoalDraft, at timestamp: Date) async throws -> WeeklyGoal
 }

@@ -380,11 +380,17 @@ final class SyncLocalStore {
             if localPayload == remote {
                 return .identical(key)
             }
+            if localRecord.id == remote.id,
+               SyncTimestamp.millisecondsSinceEpoch(localPayload.createdAt)
+                   != SyncTimestamp.millisecondsSinceEpoch(remote.createdAt)
+            {
+                throw SyncLocalStoreError.inconsistentIdentity(key)
+            }
             if try timestampWinner(
                 local: .weeklyGoal(localPayload),
                 remote: .weeklyGoal(remote),
-                localTimestamp: localPayload.createdAt,
-                remoteTimestamp: remote.createdAt,
+                localTimestamp: localPayload.updatedAt,
+                remoteTimestamp: remote.updatedAt,
             ) == .local {
                 let localKey = SyncEntityKey(entityType: .weeklyGoal, entityID: localPayload.id)
                 return .localKept(localKey, needsRepublish: [localKey])
@@ -723,7 +729,7 @@ final class SyncLocalStore {
         else {
             throw SyncLocalStoreError.invalidPayload(key, reason: "weekly goal days are invalid")
         }
-        try validateDate(payload.createdAt, key: key)
+        try validateDates(payload.createdAt, payload.updatedAt, nil, key: key)
         for day in payload.days {
             guard day.weeklyGoalID == payload.id, day.goal.isValid else {
                 throw SyncLocalStoreError.invalidPayload(key, reason: "daily goal values are invalid")
@@ -977,6 +983,7 @@ final class SyncLocalStore {
             effectiveFrom: effectiveFrom,
             days: days,
             createdAt: SyncTimestamp.canonical(record.createdAt),
+            updatedAt: SyncTimestamp.canonical(record.updatedAt ?? record.createdAt),
         )
     }
 
@@ -1111,6 +1118,7 @@ final class SyncLocalStore {
             id: payload.id,
             effectiveFromKey: payload.effectiveFrom.rawValue,
             createdAt: payload.createdAt,
+            updatedAt: payload.updatedAt,
         )
     }
 
@@ -1120,7 +1128,7 @@ final class SyncLocalStore {
         in modelContext: ModelContext,
     ) throws {
         record.effectiveFromKey = payload.effectiveFrom.rawValue
-        record.createdAt = payload.createdAt
+        record.updatedAt = payload.updatedAt
 
         let currentDaysByID = Dictionary(uniqueKeysWithValues: record.dailyGoals.map { ($0.id, $0) })
         let incomingIDs = Set(payload.days.map(\.id))

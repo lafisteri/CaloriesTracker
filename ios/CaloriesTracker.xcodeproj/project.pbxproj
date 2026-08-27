@@ -69,6 +69,7 @@
 		A10000000000000000000068 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000068 /* SettingsView.swift */; };
 		A10000000000000000000069 /* DateNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000069 /* DateNavigator.swift */; };
 		A10000000000000000000070 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000070 /* AppStyle.swift */; };
+		A10000000000000000000071 /* SchemaV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* SchemaV5.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -136,6 +137,7 @@
 		A20000000000000000000068 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A20000000000000000000069 /* DateNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateNavigator.swift; sourceTree = "<group>"; };
 		A20000000000000000000070 /* AppStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyle.swift; sourceTree = "<group>"; };
+		A20000000000000000000071 /* SchemaV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV5.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -421,6 +423,7 @@
 				A20000000000000000000049 /* SchemaV2.swift */,
 				A20000000000000000000062 /* SchemaV3.swift */,
 				A20000000000000000000065 /* SchemaV4.swift */,
+				A20000000000000000000071 /* SchemaV5.swift */,
 				A20000000000000000000020 /* MigrationPlan.swift */,
 				A20000000000000000000050 /* SyncOutbox.swift */,
 				A20000000000000000000061 /* SyncMetadata.swift */,
@@ -583,6 +586,7 @@
 				A10000000000000000000049 /* SchemaV2.swift in Sources */,
 				A10000000000000000000062 /* SchemaV3.swift in Sources */,
 				A10000000000000000000065 /* SchemaV4.swift in Sources */,
+				A10000000000000000000071 /* SchemaV5.swift in Sources */,
 				A10000000000000000000020 /* MigrationPlan.swift in Sources */,
 				A10000000000000000000050 /* SyncOutbox.swift in Sources */,
 				A10000000000000000000061 /* SyncMetadata.swift in Sources */,

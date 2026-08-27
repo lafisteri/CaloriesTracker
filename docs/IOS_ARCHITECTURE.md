@@ -169,7 +169,7 @@ account-scoped metadata.
 domain-service or `NotificationCenter` dependency. Product create, metadata
 save, version append and soft delete; Recipe create, metadata save, version
 append and soft delete; DiaryEntry create, amount save, source rebase, batch
-reorder and soft delete; and WeeklyGoal creation all signal it only after their
+reorder and soft delete; and WeeklyGoal save all signal it only after their
 SwiftData save has successfully committed their existing outbox marker. Remote
 imports bypass this notifier because they do not use those ordinary local
 outbox-staging paths. The signal debounces rapid edits for 1.8 seconds, so local
@@ -212,9 +212,11 @@ user-visible deletion is a retained tombstone. ProductVersion and RecipeVersion
 an unknown version, but a known version must be canonical-payload equivalent or
 is treated as a corruption/invariant error.
 
-WeeklyGoal and its seven DailyMacroGoal values are a write-once aggregate for
-one `effectiveFrom` key. It has a stable UUID and `createdAt` records its sole
-local mutation; goals are not edited or deleted in place.
+WeeklyGoal and its seven DailyMacroGoal values are one mutable whole aggregate
+per historical `effectiveFrom` key. A same-day edit preserves its stable UUID,
+`effectiveFrom` and immutable `createdAt`, replaces all seven daily values and
+sets `updatedAt`. Saving on a new effective day creates a new UUID; old goals
+remain available for historical lookup. There is no goal soft delete.
 
 Business timestamps are distinct from sync operational metadata. That metadata
 is infrastructure-only and never appears in domain values or canonical payloads.
@@ -280,7 +282,7 @@ the same integer on decode, so a local payload remains idempotent through a
 transport round-trip. This covers Product `createdAt` / `updatedAt` /
 `deletedAt`, ProductVersion `createdAt`, Recipe `createdAt` / `updatedAt` /
 `deletedAt`, RecipeVersion `createdAt`, DiaryEntry `createdAt` / `updatedAt` /
-`deletedAt`, and WeeklyGoal `createdAt`. SwiftData retains its original Date
+`deletedAt`, and WeeklyGoal `createdAt` / `updatedAt`. SwiftData retains its original Date
 values; normalization is only a sync-boundary operation. `LocalDay` remains a
 civil-date value, while `server_updated_at` and other transport/operational
 metadata are not canonical domain timestamps.
@@ -297,14 +299,16 @@ therefore cannot echo a pull back into a future push. Its result distinguishes
 insertion, remote application, identical content, local-wins, dependency
 deferral and explicit republish effects.
 
-Product, Recipe and DiaryEntry use whole-record last-writer-wins by canonical
+Product, Recipe, DiaryEntry and WeeklyGoal use whole-record last-writer-wins by canonical
 integer-millisecond `updatedAt`; raw high-precision local Dates never compare
 against canonical remote Dates. Tombstones are sticky: a tombstone always wins
 over a non-tombstone; two tombstones use the same timestamp rule. WeeklyGoal
-competes as a whole aggregate by its natural `effectiveFrom` key and `createdAt`.
-For an equal canonical timestamp, the canonical sorted-key JSON bytes of the
-version-1 envelope break the tie; the lexicographically greater payload wins.
-This is deterministic and direction-independent.
+competes as a whole aggregate by its UUID and natural `effectiveFrom` key; its
+seven days are never merged independently. For an equal canonical timestamp,
+the canonical sorted-key JSON bytes of the version-1 envelope break the tie;
+the lexicographically greater payload wins. This is deterministic and
+direction-independent. Old WeeklyGoal payloads without `updatedAt` decode with
+`createdAt` as their effective update time.
 
 Remote Product/Recipe current-version references, RecipeVersion pinned
 ProductVersions and DiaryEntry source versions are dependencies. Missing
@@ -335,7 +339,7 @@ ios/
     Goals/GoalService.swift
     Statistics/StatisticsService.swift
   Data/SwiftData/
-    Models/ Mappers/ Repositories/ SchemaV1.swift SchemaV4.swift MigrationPlan.swift
+    Models/ Mappers/ Repositories/ SchemaV1.swift … SchemaV5.swift MigrationPlan.swift
     SyncEntityIdentity.swift SyncMetadata.swift SyncOutbox.swift CanonicalSyncPayloads.swift
     SyncLocalStore.swift
   Data/Supabase/
@@ -547,10 +551,13 @@ historical Recipe and DiaryEntry resolution.
 
 ## SwiftData persistence
 
-CaloriesTrackerSchemaV4 is the active explicit VersionedSchema. AppDependencies
+CaloriesTrackerSchemaV5 is the active explicit VersionedSchema. AppDependencies
 creates the container with CaloriesTrackerMigrationPlan, which uses lightweight
-V1→V2, V2→V3 and V3→V4 migrations. V4 is additive: it does not rewrite existing
-user records, outbox rows or account metadata.
+V1→V2, V2→V3, V3→V4 and V4→V5 migrations. V5 adds optional stored
+`WeeklyGoalRecord.updatedAt`; old rows use `createdAt` as the domain fallback,
+so the migration does not rewrite user records, outbox rows or account metadata.
+The historical schemas retain their pre-V5 WeeklyGoal shape so each version has
+its original, distinct SwiftData checksum.
 
 | Record group | Purpose |
 | --- | --- |
@@ -595,7 +602,7 @@ resolved ingredient graph for read models, nutrition and outdated status.
 | ProductService | Listing/details, validation, version append, metadata and soft delete |
 | RecipeService | Source resolution/pinning, composition calculation, versioning, flattening and output preview |
 | DiaryService | Day totals, usage defaults, Amount source/preview, snapshot create/edit, delete and move/reorder |
-| GoalService | Seven-day validation, creation and effective-date lookup |
+| GoalService | Seven-day validation, same-effective-day upsert and historical effective-date lookup |
 | StatisticsService | Aggregation from Diary snapshots and historical goals |
 
 Amount preview and persisted DiaryEntry use the same calculation path. Recipe

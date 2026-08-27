@@ -21,29 +21,9 @@ final class GoalService {
     }
 
     @discardableResult
-    func create(draft: WeeklyGoalDraft) async throws -> UUID {
+    func save(draft: WeeklyGoalDraft) async throws -> UUID {
         try validate(draft)
-
-        if let existingGoal = try await repository.goal(effectiveOn: draft.effectiveFrom),
-           existingGoal.effectiveFrom == draft.effectiveFrom
-        {
-            throw GoalServiceError.duplicateEffectiveDate
-        }
-
-        let goal = WeeklyGoal(
-            id: UUID(),
-            effectiveFrom: draft.effectiveFrom,
-            dailyGoals: draft.dailyGoals,
-            createdAt: Date(),
-        )
-
-        do {
-            try await repository.create(goal)
-        } catch GoalRepositoryError.duplicateEffectiveDate {
-            throw GoalServiceError.duplicateEffectiveDate
-        }
-
-        return goal.id
+        return try await repository.save(draft: draft, at: Date()).id
     }
 
     private func validate(_ draft: WeeklyGoalDraft) throws {
@@ -60,7 +40,6 @@ final class GoalService {
 enum GoalServiceError: LocalizedError {
     case incompleteWeek
     case invalidValue
-    case duplicateEffectiveDate
 
     var errorDescription: String? {
         switch self {
@@ -68,8 +47,6 @@ enum GoalServiceError: LocalizedError {
             "Заполните цели для всех дней недели."
         case .invalidValue:
             "Значения целей должны быть неотрицательными числами."
-        case .duplicateEffectiveDate:
-            "Цели с этой датой уже существуют. Выберите другую дату."
         }
     }
 }

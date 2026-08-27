@@ -301,6 +301,7 @@ enum SyncPayload: Codable, Equatable, Sendable {
                     effectiveFrom: payload.effectiveFrom,
                     days: payload.days,
                     createdAt: SyncTimestamp.canonical(payload.createdAt),
+                    updatedAt: SyncTimestamp.canonical(payload.updatedAt),
                 ),
             )
         }
@@ -390,6 +391,7 @@ struct WeeklyGoalPayload: Codable, Equatable, Sendable {
     let effectiveFrom: LocalDay
     let days: [Day]
     let createdAt: Date
+    let updatedAt: Date
 }
 
 // Domain timestamp fields use this explicit codec instead of the enclosing
@@ -565,16 +567,18 @@ extension DiaryEntryPayload {
 
 extension WeeklyGoalPayload {
     private enum CodingKeys: String, CodingKey {
-        case id, effectiveFrom, days, createdAt
+        case id, effectiveFrom, days, createdAt, updatedAt
     }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let createdAt = try SyncTimestamp.decode(from: container, forKey: .createdAt)
         self.init(
             id: try container.decode(UUID.self, forKey: .id),
             effectiveFrom: try container.decode(LocalDay.self, forKey: .effectiveFrom),
             days: try container.decode([Day].self, forKey: .days),
-            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+            createdAt: createdAt,
+            updatedAt: try SyncTimestamp.decodeIfPresent(from: container, forKey: .updatedAt) ?? createdAt,
         )
     }
 
@@ -584,6 +588,7 @@ extension WeeklyGoalPayload {
         try container.encode(effectiveFrom, forKey: .effectiveFrom)
         try container.encode(days, forKey: .days)
         try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+        try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
     }
 }
 

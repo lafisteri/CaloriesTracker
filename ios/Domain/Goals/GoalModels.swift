@@ -20,6 +20,7 @@ struct WeeklyGoal: Identifiable, Hashable, Codable, Sendable {
     let effectiveFrom: LocalDay
     let dailyGoals: [LocalDay.Weekday: DailyMacroGoal]
     let createdAt: Date
+    let updatedAt: Date
 }
 
 struct WeeklyGoalDraft: Hashable, Sendable {

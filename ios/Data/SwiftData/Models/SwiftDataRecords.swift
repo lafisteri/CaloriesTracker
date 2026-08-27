@@ -249,14 +249,21 @@ final class WeeklyGoalRecord {
     @Attribute(.unique) var id: UUID
     @Attribute(.unique) var effectiveFromKey: String
     var createdAt: Date
+    var updatedAt: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \DailyMacroGoalRecord.weeklyGoal)
     var dailyGoals: [DailyMacroGoalRecord] = []
 
-    init(id: UUID, effectiveFromKey: String, createdAt: Date) {
+    init(
+        id: UUID,
+        effectiveFromKey: String,
+        createdAt: Date,
+        updatedAt: Date? = nil,
+    ) {
         self.id = id
         self.effectiveFromKey = effectiveFromKey
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
