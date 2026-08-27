@@ -48,6 +48,7 @@ struct StatisticsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .contentMargins(.top, 0, for: .scrollContent)
         .onAppear {
             Task {
                 await model.load()
@@ -92,7 +93,15 @@ struct StatisticsView: View {
                     Image(systemName: "chevron.right")
                 }
             }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous),
+            )
             .buttonStyle(.borderless)
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .listRowBackground(Color.clear)
         }
     }
 

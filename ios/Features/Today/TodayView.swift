@@ -39,7 +39,8 @@ struct TodayRootView: View {
     var body: some View {
         List {
             dateNavigation
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
+                .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
             Section {
@@ -126,6 +127,8 @@ struct TodayRootView: View {
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(.compact)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await model.load()
         }
@@ -236,18 +239,6 @@ struct TodayRootView: View {
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")
             }
         }
-        .toolbar {
-            if router.todayPath.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isSettingsPresented = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Настройки")
-                }
-            }
-        }
         .sheet(isPresented: $isSettingsPresented) {
             NavigationStack {
                 SettingsView(
@@ -307,6 +298,30 @@ struct TodayRootView: View {
     }
 
     private var dateNavigation: some View {
+        HStack(spacing: 12) {
+            calendarNavigation
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous),
+                )
+
+            Button {
+                isSettingsPresented = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .frame(width: 44, height: 44)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
+            }
+            .accessibilityLabel("Настройки")
+            .contentShape(Circle())
+            .fixedSize()
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private var calendarNavigation: some View {
         HStack {
             Button {
                 Task {
@@ -341,7 +356,6 @@ struct TodayRootView: View {
                 Image(systemName: "chevron.right")
             }
         }
-        .buttonStyle(.borderless)
     }
 
     private func move(entryID: UUID, to meal: MealType, displayedTargetIndex: Int) {
