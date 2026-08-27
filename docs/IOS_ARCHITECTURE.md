@@ -87,6 +87,16 @@ its PostgREST body as an array and requires exactly one typed row before mapping
 it to `accepted`, `conflict` or `missing`. A successful HTTP response alone
 never acknowledges an outbox item.
 
+Every sync run is pinned to one authenticated Supabase account UUID captured by
+the orchestrator and passed unchanged through bootstrap, pull, push and every
+transport request. The transport validates that the current, non-expired session
+belongs to that expected UUID immediately before and after each request. Push
+also validates before every batch item and before accepted-response metadata or
+outbox acknowledgement; pull validates before each page and before it can merge
+records or advance its cursor. A refresh that keeps the same UUID is valid; a
+sign-out or a different UUID yields the typed `accountChanged` abort instead of
+using the new session for an old run.
+
 `SyncPushCoordinator` is the only connection from the persistent outbox to the
 transport. It remains a focused push-only coordinator; `SyncOrchestrator`
 decides when it runs. A normal orchestration cycle reads at most 50 immutable
@@ -159,11 +169,15 @@ The orchestrator is single-flight: a wake while bootstrap, pull or push is
 already executing only marks `needsAnotherRun`. It performs bootstrap first when
 needed, then normal `Pull → Push → Pull` cycles, with at most three convergence
 cycles per wake and one coalesced follow-up run. Before proceeding after each
-network phase, it checks the original account UUID against the current session,
-so a result for a signed-out or switched account is never continued as work for
-another account. A successful sign-out cancels pending old-account debounce,
-retry and periodic scheduling, while retaining local records, outbox rows and
-account-scoped metadata.
+network phase, it checks the original account UUID against the current session.
+It also tracks an account-identity generation: a sign-out or different account
+invalidates an active old-account run, while a token refresh for the same UUID
+does not. `accountChanged` is a benign, non-retry abort: a signed-out app shows
+`signedOut`; a newly authenticated account receives its normal session wake.
+No old run may acknowledge global outbox work, merge remote data, advance a
+cursor or mark bootstrap complete after invalidation. A successful sign-out
+cancels pending old-account debounce, retry and periodic scheduling, while
+retaining local records, outbox rows and account-scoped metadata.
 
 `SyncChangeNotifier` is a typed, post-commit infrastructure signal, not a
 domain-service or `NotificationCenter` dependency. Product create, metadata

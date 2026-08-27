@@ -479,7 +479,7 @@ final class SettingsViewModel {
             category = "authentication"
         case .notConfigured:
             category = "configuration"
-        case .decode, .invalidResponse, .none:
+        case .decode, .invalidResponse, .accountChanged, .none:
             category = "unexpected"
         }
         Self.logger.error("Settings operation \(operation, privacy: .public) failed category=\(category, privacy: .public)")

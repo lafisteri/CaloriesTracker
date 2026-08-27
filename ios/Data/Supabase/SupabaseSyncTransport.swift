@@ -9,6 +9,7 @@ enum SupabaseInfrastructureError: Error, Equatable, Sendable, LocalizedError {
     case server
     case decode
     case invalidResponse
+    case accountChanged
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +27,8 @@ enum SupabaseInfrastructureError: Error, Equatable, Sendable, LocalizedError {
             "The Supabase response could not be decoded."
         case .invalidResponse:
             "The Supabase response was invalid."
+        case .accountChanged:
+            "The authenticated Supabase account changed during synchronization."
         }
     }
 
@@ -296,6 +299,7 @@ actor SupabaseSyncTransport {
         key: SyncEntityKey,
         envelope: SyncPayloadEnvelope,
         expectedServerRevision: Int64?,
+        expectedAccountID: UUID,
     ) async throws -> SupabasePushResult {
         guard
             envelope.schemaVersion == SyncPayloadFormat.currentSchemaVersion,
@@ -305,7 +309,7 @@ actor SupabaseSyncTransport {
             throw SupabaseInfrastructureError.invalidResponse
         }
 
-        try await requireAuthenticatedSession()
+        try await requireAuthenticatedSession(expectedAccountID: expectedAccountID)
 
         do {
             let request = SupabasePushRequest(
@@ -316,6 +320,7 @@ actor SupabaseSyncTransport {
             let response: PostgrestResponse<[SupabasePushRPCResponse]> = try await client
                 .rpc("push_sync_record", params: request)
                 .execute()
+            try await requireAuthenticatedSession(expectedAccountID: expectedAccountID)
             guard response.value.count == 1, let row = response.value.first else {
                 throw SupabaseInfrastructureError.invalidResponse
             }
@@ -328,12 +333,13 @@ actor SupabaseSyncTransport {
     func fetchChanges(
         after revision: Int64,
         limit: Int = SupabaseSyncTransport.defaultPageSize,
+        expectedAccountID: UUID,
     ) async throws -> [SupabaseRemoteSyncRecord] {
         guard revision >= 0, limit > 0 else {
             throw SupabaseInfrastructureError.invalidResponse
         }
 
-        try await requireAuthenticatedSession()
+        try await requireAuthenticatedSession(expectedAccountID: expectedAccountID)
 
         do {
             let response: PostgrestResponse<[SupabaseRemoteSyncRecord]> = try await client
@@ -343,6 +349,7 @@ actor SupabaseSyncTransport {
                 .order("server_revision", ascending: true)
                 .limit(limit)
                 .execute()
+            try await requireAuthenticatedSession(expectedAccountID: expectedAccountID)
             let records = response.value
             guard records.allSatisfy({ $0.serverRevision > revision }) else {
                 throw SupabaseInfrastructureError.invalidResponse
@@ -356,15 +363,27 @@ actor SupabaseSyncTransport {
         }
     }
 
-    private func requireAuthenticatedSession() async throws {
+    /// Validates the exact session identity used by the next or just-completed
+    /// request. A token refresh for the same account remains valid.
+    private func requireAuthenticatedSession(expectedAccountID: UUID) async throws {
         guard client.auth.currentSession != nil else {
-            throw SupabaseInfrastructureError.notAuthenticated
+            throw SupabaseInfrastructureError.accountChanged
         }
 
         do {
-            _ = try await client.auth.session
+            let session = try await client.auth.session
+            guard !session.isExpired, session.user.id == expectedAccountID else {
+                throw SupabaseInfrastructureError.accountChanged
+            }
         } catch {
-            throw SupabaseInfrastructureError.categorize(error)
+            if let error = error as? SupabaseInfrastructureError {
+                throw error
+            }
+            let category = SupabaseInfrastructureError.categorize(error)
+            if category == .notAuthenticated || category == .unauthorized {
+                throw SupabaseInfrastructureError.accountChanged
+            }
+            throw category
         }
     }
 }

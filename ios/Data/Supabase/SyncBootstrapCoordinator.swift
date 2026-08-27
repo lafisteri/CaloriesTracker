@@ -80,6 +80,7 @@ final class SyncBootstrapCoordinator {
     private let pullCoordinator: SyncPullCoordinator
     private let pushCoordinator: SyncPushCoordinator
     private var isBootstrapRunning = false
+    private var didLogAccountChangedAbort = false
 
     init(
         modelContainer: ModelContainer,
@@ -97,6 +98,7 @@ final class SyncBootstrapCoordinator {
 
     /// Bootstraps only accounts that have not already reached convergence.
     func bootstrapIfNeeded(
+        expectedAccountID: UUID,
         maximumRounds: Int = defaultSyncBootstrapMaximumRounds,
     ) async throws -> SyncBootstrapReport {
         guard maximumRounds > 0 else {
@@ -106,55 +108,16 @@ final class SyncBootstrapCoordinator {
             throw SyncBootstrapCoordinatorError.alreadyRunning
         }
         isBootstrapRunning = true
+        didLogAccountChangedAbort = false
         defer { isBootstrapRunning = false }
 
-        let accountID: UUID
-        do {
-            guard let session = try await authService.currentSession() else {
-                return report(
-                    status: .notAuthenticated,
-                    rounds: 0,
-                    pulled: 0,
-                    pushed: 0,
-                    seeded: 0,
-                    remainingOutbox: nil,
-                    startingCursor: nil,
-                    endingCursor: nil,
-                    reason: nil,
-                )
-            }
-            accountID = session.userID
-        } catch let error as SupabaseInfrastructureError {
-            return report(
-                status: .incompleteNeedsRetry,
-                rounds: 0,
-                pulled: 0,
-                pushed: 0,
-                seeded: 0,
-                remainingOutbox: nil,
-                startingCursor: nil,
-                endingCursor: nil,
-                reason: .transport(error),
-            )
-        } catch {
-            return report(
-                status: .incompleteNeedsRetry,
-                rounds: 0,
-                pulled: 0,
-                pushed: 0,
-                seeded: 0,
-                remainingOutbox: nil,
-                startingCursor: nil,
-                endingCursor: nil,
-                reason: .transport(.server),
-            )
-        }
+        try await verifyCurrentAccount(expectedAccountID)
 
         let startingCursor: Int64
         do {
             let modelContext = ModelContext(modelContainer)
-            startingCursor = try SyncMetadataStore.pullCursor(accountID: accountID, in: modelContext)
-            if try SyncMetadataStore.bootstrapCompleted(accountID: accountID, in: modelContext) {
+            startingCursor = try SyncMetadataStore.pullCursor(accountID: expectedAccountID, in: modelContext)
+            if try SyncMetadataStore.bootstrapCompleted(accountID: expectedAccountID, in: modelContext) {
                 return report(
                     status: .alreadyCompleted,
                     rounds: 0,
@@ -192,7 +155,10 @@ final class SyncBootstrapCoordinator {
         for round in 1 ... maximumRounds {
             let initialPull: SyncPullReport
             do {
-                initialPull = try await pullCoordinator.pullIncrementally()
+                initialPull = try await pullCoordinator.pullIncrementally(expectedAccountID: expectedAccountID)
+            } catch let error as SupabaseInfrastructureError where error == .accountChanged {
+                logAccountChangedAbort()
+                throw error
             } catch let error as SupabaseInfrastructureError {
                 return report(
                     status: error == .notAuthenticated || error == .unauthorized ? .notAuthenticated : .incompleteNeedsRetry,
@@ -220,6 +186,8 @@ final class SyncBootstrapCoordinator {
             }
             pulled += initialPull.processed
             endingCursor = initialPull.endingCursor
+
+            try await verifyCurrentAccount(expectedAccountID)
 
             if let runFailure = initialPull.runFailure {
                 return report(
@@ -256,7 +224,7 @@ final class SyncBootstrapCoordinator {
 
             let newlySeeded: Int
             do {
-                newlySeeded = try seedUnknownLocalEntities(accountID: accountID)
+                newlySeeded = try seedUnknownLocalEntities(accountID: expectedAccountID)
             } catch {
                 syncBootstrapLogger.error("Sync bootstrap could not seed the outbox")
                 return report(
@@ -275,8 +243,11 @@ final class SyncBootstrapCoordinator {
 
             let pushBatchResult: (pushed: Int, reason: SyncBootstrapBlockingReason?)
             do {
-                pushBatchResult = try await pushPendingBatches()
+                pushBatchResult = try await pushPendingBatches(expectedAccountID: expectedAccountID)
                 pushed += pushBatchResult.pushed
+            } catch let error as SupabaseInfrastructureError where error == .accountChanged {
+                logAccountChangedAbort()
+                throw error
             } catch let error as SupabaseInfrastructureError {
                 return report(
                     status: error == .notAuthenticated || error == .unauthorized ? .notAuthenticated : .incompleteNeedsRetry,
@@ -305,7 +276,10 @@ final class SyncBootstrapCoordinator {
 
             let finalPull: SyncPullReport
             do {
-                finalPull = try await pullCoordinator.pullIncrementally()
+                finalPull = try await pullCoordinator.pullIncrementally(expectedAccountID: expectedAccountID)
+            } catch let error as SupabaseInfrastructureError where error == .accountChanged {
+                logAccountChangedAbort()
+                throw error
             } catch let error as SupabaseInfrastructureError {
                 return report(
                     status: error == .notAuthenticated || error == .unauthorized ? .notAuthenticated : .incompleteNeedsRetry,
@@ -333,6 +307,8 @@ final class SyncBootstrapCoordinator {
             }
             pulled += finalPull.processed
             endingCursor = finalPull.endingCursor
+
+            try await verifyCurrentAccount(expectedAccountID)
 
             if let runFailure = finalPull.runFailure {
                 return report(
@@ -371,7 +347,7 @@ final class SyncBootstrapCoordinator {
 
             let readiness: SyncBootstrapReadiness
             do {
-                readiness = try completeIfReady(accountID: accountID)
+                readiness = try completeIfReady(accountID: expectedAccountID)
             } catch {
                 syncBootstrapLogger.error("Sync bootstrap could not persist completion state")
                 return report(
@@ -409,7 +385,8 @@ final class SyncBootstrapCoordinator {
             }
         }
 
-        let finalReadiness = try? readiness(accountID: accountID)
+        try await verifyCurrentAccount(expectedAccountID)
+        let finalReadiness = try? readiness(accountID: expectedAccountID)
         return report(
             status: .incompleteNeedsRetry,
             rounds: maximumRounds,
@@ -445,10 +422,17 @@ final class SyncBootstrapCoordinator {
     }
 
     /// Stops after a non-accepted push outcome so conflicts are never blindly retried in the same pass.
-    private func pushPendingBatches() async throws -> (pushed: Int, reason: SyncBootstrapBlockingReason?) {
+    private func pushPendingBatches(
+        expectedAccountID: UUID,
+    ) async throws -> (pushed: Int, reason: SyncBootstrapBlockingReason?) {
         var pushed = 0
         for _ in 0 ..< Self.maximumPushBatchesPerRound {
-            let report = try await pushCoordinator.pushPending(limit: Self.pushBatchSize)
+            try await verifyCurrentAccount(expectedAccountID)
+            let report = try await pushCoordinator.pushPending(
+                expectedAccountID: expectedAccountID,
+                limit: Self.pushBatchSize,
+            )
+            try await verifyCurrentAccount(expectedAccountID)
             pushed += report.accepted + report.acceptedButStillPending
             if report.conflicts > 0 {
                 return (pushed, .pushConflict)
@@ -531,5 +515,20 @@ final class SyncBootstrapCoordinator {
             "Sync bootstrap summary status=\(String(describing: status), privacy: .public) rounds=\(rounds, privacy: .public) pulled=\(pulled, privacy: .public) pushed=\(pushed, privacy: .public) seeded=\(seeded, privacy: .public) remainingOutbox=\(remainingOutboxLabel, privacy: .public) reason=\(reasonLabel, privacy: .public)",
         )
         return bootstrapReport
+    }
+
+    private func verifyCurrentAccount(_ expectedAccountID: UUID) async throws {
+        guard try await authService.currentSession()?.userID == expectedAccountID else {
+            logAccountChangedAbort()
+            throw SupabaseInfrastructureError.accountChanged
+        }
+    }
+
+    private func logAccountChangedAbort() {
+        guard !didLogAccountChangedAbort else {
+            return
+        }
+        didLogAccountChangedAbort = true
+        syncBootstrapLogger.debug("Sync bootstrap run aborted because authenticated account changed")
     }
 }

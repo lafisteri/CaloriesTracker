@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import SwiftData
 
 enum SyncStatus: Equatable, Sendable {
@@ -73,9 +74,12 @@ private enum SyncRunOutcome: Sendable {
     case inactive
     case succeeded
     case signedOut
+    case accountChanged
     case retry(SyncErrorCategory)
     case blocked(SyncErrorCategory)
 }
+
+private let syncOrchestratorLogger = Logger(subsystem: "com.caloriestracker.ios", category: "SyncOrchestrator")
 
 /// Actor-isolated, foreground-only orchestration around the existing sync coordinators.
 actor SyncOrchestrator {
@@ -104,6 +108,8 @@ actor SyncOrchestrator {
     private var debounceTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var periodicTask: Task<Void, Never>?
+    private var observedAccountID: UUID?
+    private var accountGeneration: UInt64 = 0
 
     init(
         modelContainer: ModelContainer,
@@ -140,7 +146,8 @@ actor SyncOrchestrator {
     }
 
     /// Called after OTP verification; restored sessions are also picked up on activation.
-    func authenticatedSessionDidBecomeAvailable() {
+    func authenticatedSessionDidBecomeAvailable() async {
+        observeAccountIdentity(await currentAccountID())
         guard isForeground else {
             return
         }
@@ -150,6 +157,7 @@ actor SyncOrchestrator {
 
     /// Cancels scheduled work after the auth boundary has completed sign-out.
     func authenticatedSessionDidEnd() async {
+        observeAccountIdentity(nil)
         needsAnotherRun = false
         debounceTask?.cancel()
         debounceTask = nil
@@ -250,6 +258,14 @@ actor SyncOrchestrator {
                 retryAttempt = 0
                 await setStatus(.signedOut, errorCategory: .authentication)
                 return
+            case .accountChanged:
+                retryAttempt = 0
+                if await currentAccountID() == nil {
+                    await setStatus(.signedOut, errorCategory: .authentication)
+                } else {
+                    await setStatus(.idle)
+                }
+                return
             case let .retry(category):
                 scheduleRetry(for: category)
                 return
@@ -275,12 +291,14 @@ actor SyncOrchestrator {
         } catch {
             return .retry(.server)
         }
+        observeAccountIdentity(accountID)
+        let expectedAccountGeneration = accountGeneration
 
         await setStatus(.syncing)
 
         let bootstrapReport: SyncBootstrapReport
         do {
-            bootstrapReport = try await bootstrapCoordinator.bootstrapIfNeeded()
+            bootstrapReport = try await bootstrapCoordinator.bootstrapIfNeeded(expectedAccountID: accountID)
         } catch let error as SupabaseInfrastructureError {
             return outcome(for: error)
         } catch {
@@ -289,8 +307,8 @@ actor SyncOrchestrator {
         guard isForeground else {
             return .inactive
         }
-        guard await accountIsStillCurrent(accountID) else {
-            return .signedOut
+        guard await runIsStillCurrent(accountID, generation: expectedAccountGeneration) else {
+            return .accountChanged
         }
 
         switch bootstrapReport.status {
@@ -307,7 +325,7 @@ actor SyncOrchestrator {
         for _ in 0 ..< Self.maximumConvergenceCycles {
             let firstPull: SyncPullReport
             do {
-                firstPull = try await pullCoordinator.pullIncrementally()
+                firstPull = try await pullCoordinator.pullIncrementally(expectedAccountID: accountID)
             } catch let error as SupabaseInfrastructureError {
                 return outcome(for: error)
             } catch {
@@ -316,8 +334,8 @@ actor SyncOrchestrator {
             guard isForeground else {
                 return .inactive
             }
-            guard await accountIsStillCurrent(accountID) else {
-                return .signedOut
+            guard await runIsStillCurrent(accountID, generation: expectedAccountGeneration) else {
+                return .accountChanged
             }
             if let runFailure = firstPull.runFailure {
                 return pullOutcome(for: runFailure)
@@ -328,7 +346,7 @@ actor SyncOrchestrator {
 
             let push: SyncPushReport
             do {
-                push = try await pushCoordinator.pushPending()
+                push = try await pushCoordinator.pushPending(expectedAccountID: accountID)
             } catch let error as SupabaseInfrastructureError {
                 return outcome(for: error)
             } catch {
@@ -337,8 +355,8 @@ actor SyncOrchestrator {
             guard isForeground else {
                 return .inactive
             }
-            guard await accountIsStillCurrent(accountID) else {
-                return .signedOut
+            guard await runIsStillCurrent(accountID, generation: expectedAccountGeneration) else {
+                return .accountChanged
             }
             if let failure = pushFailureOutcome(push) {
                 return failure
@@ -346,7 +364,7 @@ actor SyncOrchestrator {
 
             let finalPull: SyncPullReport
             do {
-                finalPull = try await pullCoordinator.pullIncrementally()
+                finalPull = try await pullCoordinator.pullIncrementally(expectedAccountID: accountID)
             } catch let error as SupabaseInfrastructureError {
                 return outcome(for: error)
             } catch {
@@ -355,8 +373,8 @@ actor SyncOrchestrator {
             guard isForeground else {
                 return .inactive
             }
-            guard await accountIsStillCurrent(accountID) else {
-                return .signedOut
+            guard await runIsStillCurrent(accountID, generation: expectedAccountGeneration) else {
+                return .accountChanged
             }
             if let runFailure = finalPull.runFailure {
                 return pullOutcome(for: runFailure)
@@ -370,6 +388,9 @@ actor SyncOrchestrator {
                 pendingCount = try await pendingOutboxCount()
             } catch {
                 return .blocked(.persistence)
+            }
+            guard await runIsStillCurrent(accountID, generation: expectedAccountGeneration) else {
+                return .accountChanged
             }
             guard pendingCount == 0,
                   firstPull.caughtUpToRemoteState,
@@ -388,12 +409,30 @@ actor SyncOrchestrator {
         return .blocked(.dependency)
     }
 
-    private func accountIsStillCurrent(_ expectedAccountID: UUID) async -> Bool {
+    private func currentAccountID() async -> UUID? {
         do {
-            return try await authService.currentSession()?.userID == expectedAccountID
+            return try await authService.currentSession()?.userID
         } catch {
+            return nil
+        }
+    }
+
+    private func observeAccountIdentity(_ accountID: UUID?) {
+        guard observedAccountID != accountID else {
+            return
+        }
+        observedAccountID = accountID
+        accountGeneration &+= 1
+        syncOrchestratorLogger.debug("Sync authenticated account identity changed; active runs are invalidated")
+    }
+
+    private func runIsStillCurrent(_ expectedAccountID: UUID, generation: UInt64) async -> Bool {
+        guard accountGeneration == generation else {
             return false
         }
+        let currentAccountID = await currentAccountID()
+        observeAccountIdentity(currentAccountID)
+        return accountGeneration == generation && currentAccountID == expectedAccountID
     }
 
     private func pendingOutboxCount() async throws -> Int {
@@ -441,6 +480,8 @@ actor SyncOrchestrator {
 
     private func outcome(for error: SupabaseInfrastructureError) -> SyncRunOutcome {
         switch error {
+        case .accountChanged:
+            .accountChanged
         case .notAuthenticated, .unauthorized:
             .signedOut
         case .network:
@@ -468,7 +509,7 @@ actor SyncOrchestrator {
             switch outcome(for: error) {
             case let .retry(category), let .blocked(category):
                 category
-            case .inactive, .succeeded, .signedOut:
+            case .inactive, .succeeded, .signedOut, .accountChanged:
                 .authentication
             }
         case .none, .pullBlocked, .pushFailed, .convergenceLimit, .pullRunFailure(.cursorPersistence):

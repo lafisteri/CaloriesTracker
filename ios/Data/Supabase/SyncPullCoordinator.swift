@@ -159,6 +159,7 @@ final class SyncPullCoordinator {
     private let authService: SupabaseAuthService
     private let transport: SupabaseSyncTransport
     private var isPullRunning = false
+    private var didLogAccountChangedAbort = false
 
     init(
         modelContainer: ModelContainer,
@@ -174,6 +175,7 @@ final class SyncPullCoordinator {
 
     /// Pulls a bounded incremental scan. A deferred dependency never advances the persistent cursor.
     func pullIncrementally(
+        expectedAccountID: UUID,
         pageSize: Int = defaultSyncPullPageSize,
         maximumPages: Int = defaultSyncPullMaximumPages,
     ) async throws -> SyncPullReport {
@@ -184,17 +186,14 @@ final class SyncPullCoordinator {
             throw SyncPullCoordinatorError.alreadyRunning
         }
         isPullRunning = true
+        didLogAccountChangedAbort = false
         defer { isPullRunning = false }
 
-        // An absent session returns before reading or mutating local sync state.
-        guard let session = try await authService.currentSession() else {
-            throw SupabaseInfrastructureError.notAuthenticated
-        }
-        let accountID = session.userID
+        try await verifyCurrentAccount(expectedAccountID)
         let startingCursor: Int64
         do {
             let modelContext = ModelContext(modelContainer)
-            startingCursor = try SyncMetadataStore.pullCursor(accountID: accountID, in: modelContext)
+            startingCursor = try SyncMetadataStore.pullCursor(accountID: expectedAccountID, in: modelContext)
         } catch {
             syncPullLogger.error("Sync pull could not read its persistent cursor")
             throw SyncPullCoordinatorError.cursorReadFailed
@@ -218,8 +217,17 @@ final class SyncPullCoordinator {
             let requestLimit = min(pageSize, Self.maximumFetchedRecords - fetched)
             let page: [SupabaseRemoteSyncRecord]
             do {
-                page = try await transport.fetchChanges(after: scanAfterRevision, limit: requestLimit)
+                try await verifyCurrentAccount(expectedAccountID)
+                page = try await transport.fetchChanges(
+                    after: scanAfterRevision,
+                    limit: requestLimit,
+                    expectedAccountID: expectedAccountID,
+                )
+                try await verifyCurrentAccount(expectedAccountID)
                 pagesFetched += 1
+            } catch let error as SupabaseInfrastructureError where error == .accountChanged {
+                logAccountChangedAbort()
+                throw error
             } catch let error as SupabaseInfrastructureError {
                 syncPullLogger.error("Sync pull transport failed")
                 runFailure = .transport(error)
@@ -276,7 +284,7 @@ final class SyncPullCoordinator {
                 pendingRecords: &pendingRecords,
                 deferredDependencies: &deferredDependencies,
                 outcomes: &outcomes,
-                accountID: accountID,
+                accountID: expectedAccountID,
             )
 
             let safeCursor = safeCursor(
@@ -286,7 +294,7 @@ final class SyncPullCoordinator {
                 outcomes: outcomes,
             )
             if safeCursor > endingCursor {
-                guard advanceCursor(safeCursor, accountID: accountID) else {
+                guard advanceCursor(safeCursor, accountID: expectedAccountID) else {
                     runFailure = .cursorPersistence
                     break
                 }
@@ -845,5 +853,20 @@ final class SyncPullCoordinator {
             syncPullLogger.error("Sync pull could not persist its safe cursor")
             return false
         }
+    }
+
+    private func verifyCurrentAccount(_ expectedAccountID: UUID) async throws {
+        guard try await authService.currentSession()?.userID == expectedAccountID else {
+            logAccountChangedAbort()
+            throw SupabaseInfrastructureError.accountChanged
+        }
+    }
+
+    private func logAccountChangedAbort() {
+        guard !didLogAccountChangedAbort else {
+            return
+        }
+        didLogAccountChangedAbort = true
+        syncPullLogger.debug("Sync pull run aborted because authenticated account changed")
     }
 }

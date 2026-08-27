@@ -65,6 +65,7 @@ final class SyncPushCoordinator {
     private let transport: SupabaseSyncTransport
     private var isPushRunning = false
     private var transportFailureCounts: [SyncPushTransportFailureLogKey: Int] = [:]
+    private var didLogAccountChangedAbort = false
 
     init(
         modelContainer: ModelContainer,
@@ -78,23 +79,25 @@ final class SyncPushCoordinator {
         self.transport = transport
     }
 
-    /// Pushes at most `limit` existing outbox items in stable order.
-    func pushPending(limit: Int = SyncOutboxStore.defaultPendingLimit) async throws -> SyncPushReport {
+    /// Pushes at most `limit` existing outbox items in stable order for one
+    /// account pinned by the orchestrator.
+    func pushPending(
+        expectedAccountID: UUID,
+        limit: Int = SyncOutboxStore.defaultPendingLimit,
+    ) async throws -> SyncPushReport {
         guard !isPushRunning else {
             throw SyncPushCoordinatorError.alreadyRunning
         }
         isPushRunning = true
         transportFailureCounts.removeAll(keepingCapacity: true)
+        didLogAccountChangedAbort = false
         defer {
             logTransportFailureAggregates()
             transportFailureCounts.removeAll(keepingCapacity: true)
             isPushRunning = false
         }
 
-        guard let session = try await authService.currentSession() else {
-            throw SupabaseInfrastructureError.notAuthenticated
-        }
-        let accountID = session.userID
+        try await verifyCurrentAccount(expectedAccountID)
         let pendingItems: [SyncOutboxItem]
         do {
             let modelContext = ModelContext(modelContainer)
@@ -108,7 +111,8 @@ final class SyncPushCoordinator {
         outcomes.reserveCapacity(pendingItems.count)
 
         for item in pendingItems {
-            let outcome = try await push(item, accountID: accountID)
+            try await verifyCurrentAccount(expectedAccountID)
+            let outcome = try await push(item, accountID: expectedAccountID)
             outcomes.append(outcome)
         }
 
@@ -154,7 +158,9 @@ final class SyncPushCoordinator {
                 key: item.entityKey,
                 envelope: envelope,
                 expectedServerRevision: expectedServerRevision,
+                expectedAccountID: accountID,
             )
+            try await verifyCurrentAccount(accountID)
             switch result {
             case let .accepted(remoteRecord):
                 return commitAccepted(
@@ -170,6 +176,10 @@ final class SyncPushCoordinator {
                 return .missingRemote(key: item.entityKey)
             }
         } catch let failure as SupabasePushTransportFailure {
+            if failure.category == .accountChanged {
+                logAccountChangedAbort()
+                throw failure.category
+            }
             if failure.category == .notAuthenticated || failure.category == .unauthorized {
                 syncPushLogger.error("Sync push stopped because authentication is unavailable")
                 throw failure.category
@@ -183,6 +193,10 @@ final class SyncPushCoordinator {
             )
             return .failed(key: item.entityKey, reason: .transport(failure.category))
         } catch let error as SupabaseInfrastructureError {
+            if error == .accountChanged {
+                logAccountChangedAbort()
+                throw error
+            }
             if error == .notAuthenticated || error == .unauthorized {
                 syncPushLogger.error("Sync push stopped because authentication is unavailable")
                 throw error
@@ -248,7 +262,23 @@ final class SyncPushCoordinator {
         case .server: "server"
         case .decode: "decode"
         case .invalidResponse: "invalidResponse"
+        case .accountChanged: "accountChanged"
         }
+    }
+
+    private func verifyCurrentAccount(_ expectedAccountID: UUID) async throws {
+        guard try await authService.currentSession()?.userID == expectedAccountID else {
+            logAccountChangedAbort()
+            throw SupabaseInfrastructureError.accountChanged
+        }
+    }
+
+    private func logAccountChangedAbort() {
+        guard !didLogAccountChangedAbort else {
+            return
+        }
+        didLogAccountChangedAbort = true
+        syncPushLogger.debug("Sync push run aborted because authenticated account changed")
     }
 
     private func commitAccepted(
