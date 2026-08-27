@@ -14,7 +14,6 @@ struct TodayRootView: View {
     @State private var model: TodayViewModel
     @State private var draggedEntryID: UUID?
     @State private var quickAddState = CatalogQuickAddState()
-    @State private var isSettingsPresented = false
 
     init(
         router: AppRouter,
@@ -138,6 +137,13 @@ struct TodayRootView: View {
         }
         .navigationDestination(for: TodayRoute.self) { route in
             switch route {
+            case .settings:
+                SettingsView(
+                    goalService: goalService,
+                    supabaseAuth: supabaseAuth,
+                    syncStatus: syncStatus,
+                    syncOrchestrator: syncOrchestrator,
+                )
             case let .catalogSelection(context):
                 CatalogView(
                     mode: .selection(foodSelectionContext(for: context)),
@@ -230,16 +236,6 @@ struct TodayRootView: View {
                 ContentUnavailableView("Этот экран пока недоступен", systemImage: "fork.knife")
             }
         }
-        .sheet(isPresented: $isSettingsPresented) {
-            NavigationStack {
-                SettingsView(
-                    goalService: goalService,
-                    supabaseAuth: supabaseAuth,
-                    syncStatus: syncStatus,
-                    syncOrchestrator: syncOrchestrator,
-                )
-            }
-        }
     }
 
     private func foodSelectionContext(for context: DiaryContext) -> FoodSelectionContext {
@@ -317,7 +313,7 @@ struct TodayRootView: View {
             .frame(maxWidth: .infinity)
 
             Button {
-                isSettingsPresented = true
+                router.todayPath.append(.settings)
             } label: {
                 AppCircularControl {
                     Image(systemName: "gearshape")

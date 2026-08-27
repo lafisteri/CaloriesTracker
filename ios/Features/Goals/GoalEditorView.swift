@@ -77,7 +77,9 @@ struct GoalEditorView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appScreenBackground()
         .toolbar(.hidden, for: .navigationBar)
         .disabled(model.isSaving || model.isLoading)

@@ -57,6 +57,7 @@ final class AppRouter {
 }
 
 enum TodayRoute: Hashable {
+    case settings
     case catalogSelection(DiaryContext)
     case amount(context: DiaryContext, source: FoodSourceReference, selectionDefault: FoodSelectionAmountDefault?)
     case entryEditor(UUID)

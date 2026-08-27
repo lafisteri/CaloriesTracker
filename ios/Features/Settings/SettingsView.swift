@@ -44,7 +44,9 @@ struct SettingsView: View {
                 }
             }
             .appPlainListStyle()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appScreenBackground()
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -148,7 +150,9 @@ struct SyncSettingsView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appScreenBackground()
         .toolbar(.hidden, for: .navigationBar)
         .task {
