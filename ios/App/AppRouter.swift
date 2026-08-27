@@ -5,7 +5,6 @@ import SwiftUI
 @Observable
 final class AppRouter {
     var selectedTab: AppTab = .today
-    var statisticsPath: [StatisticsRoute] = []
     var todayPath: [TodayRoute] = []
     var catalogPath: [CatalogRoute] = []
     var amountFocusRestorationRevision = 0
@@ -55,10 +54,6 @@ final class AppRouter {
         }
         catalogPath.removeLast()
     }
-}
-
-enum StatisticsRoute: Hashable {
-    case goals
 }
 
 enum TodayRoute: Hashable {

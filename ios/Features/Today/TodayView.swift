@@ -251,6 +251,7 @@ struct TodayRootView: View {
         .sheet(isPresented: $isSettingsPresented) {
             NavigationStack {
                 SettingsView(
+                    goalService: goalService,
                     supabaseAuth: supabaseAuth,
                     syncStatus: syncStatus,
                     syncOrchestrator: syncOrchestrator,

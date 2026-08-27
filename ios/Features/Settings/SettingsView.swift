@@ -5,6 +5,47 @@ import SwiftUI
 
 @MainActor
 struct SettingsView: View {
+    let goalService: GoalService
+    let supabaseAuth: SupabaseAuthService?
+    let syncStatus: SyncStatusStore?
+    let syncOrchestrator: SyncOrchestrator?
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    GoalEditorView(goalService: goalService)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Цели")
+                        Text("Калории и БЖУ по дням недели")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                NavigationLink {
+                    SyncSettingsView(
+                        supabaseAuth: supabaseAuth,
+                        syncStatus: syncStatus,
+                        syncOrchestrator: syncOrchestrator,
+                    )
+                } label: {
+                    LabeledContent("Синхронизация") {
+                        Text(SyncStatusPresentation.title(for: syncStatus))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Настройки")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+@MainActor
+struct SyncSettingsView: View {
     let syncStatus: SyncStatusStore?
 
     @State private var model: SettingsViewModel
@@ -96,7 +137,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("Настройки")
+        .navigationTitle("Синхронизация")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await model.loadCurrentSession()
@@ -113,7 +154,7 @@ struct SettingsView: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Text(syncStatusTitle(for: currentSyncStatus))
+                Text(SyncStatusPresentation.title(for: syncStatus))
             }
         }
 
@@ -186,8 +227,13 @@ struct SettingsView: View {
         return date.formatted(.dateTime.day(.twoDigits).month(.twoDigits).year().hour().minute())
     }
 
-    private func syncStatusTitle(for status: SyncStatus) -> String {
-        switch status {
+}
+
+@MainActor
+private enum SyncStatusPresentation {
+    static func title(for syncStatus: SyncStatusStore?) -> String {
+        let status = syncStatus?.status ?? .disabled
+        return switch status {
         case .disabled:
             "Недоступно"
         case .signedOut:

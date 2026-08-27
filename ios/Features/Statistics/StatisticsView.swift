@@ -2,12 +2,9 @@ import Charts
 import SwiftUI
 
 struct StatisticsView: View {
-    let router: AppRouter
-
     @State private var model: StatisticsViewModel
 
-    init(router: AppRouter, statisticsService: StatisticsService) {
-        self.router = router
+    init(statisticsService: StatisticsService) {
         _model = State(initialValue: StatisticsViewModel(statisticsService: statisticsService))
     }
 
@@ -51,22 +48,7 @@ struct StatisticsView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Настроить цели") {
-                    router.statisticsPath.append(.goals)
-                }
-            }
-        }
         .onAppear {
-            Task {
-                await model.load()
-            }
-        }
-        .onChange(of: router.statisticsPath) { _, path in
-            guard path.isEmpty else {
-                return
-            }
             Task {
                 await model.load()
             }

@@ -187,16 +187,20 @@ has no pending outbox work or known pull blocker. Settings calls the idle state
 “Синхронизировано” only when such a successful cycle exists and no later error
 is retained; otherwise it shows that synchronization is waiting.
 
-Today root exposes the optional Sync settings sheet through its trailing
-`gearshape` toolbar button; it does not add a fourth tab or alter `todayPath`.
-`SettingsView` uses `SupabaseAuthService` for passwordless email OTP only and
-receives the observable status store plus `SyncOrchestrator`'s explicit manual
-wake API. It never calls bootstrap, pull or push coordinators. Signed-out users
-enter an email, request a code, enter up to six numeric OTP digits and can resend
-after a view-local 60-second cooldown. Signed-in users see their email, a
-human-readable sync state, last successful sync time, Sync now and sign-out.
-The screen shows no account UUID, access token, refresh token or raw transport
-error. Sign-out preserves all local data, outbox rows and sync metadata.
+Today root presents a modal `SettingsView` from its trailing `gearshape` toolbar
+button; it does not add a fourth tab or alter `todayPath`. The Settings root is
+a simple native list with `Цели` and `Синхронизация` NavigationLinks, so later
+app-setting sections can be added without changing Today or AppRouter.
+`Цели` reuses the existing `GoalEditorView` and `GoalService` within that modal
+NavigationStack. `SyncSettingsView` uses `SupabaseAuthService` for passwordless
+email OTP only and receives the observable status store plus
+`SyncOrchestrator`'s explicit manual wake API. It never calls bootstrap, pull
+or push coordinators. Signed-out users enter an email, request a code, enter up
+to six numeric OTP digits and can resend after a view-local 60-second cooldown.
+Signed-in users see their email, a human-readable sync state, last successful
+sync time, Sync now and sign-out. The screen shows no account UUID, access
+token, refresh token or raw transport error. Sign-out preserves all local data,
+outbox rows and sync metadata.
 
 The app remains fully usable offline: synchronization must not block adding or
 editing local data.
@@ -345,19 +349,20 @@ ios/
 
 ### Root tabs and paths
 
-AppRouter owns the selected tab and three typed paths:
+AppRouter owns the selected tab and the typed paths that need route state:
 
 ~~~text
-Статистика → statisticsPath
 Сегодня    → todayPath
 Продукты   → catalogPath
 ~~~
 
-Goals is a Statistics destination. Catalog owns Product/Recipe details, editors
-and histories. Today owns selection, Amount and contextual editor routes.
-Routes carry IDs and explicit context, never URLs or captured SwiftData objects.
-DiaryContext carries LocalDay and MealType; FoodSourceReference carries
-SourceType and logical source ID.
+Statistics is a root-only stack. Goals is reached from the Settings modal and
+uses that modal's own NavigationStack, so Settings state does not leak into a
+tab path. Catalog owns Product/Recipe details, editors and histories. Today
+owns selection, Amount and contextual editor routes. Routes carry IDs and
+explicit context, never URLs or captured SwiftData objects. DiaryContext carries
+LocalDay and MealType; FoodSourceReference carries SourceType and logical source
+ID.
 
 Paths are independent with one intentional exception: leaving the Today tab
 clears todayPath. This discards unfinished transient flows so returning shows
@@ -623,9 +628,10 @@ presented to the user only through a stable context-specific message.
 SwiftData remains the only persistence implementation and the local source of
 truth. Supabase provides optional email-OTP, typed transport and automatic
 foreground-only orchestration with persistent account-scoped revision,
-pull-cursor and bootstrap metadata. A compact Settings → Sync UI supports OTP,
-status, Sync now and sign-out; there is no Realtime, background worker, staging
-queue, web migration, barcode scanner wrapper or external product API.
+pull-cursor and bootstrap metadata. Settings contains reusable Goals and Sync
+destinations; Sync supports OTP, status, Sync now and sign-out. There is no
+Realtime, background worker, staging queue, web migration, barcode scanner
+wrapper or external product API.
 Canonical payload export and direct local remote-merge support remain internal
 foundation rather than a user-facing import/export feature.
 

@@ -1,12 +1,11 @@
 import SwiftUI
 
 struct GoalEditorView: View {
-    let router: AppRouter
+    @Environment(\.dismiss) private var dismiss
 
     @State private var model: GoalEditorViewModel
 
-    init(router: AppRouter, goalService: GoalService) {
-        self.router = router
+    init(goalService: GoalService) {
         _model = State(initialValue: GoalEditorViewModel(goalService: goalService))
     }
 
@@ -63,7 +62,7 @@ struct GoalEditorView: View {
                 Button {
                     Task {
                         if await model.save() {
-                            router.statisticsPath = []
+                            dismiss()
                         }
                     }
                 } label: {
