@@ -13,38 +13,39 @@ struct GoalEditorView: View {
         @Bindable var model = model
 
         Form {
-            Section {
-                DatePicker(
-                    "Действует с",
-                    selection: Binding(
-                        get: { model.effectiveFrom.presentationDate() },
-                        set: { model.setEffectiveFrom($0) },
-                    ),
-                    displayedComponents: .date,
-                )
-            }
-
-            ForEach(model.days.indices, id: \.self) { index in
-                Section(model.days[index].weekday.russianLabel) {
-                    TextField("Калории", text: EditableDecimal.binding($model.days[index].caloriesText))
-                        .keyboardType(.decimalPad)
-                    TextField("Белки", text: EditableDecimal.binding($model.days[index].proteinText))
-                        .keyboardType(.decimalPad)
-                    TextField("Жиры", text: EditableDecimal.binding($model.days[index].fatText))
-                        .keyboardType(.decimalPad)
-                    TextField("Углеводы", text: EditableDecimal.binding($model.days[index].carbsText))
-                        .keyboardType(.decimalPad)
-                }
-            }
-
-            Section {
-                Picker("Источник", selection: $model.applySourceWeekday) {
-                    ForEach(LocalDay.Weekday.allCases, id: \.self) { weekday in
-                        Text(weekday.russianShortLabel).tag(weekday)
+            if model.isLoading {
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView("Загрузка целей")
+                        Spacer()
                     }
                 }
-                Button("Применить ко всем дням") {
-                    model.applyToAllDays()
+            } else {
+                Section {
+                    WeekdaySelector(selectedWeekday: $model.selectedWeekday)
+
+                    let selectedDayIndex = model.days.firstIndex { $0.weekday == model.selectedWeekday } ?? 0
+
+                    Group {
+                        TextField("Калории", text: EditableDecimal.binding($model.days[selectedDayIndex].caloriesText))
+                            .keyboardType(.decimalPad)
+                        TextField("Белки", text: EditableDecimal.binding($model.days[selectedDayIndex].proteinText))
+                            .keyboardType(.decimalPad)
+                        TextField("Жиры", text: EditableDecimal.binding($model.days[selectedDayIndex].fatText))
+                            .keyboardType(.decimalPad)
+                        TextField("Углеводы", text: EditableDecimal.binding($model.days[selectedDayIndex].carbsText))
+                            .keyboardType(.decimalPad)
+                    }
+                    .id(model.selectedWeekday)
+
+                    Button {
+                        model.applyToAllDays()
+                    } label: {
+                        Text("Применить ко всем дням")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
 
@@ -56,7 +57,10 @@ struct GoalEditorView: View {
         }
         .navigationTitle("Цели")
         .navigationBarTitleDisplayMode(.inline)
-        .disabled(model.isSaving)
+        .disabled(model.isSaving || model.isLoading)
+        .task {
+            await model.load()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -74,6 +78,35 @@ struct GoalEditorView: View {
                 }
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isSaving)
+            }
+        }
+    }
+}
+
+private struct WeekdaySelector: View {
+    @Binding var selectedWeekday: LocalDay.Weekday
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(LocalDay.Weekday.allCases, id: \.self) { weekday in
+                let isSelected = weekday == selectedWeekday
+
+                Button {
+                    selectedWeekday = weekday
+                } label: {
+                    Text(weekday.russianShortLabel)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            isSelected ? Color.accentColor : Color.secondary.opacity(0.15),
+                            in: Circle(),
+                        )
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(weekday.russianLabel)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
     }

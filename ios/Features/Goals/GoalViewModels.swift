@@ -18,10 +18,11 @@ struct GoalDayForm: Identifiable, Hashable {
 @Observable
 final class GoalEditorViewModel {
     private let goalService: GoalService
+    private var originalDailyGoals: [LocalDay.Weekday: DailyMacroGoal]?
 
-    var effectiveFrom: LocalDay = .current()
     var days = LocalDay.Weekday.allCases.map { GoalDayForm(weekday: $0) }
-    var applySourceWeekday: LocalDay.Weekday = .monday
+    var selectedWeekday: LocalDay.Weekday = LocalDay.current().weekday()
+    private(set) var isLoading = false
     private(set) var isSaving = false
     var errorMessage: String?
 
@@ -29,12 +30,36 @@ final class GoalEditorViewModel {
         self.goalService = goalService
     }
 
-    func setEffectiveFrom(_ date: Date) {
-        effectiveFrom = .from(date)
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            guard let latestGoal = try await goalService.latestGoal() else {
+                return
+            }
+
+            originalDailyGoals = latestGoal.dailyGoals
+            days = LocalDay.Weekday.allCases.map { weekday in
+                guard let goal = latestGoal.dailyGoals[weekday] else {
+                    return GoalDayForm(weekday: weekday)
+                }
+
+                return GoalDayForm(
+                    weekday: weekday,
+                    caloriesText: EditableDecimal.string(from: goal.calories),
+                    proteinText: EditableDecimal.string(from: goal.protein),
+                    fatText: EditableDecimal.string(from: goal.fat),
+                    carbsText: EditableDecimal.string(from: goal.carbs),
+                )
+            }
+        } catch {
+            errorMessage = goalErrorMessage(error, fallback: "Не удалось загрузить цели.")
+        }
     }
 
     func applyToAllDays() {
-        guard let source = days.first(where: { $0.weekday == applySourceWeekday }) else {
+        guard let source = days.first(where: { $0.weekday == selectedWeekday }) else {
             return
         }
 
@@ -52,6 +77,10 @@ final class GoalEditorViewModel {
 
         do {
             let draft = try makeDraft()
+            if let originalDailyGoals, originalDailyGoals == draft.dailyGoals {
+                return true
+            }
+
             isSaving = true
             try await goalService.create(draft: draft)
             isSaving = false
@@ -75,7 +104,7 @@ final class GoalEditorViewModel {
             )
         }
 
-        return WeeklyGoalDraft(effectiveFrom: effectiveFrom, dailyGoals: dailyGoals)
+        return WeeklyGoalDraft(effectiveFrom: .current(), dailyGoals: dailyGoals)
     }
 
     private func numericValue(
