@@ -54,7 +54,7 @@ struct TodayRootView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("За день")
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.black)
                     .padding(.top, 4)
                     .accessibilityAddTraits(.isHeader)
 
@@ -440,10 +440,12 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
     private var headerContent: some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.headline)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Color.black)
 
             Text("\(diaryNumber(nutrition.calories)) ккал")
-                .foregroundStyle(.secondary)
+                .font(.body.weight(.regular))
+                .foregroundStyle(Color.black)
 
             Spacer()
 
@@ -453,7 +455,9 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
                         .font(.title2.weight(.regular))
                         .foregroundStyle(.tint)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
                 .accessibilityLabel("Добавить в \(title)")
             }
         }
@@ -471,6 +475,7 @@ struct FoodCompositionEntryRow: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.body.weight(.medium))
+                .foregroundStyle(Color.black)
 
             HStack {
                 Text("\(diaryNumber(amount)) \(unitLabel)")
@@ -478,7 +483,7 @@ struct FoodCompositionEntryRow: View {
                 Text("\(diaryNumber(calories)) ккал")
             }
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.black)
         }
     }
 }
@@ -546,14 +551,16 @@ private struct DailyNutritionSummary: View {
         VStack(alignment: .leading, spacing: 6) {
             if let calorieGoal {
                 Text("\(diaryNumber(nutrition.calories)) / \(diaryNumber(calorieGoal)) ккал")
-                    .font(.title3.weight(.semibold))
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(Color.black)
             } else {
                 Text("\(diaryNumber(nutrition.calories)) ккал")
-                    .font(.title3.weight(.semibold))
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(Color.black)
             }
             Text("Б \(diaryNumber(nutrition.protein)) · Ж \(diaryNumber(nutrition.fat)) · У \(diaryNumber(nutrition.carbs))")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.black)
         }
     }
 }
