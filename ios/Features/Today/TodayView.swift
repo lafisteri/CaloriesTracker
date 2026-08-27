@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 struct TodayRootView: View {
@@ -39,23 +40,32 @@ struct TodayRootView: View {
     var body: some View {
         List {
             dateNavigation
-                .listRowInsets(DateNavigatorLayout.listRowInsets)
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 0,
+                        leading: DateNavigatorLayout.screenHorizontalMargin,
+                        bottom: 2,
+                        trailing: DateNavigatorLayout.screenHorizontalMargin,
+                    ),
+                )
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            Section {
-                if let day = model.day {
-                    DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
-                } else {
-                    ProgressView()
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
-                }
-            } header: {
-                Text("За день")
-                    .textCase(nil)
+            Text("За день")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 0, trailing: 16))
+                .listRowSeparator(.hidden)
+                .accessibilityAddTraits(.isHeader)
+
+            if let day = model.day {
+                DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
+            } else {
+                ProgressView()
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
             }
 
             if let day = model.day {
@@ -99,6 +109,7 @@ struct TodayRootView: View {
 
                     } addRow: {
                         FoodCompositionAddRow(
+                            alignment: .trailing,
                             onAdd: {
                                 router.todayPath.append(
                                     .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
@@ -114,6 +125,7 @@ struct TodayRootView: View {
                             },
                         )
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
+                        .listRowSeparator(.hidden)
                     }
                 }
             }
@@ -426,6 +438,7 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
         } header: {
             HStack {
                 Text(title)
+                    .font(.headline)
                 Spacer()
                 Text("\(diaryNumber(nutrition.calories)) ккал")
                     .foregroundStyle(.secondary)
@@ -458,15 +471,18 @@ struct FoodCompositionEntryRow: View {
 }
 
 struct FoodCompositionAddRow: View {
+    let alignment: Alignment
     let onAdd: @MainActor () -> Void
     let onDrop: (@MainActor (UUID) -> Void)?
 
     @State private var isDropTarget = false
 
     init(
+        alignment: Alignment = .leading,
         onAdd: @escaping @MainActor () -> Void,
         onDrop: (@MainActor (UUID) -> Void)? = nil,
     ) {
+        self.alignment = alignment
         self.onAdd = onAdd
         self.onDrop = onDrop
     }
@@ -504,7 +520,7 @@ struct FoodCompositionAddRow: View {
         Button(action: onAdd) {
             Label("Добавить", systemImage: "plus")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: alignment)
         .contentShape(Rectangle())
     }
 }
@@ -559,6 +575,35 @@ func diaryUnitLabel(for token: String, sourceType: SourceType) -> String {
         return baseUnit.russianLabel
     }
     return "—"
+}
+
+@MainActor
+private struct TodayViewPreview: View {
+    @State private var router = AppRouter()
+
+    private let dependencies: AppDependencies
+
+    init() {
+        dependencies = try! AppDependencies(isStoredInMemoryOnly: true)
+    }
+
+    var body: some View {
+        @Bindable var router = router
+
+        NavigationStack(path: $router.todayPath) {
+            TodayRootView(
+                router: router,
+                diaryService: dependencies.diaryService,
+                goalService: dependencies.goalService,
+                productService: dependencies.productService,
+                recipeService: dependencies.recipeService,
+                supabaseAuth: nil,
+                syncStatus: nil,
+                syncOrchestrator: nil,
+            )
+        }
+        .modelContainer(dependencies.modelContainer)
+    }
 }
 
 struct DiaryInlineErrorView: View {
