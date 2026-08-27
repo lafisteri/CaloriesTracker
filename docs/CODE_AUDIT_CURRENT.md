@@ -1,7 +1,31 @@
 # CaloriesTracker Current Code Audit
 
 **Snapshot date:** 2026-08-27  
-**Scope:** P1 WeeklyGoal identity and legacy synchronization safety.
+**Scope:** P1 WeeklyGoal identity, legacy synchronization safety and remote
+merge domain invariants.
+
+## P1: Remote merge domain invariants — FIXED
+
+`SyncLocalStore` treats every remote payload as untrusted input. Existing
+Product and Recipe records reject a different canonical-millisecond `createdAt`
+before LWW and never assign that immutable field during remote application.
+Existing DiaryEntry records similarly reject changed `LocalDay`, `sourceType`,
+`sourceID` or `createdAt` before any dependency, LWW or assignment step. A
+changed DiaryEntry source version/name remains valid only as a contextual rebase
+whose ProductVersion/RecipeVersion is present and belongs to the same immutable
+source.
+
+ProductVersion and RecipeVersion remain whole-record immutable on UUID
+collision. New versions validate the local repository's initial/append shape,
+reject self-references and cross-owner bases, defer only missing bases, and
+retain the existing pinned-ingredient/total validation for recipes. Pull rolls
+back the caller-owned context for every invalid or invariant-violating remote
+record, so no partial domain mutation, metadata write or stale-outbox
+acknowledgement is persisted.
+
+This hardening does not change account pinning, outbox token semantics, pull
+cursors, sync transport, conflict ordering, WeeklyGoal canonical identity,
+schema or UI.
 
 ## P1: Canonical WeeklyGoal identity — FIXED
 

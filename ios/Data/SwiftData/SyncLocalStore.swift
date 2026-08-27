@@ -6,6 +6,7 @@ enum SyncLocalStoreError: Error, LocalizedError {
     case missingEntity(SyncEntityKey)
     case invalidPayload(SyncEntityKey, reason: String)
     case inconsistentIdentity(SyncEntityKey)
+    case immutableFieldViolation(SyncEntityKey, field: String)
     case immutableCollision(SyncEntityKey)
 
     var errorDescription: String? {
@@ -18,6 +19,8 @@ enum SyncLocalStoreError: Error, LocalizedError {
             "Некорректный sync payload \(key.rawValue): \(reason)."
         case let .inconsistentIdentity(key):
             "Локальная sync-идентичность не согласована для \(key.rawValue)."
+        case let .immutableFieldViolation(key, field):
+            "Неизменяемое поле \(field) не согласовано для \(key.rawValue)."
         case let .immutableCollision(key):
             "Неизменяемая sync-сущность \(key.rawValue) имеет конфликтующее содержимое."
         }
@@ -216,9 +219,16 @@ final class SyncLocalStore {
 
         if let localRecord = try productRecord(id: remote.id, in: modelContext) {
             let localPayload = productPayload(from: localRecord)
+            try validateImmutableFields(local: localPayload, remote: remote, key: key)
             if localPayload == remote {
                 return .identical(key)
             }
+
+            let missing = try missingDependencies(for: remote, in: modelContext)
+            guard missing.isEmpty else {
+                return .deferred(key, missing: missing)
+            }
+
             if try mutableWinner(
                 local: .product(localPayload),
                 remote: remotePayload,
@@ -228,11 +238,6 @@ final class SyncLocalStore {
                 remoteDeletedAt: remote.deletedAt,
             ) == .local {
                 return .localKept(key, needsRepublish: [key])
-            }
-
-            let missing = try missingDependencies(for: remote, in: modelContext)
-            guard missing.isEmpty else {
-                return .deferred(key, missing: missing)
             }
 
             apply(remote, to: localRecord)
@@ -265,7 +270,15 @@ final class SyncLocalStore {
             return .identical(key)
         }
 
+        let missing = try missingDependencies(for: remote, in: modelContext)
+        guard missing.isEmpty else {
+            return .deferred(key, missing: missing)
+        }
+
         let record = makeProductVersionRecord(from: remote)
+        // A Product depends on its current ProductVersion, so a first import may
+        // legitimately receive the version before the Product can be inserted.
+        // The inverse association is attached when its Product arrives.
         if let owner = try productRecord(id: remote.productID, in: modelContext) {
             record.product = owner
         }
@@ -279,9 +292,16 @@ final class SyncLocalStore {
 
         if let localRecord = try recipeRecord(id: remote.id, in: modelContext) {
             let localPayload = recipePayload(from: localRecord)
+            try validateImmutableFields(local: localPayload, remote: remote, key: key)
             if localPayload == remote {
                 return .identical(key)
             }
+
+            let missing = try missingDependencies(for: remote, in: modelContext)
+            guard missing.isEmpty else {
+                return .deferred(key, missing: missing)
+            }
+
             if try mutableWinner(
                 local: .recipe(localPayload),
                 remote: remotePayload,
@@ -291,11 +311,6 @@ final class SyncLocalStore {
                 remoteDeletedAt: remote.deletedAt,
             ) == .local {
                 return .localKept(key, needsRepublish: [key])
-            }
-
-            let missing = try missingDependencies(for: remote, in: modelContext)
-            guard missing.isEmpty else {
-                return .deferred(key, missing: missing)
             }
 
             apply(remote, to: localRecord)
@@ -332,6 +347,8 @@ final class SyncLocalStore {
         }
 
         let record = makeRecipeVersionRecord(from: remote)
+        // See the equivalent ProductVersion note: the logical Recipe waits for
+        // this current version, then attaches all already-imported versions.
         if let owner = try recipeRecord(id: remote.recipeID, in: modelContext) {
             record.recipe = owner
         }
@@ -357,9 +374,16 @@ final class SyncLocalStore {
 
         if let localRecord = try diaryEntryRecord(id: remote.id, in: modelContext) {
             let localPayload = try diaryEntryPayload(from: localRecord)
+            try validateImmutableFields(local: localPayload, remote: remote, key: key)
             if localPayload == remote {
                 return .identical(key)
             }
+
+            let missing = try missingDependencies(for: remote, in: modelContext)
+            guard missing.isEmpty else {
+                return .deferred(key, missing: missing)
+            }
+
             if try mutableWinner(
                 local: .diaryEntry(localPayload),
                 remote: remotePayload,
@@ -369,11 +393,6 @@ final class SyncLocalStore {
                 remoteDeletedAt: remote.deletedAt,
             ) == .local {
                 return .localKept(key, needsRepublish: [key])
-            }
-
-            let missing = try missingDependencies(for: remote, in: modelContext)
-            guard missing.isEmpty else {
-                return .deferred(key, missing: missing)
             }
 
             apply(remote, to: localRecord)
@@ -497,6 +516,43 @@ final class SyncLocalStore {
     }
 
     private func missingDependencies(
+        for payload: ProductVersionPayload,
+        in modelContext: ModelContext,
+    ) throws -> [SyncEntityKey] {
+        let key = SyncEntityKey(entityType: .productVersion, entityID: payload.id)
+        guard payload.basedOnVersionID != payload.id else {
+            throw SyncLocalStoreError.invalidPayload(key, reason: "basedOnVersionID cannot reference itself")
+        }
+
+        guard let basedOnVersionID = payload.basedOnVersionID else {
+            guard payload.versionNumber == 1 else {
+                throw SyncLocalStoreError.invalidPayload(
+                    key,
+                    reason: "an initial version must have version number 1",
+                )
+            }
+            return []
+        }
+
+        guard payload.versionNumber > 1 else {
+            throw SyncLocalStoreError.invalidPayload(
+                key,
+                reason: "an appended version must have a version number greater than 1",
+            )
+        }
+        guard let basedOn = try productVersionRecord(id: basedOnVersionID, in: modelContext) else {
+            return [SyncEntityKey(entityType: .productVersion, entityID: basedOnVersionID)]
+        }
+        guard basedOn.productID == payload.productID else {
+            throw SyncLocalStoreError.invalidPayload(
+                key,
+                reason: "basedOnVersionID belongs to a different product",
+            )
+        }
+        return []
+    }
+
+    private func missingDependencies(
         for payload: RecipePayload,
         in modelContext: ModelContext,
     ) throws -> [SyncEntityKey] {
@@ -549,7 +605,36 @@ final class SyncLocalStore {
         for payload: RecipeVersionPayload,
         in modelContext: ModelContext,
     ) throws -> [SyncEntityKey] {
+        let key = SyncEntityKey(entityType: .recipeVersion, entityID: payload.id)
+        guard payload.basedOnVersionID != payload.id else {
+            throw SyncLocalStoreError.invalidPayload(key, reason: "basedOnVersionID cannot reference itself")
+        }
+
         var missing: Set<SyncEntityKey> = []
+        if let basedOnVersionID = payload.basedOnVersionID {
+            guard payload.versionNumber > 1 else {
+                throw SyncLocalStoreError.invalidPayload(
+                    key,
+                    reason: "an appended version must have a version number greater than 1",
+                )
+            }
+            if let basedOn = try recipeVersionRecord(id: basedOnVersionID, in: modelContext) {
+                guard basedOn.recipeID == payload.recipeID else {
+                    throw SyncLocalStoreError.invalidPayload(
+                        key,
+                        reason: "basedOnVersionID belongs to a different recipe",
+                    )
+                }
+            } else {
+                missing.insert(SyncEntityKey(entityType: .recipeVersion, entityID: basedOnVersionID))
+            }
+        } else if payload.versionNumber != 1 {
+            throw SyncLocalStoreError.invalidPayload(
+                key,
+                reason: "an initial version must have version number 1",
+            )
+        }
+
         var inputs: [RecipeIngredientCalculationInput] = []
 
         for ingredient in payload.ingredients {
@@ -561,7 +646,7 @@ final class SyncLocalStore {
                   productVersion.baseUnitRaw == ingredient.unitToken
             else {
                 throw SyncLocalStoreError.invalidPayload(
-                    SyncEntityKey(entityType: .recipeVersion, entityID: payload.id),
+                    key,
                     reason: "ingredient pin or unit is incompatible with its ProductVersion",
                 )
             }
@@ -583,7 +668,7 @@ final class SyncLocalStore {
             let calculation = try RecipeCalculator.calculate(ingredients: inputs)
             guard calculation.totalNutrition == payload.totalNutrition else {
                 throw SyncLocalStoreError.invalidPayload(
-                    SyncEntityKey(entityType: .recipeVersion, entityID: payload.id),
+                    key,
                     reason: "ingredient totals do not match totalNutrition",
                 )
             }
@@ -592,7 +677,7 @@ final class SyncLocalStore {
             )
             guard payload.ingredients.allSatisfy({ normalizedAmounts[$0.id] == $0.normalizedAmount }) else {
                 throw SyncLocalStoreError.invalidPayload(
-                    SyncEntityKey(entityType: .recipeVersion, entityID: payload.id),
+                    key,
                     reason: "ingredient normalized amounts do not match pinned ProductVersions",
                 )
             }
@@ -600,11 +685,82 @@ final class SyncLocalStore {
             throw error
         } catch {
             throw SyncLocalStoreError.invalidPayload(
-                SyncEntityKey(entityType: .recipeVersion, entityID: payload.id),
+                key,
                 reason: "recipe calculation validation failed",
             )
         }
         return []
+    }
+
+    private func validateImmutableFields(
+        local: ProductPayload,
+        remote: ProductPayload,
+        key: SyncEntityKey,
+    ) throws {
+        guard local.id == remote.id else {
+            throw SyncLocalStoreError.inconsistentIdentity(key)
+        }
+        try validateImmutableTimestamp(
+            local.createdAt,
+            remote.createdAt,
+            field: "createdAt",
+            key: key,
+        )
+    }
+
+    private func validateImmutableFields(
+        local: RecipePayload,
+        remote: RecipePayload,
+        key: SyncEntityKey,
+    ) throws {
+        guard local.id == remote.id else {
+            throw SyncLocalStoreError.inconsistentIdentity(key)
+        }
+        try validateImmutableTimestamp(
+            local.createdAt,
+            remote.createdAt,
+            field: "createdAt",
+            key: key,
+        )
+    }
+
+    private func validateImmutableFields(
+        local: DiaryEntryPayload,
+        remote: DiaryEntryPayload,
+        key: SyncEntityKey,
+    ) throws {
+        guard local.id == remote.id else {
+            throw SyncLocalStoreError.inconsistentIdentity(key)
+        }
+        guard local.day == remote.day else {
+            throw SyncLocalStoreError.immutableFieldViolation(key, field: "day")
+        }
+        guard local.sourceType == remote.sourceType else {
+            throw SyncLocalStoreError.immutableFieldViolation(key, field: "sourceType")
+        }
+        guard local.sourceID == remote.sourceID else {
+            throw SyncLocalStoreError.immutableFieldViolation(key, field: "sourceID")
+        }
+        try validateImmutableTimestamp(
+            local.createdAt,
+            remote.createdAt,
+            field: "createdAt",
+            key: key,
+        )
+    }
+
+    private func validateImmutableTimestamp(
+        _ local: Date,
+        _ remote: Date,
+        field: String,
+        key: SyncEntityKey,
+    ) throws {
+        guard let localMilliseconds = SyncTimestamp.millisecondsSinceEpoch(local),
+              let remoteMilliseconds = SyncTimestamp.millisecondsSinceEpoch(remote),
+              localMilliseconds == remoteMilliseconds
+        else {
+            throw SyncLocalStoreError.immutableFieldViolation(key, field: field)
+        }
     }
 
     private func repairBarcodeConflict(
@@ -1122,7 +1278,6 @@ final class SyncLocalStore {
         record.name = payload.name
         record.barcode = payload.barcode
         record.currentVersionID = payload.currentVersionID
-        record.createdAt = payload.createdAt
         record.updatedAt = payload.updatedAt
         record.deletedAt = payload.deletedAt
     }
@@ -1157,7 +1312,6 @@ final class SyncLocalStore {
     private func apply(_ payload: RecipePayload, to record: RecipeRecord) {
         record.name = payload.name
         record.currentVersionID = payload.currentVersionID
-        record.createdAt = payload.createdAt
         record.updatedAt = payload.updatedAt
         record.deletedAt = payload.deletedAt
     }
@@ -1214,11 +1368,8 @@ final class SyncLocalStore {
     }
 
     private func apply(_ payload: DiaryEntryPayload, to record: DiaryEntryRecord) {
-        record.dayKey = payload.day.rawValue
         record.mealTypeRaw = payload.mealType.rawValue
         record.sortOrder = payload.sortOrder
-        record.sourceTypeRaw = payload.sourceType.rawValue
-        record.sourceID = payload.sourceID
         record.sourceVersionID = payload.sourceVersionID
         record.sourceName = payload.sourceName
         record.amount = payload.amount
@@ -1227,7 +1378,6 @@ final class SyncLocalStore {
         record.protein = payload.nutrition.protein
         record.fat = payload.nutrition.fat
         record.carbs = payload.nutrition.carbs
-        record.createdAt = payload.createdAt
         record.updatedAt = payload.updatedAt
         record.deletedAt = payload.deletedAt
     }

@@ -326,13 +326,36 @@ pinned ingredients and WeeklyGoal embeds its seven ordered daily values.
 
 `SyncLocalStore.payload(for:)` exports the current local state immutably,
 including tombstones. A missing physical record for a requested key is an
-invariant error, never an empty or synthetic payload. `applyRemote` validates a
-payload, checks dependencies and resolves conflicts. Its caller-owned context
-variant lets pull combine the merge with metadata/outbox updates in one save;
-the convenience form saves by itself. It never marks an outbox record and
-therefore cannot echo a pull back into a future push. Its result distinguishes
-insertion, remote application, identical content, local-wins, dependency
-deferral and explicit republish effects.
+invariant error, never an empty or synthetic payload. Remote payloads are
+untrusted input: before either inserting or mutating a record, `applyRemote`
+validates payload values, immutable identity, and dependencies, then resolves
+LWW and only then writes mutable fields. Its caller-owned context variant lets
+pull combine the merge with metadata/outbox updates in one save; the convenience
+form saves by itself. It never marks an outbox record and therefore cannot echo
+a pull back into a future push. Its result distinguishes insertion, remote
+application, identical content, local-wins, dependency deferral and explicit
+republish effects.
+
+For existing Product and Recipe records, `id` and canonical-millisecond
+`createdAt` are immutable; LWW may update only their logical mutable state
+(including the current-version pointer when a valid version is available).
+For an existing DiaryEntry, `id`, `LocalDay`, `sourceType`, `sourceID` and
+canonical-millisecond `createdAt` are immutable. A remote contextual rebase may
+change `sourceVersionID` and `sourceName`, but only after the referenced
+ProductVersion or RecipeVersion is present and proven to belong to that same
+immutable source. Meal, order, amount, unit, nutrition snapshot, timestamps and
+tombstone remain normal mutable diary state.
+
+ProductVersion and RecipeVersion are immutable whole records. A known UUID must
+have exactly equal canonical content or is a corruption error. New remote
+versions must satisfy the same initial-versus-appended version shape as the
+local repositories (`versionNumber == 1` with no base, or `versionNumber > 1`
+with a non-self base); a missing base is deferred, while a base owned by a
+different Product or Recipe is rejected. RecipeVersion additionally validates
+its ordered, pinned ingredients and derived totals before insertion. The
+logical Product/Recipe is attached when its current version is available, which
+preserves the dependency ordering required for first-time sync without creating
+outbox work from remote import.
 
 Product, Recipe, DiaryEntry and WeeklyGoal use whole-record last-writer-wins by canonical
 integer-millisecond `updatedAt`; raw high-precision local Dates never compare

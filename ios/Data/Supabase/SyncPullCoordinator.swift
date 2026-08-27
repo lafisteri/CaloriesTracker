@@ -33,6 +33,7 @@ private enum SyncRemoteApplyFailureCategory: String {
     case syncLocalStoreMissingEntity
     case syncLocalStoreInvalidPayload
     case syncLocalStoreInconsistentIdentity
+    case syncLocalStoreImmutableFieldViolation
     case syncLocalStoreImmutableCollision
     case syncMetadata
     case persistence
@@ -577,6 +578,12 @@ final class SyncPullCoordinator {
                 reason: .invariantViolation,
                 category: .syncLocalStoreInconsistentIdentity,
                 safeErrorDescription: "local identity invariant rejected the remote record",
+            )
+        case let .immutableFieldViolation(_, field):
+            return SyncRemoteApplyFailureDiagnostic(
+                reason: .invariantViolation,
+                category: .syncLocalStoreImmutableFieldViolation,
+                safeErrorDescription: "immutable field \(field) differs from the local record",
             )
         case .immutableCollision:
             return SyncRemoteApplyFailureDiagnostic(
