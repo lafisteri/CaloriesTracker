@@ -26,15 +26,20 @@ struct ProductDetailView: View {
 
     var body: some View {
         content
+            .appScreenBackground()
             .navigationTitle(model.details?.product.name ?? "Продукт")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 if model.details != nil {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             openEditor()
                         } label: {
-                            Image(systemName: "pencil")
+                            AppCircularControl {
+                                Image(systemName: "pencil")
+                                    .font(.body.weight(.semibold))
+                            }
                         }
                         .accessibilityLabel("Редактировать")
                     }
@@ -54,7 +59,10 @@ struct ProductDetailView: View {
                                     }
                                 }
                             } label: {
-                                Image(systemName: "ellipsis.circle")
+                                AppCircularControl {
+                                    Image(systemName: "ellipsis")
+                                        .font(.body.weight(.semibold))
+                                }
                             }
                         }
                     }
@@ -107,6 +115,7 @@ struct ProductDetailView: View {
                     }
                 }
             }
+            .appPlainListStyle()
         } else {
             ContentUnavailableView(
                 "Продукт недоступен",

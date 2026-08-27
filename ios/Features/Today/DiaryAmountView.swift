@@ -50,7 +50,10 @@ struct DiaryAmountView: View {
                     Button {
                         refreshAfterProductEdit()
                     } label: {
-                        Image(systemName: "arrow.clockwise")
+                        AppCircularControl {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.body.weight(.semibold))
+                        }
                     }
                     .accessibilityLabel("Повторить обновление продукта")
                 }
@@ -62,7 +65,10 @@ struct DiaryAmountView: View {
                         amountIsFocused = false
                         router.todayPath.append(productEditorRoute(for: productID))
                     } label: {
-                        Image(systemName: "pencil")
+                        AppCircularControl {
+                            Image(systemName: "pencil")
+                                .font(.body.weight(.semibold))
+                        }
                     }
                     .accessibilityLabel("Редактировать")
                 }
@@ -303,8 +309,10 @@ struct AmountEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppStyle.background.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .task {
             guard autoFocusAmount, let amountFocus else {
                 return
@@ -336,9 +344,16 @@ struct AmountEditorView: View {
             .disabled(isLoading || isSaving)
         }
         .frame(maxWidth: .infinity)
+        .padding(8)
+        .background(AppStyle.controlBackground, in: Capsule())
+        .shadow(
+            color: AppStyle.controlShadowColor,
+            radius: AppStyle.controlShadowRadius,
+            y: AppStyle.controlShadowY
+        )
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(AppStyle.background)
     }
 
     @ViewBuilder
@@ -359,9 +374,9 @@ struct AmountEditorView: View {
             .frame(width: 64)
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(AppStyle.selectedControlBackground, in: Capsule())
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .stroke(amountIsFocused ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 1)
             }
             .accessibilityLabel("Количество")
@@ -402,8 +417,8 @@ struct AmountEditorView: View {
                 .frame(minWidth: 64, minHeight: 44)
                 .padding(.horizontal, 8)
                 .background(
-                    Color(uiColor: .secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous),
+                    AppStyle.selectedControlBackground,
+                    in: Capsule(),
                 )
             }
             .accessibilityLabel("Единица: \(selectedUnitLabel)")
@@ -446,7 +461,12 @@ private struct AmountNutritionPreview: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(AppStyle.controlBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(
+            color: AppStyle.controlShadowColor,
+            radius: AppStyle.controlShadowRadius,
+            y: AppStyle.controlShadowY
+        )
     }
 
     private func macroValue(title: String, value: Double) -> some View {

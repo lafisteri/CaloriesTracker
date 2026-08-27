@@ -68,8 +68,10 @@ struct ProductEditorView: View {
                 }
             }
         }
+        .appScreenBackground()
         .navigationTitle(model.productID == nil ? "Новый продукт" : "Редактировать продукт")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -87,10 +89,13 @@ struct ProductEditorView: View {
                         }
                     }
                 } label: {
-                    if model.isSaving {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "checkmark")
+                    AppCircularControl {
+                        if model.isSaving {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                        }
                     }
                 }
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")

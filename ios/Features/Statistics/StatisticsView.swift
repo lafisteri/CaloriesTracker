@@ -47,7 +47,7 @@ struct StatisticsView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .appPlainListStyle()
         .contentMargins(.top, 0, for: .scrollContent)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {

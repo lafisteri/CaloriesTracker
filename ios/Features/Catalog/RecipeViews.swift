@@ -3,11 +3,10 @@ import SwiftUI
 
 struct RecipeListView: View {
     let onSelect: (UUID, FoodSelectionAmountDefault?) -> Void
-    let onAdd: () -> Void
     let mode: RecipeListMode
 
     @State private var model: RecipeListViewModel
-    @State private var searchText = ""
+    @Binding private var searchText: String
     @State private var quickAddingRecipeID: UUID?
 
     init(
@@ -15,15 +14,33 @@ struct RecipeListView: View {
         diaryService: DiaryService?,
         mode: RecipeListMode,
         onSelect: @escaping (UUID, FoodSelectionAmountDefault?) -> Void,
-        onAdd: @escaping () -> Void,
+        searchText: Binding<String>,
     ) {
         self.onSelect = onSelect
-        self.onAdd = onAdd
         self.mode = mode
         _model = State(initialValue: RecipeListViewModel(recipeService: recipeService, diaryService: diaryService))
+        _searchText = searchText
     }
 
     var body: some View {
+        recipeList
+            .appPlainListStyle()
+        .task {
+            await model.load(matching: searchText)
+        }
+        .onAppear {
+            Task {
+                await model.load(matching: searchText)
+            }
+        }
+        .onChange(of: searchText) { _, query in
+            Task {
+                await model.load(matching: query)
+            }
+        }
+    }
+
+    private var recipeList: some View {
         List {
             if model.isLoading && model.recipes.isEmpty {
                 HStack {
@@ -32,6 +49,7 @@ struct RecipeListView: View {
                     Spacer()
                 }
                 .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             } else if model.recipes.isEmpty, model.errorMessage == nil {
                 ContentUnavailableView(
                     "У вас пока нет рецептов",
@@ -39,6 +57,7 @@ struct RecipeListView: View {
                     description: Text("Создайте первый рецепт с помощью кнопки выше."),
                 )
                 .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             } else {
                 ForEach(model.recipes) { item in
                     switch mode {
@@ -56,6 +75,7 @@ struct RecipeListView: View {
                             }
                             .accessibilityLabel("Удалить")
                         }
+                        .catalogListRow()
                     case let .selection(context):
                         if let selectionDisplay = model.selectionDisplay(for: item) {
                             let defaultValue = selectionDisplay.defaultValue
@@ -90,7 +110,7 @@ struct RecipeListView: View {
                                         }
                                     } label: {
                                         Image(systemName: "plus.circle.fill")
-                                            .font(.title3)
+                                            .font(.title2)
                                     }
                                     .buttonStyle(.borderless)
                                     .frame(minWidth: 44, minHeight: 44)
@@ -99,6 +119,7 @@ struct RecipeListView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .catalogListRow()
                         } else {
                             Button {
                                 onSelect(item.recipe.id, nil)
@@ -113,6 +134,7 @@ struct RecipeListView: View {
                             .buttonStyle(.plain)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .catalogListRow()
                         }
                     }
                 }
@@ -122,30 +144,6 @@ struct RecipeListView: View {
                 Section {
                     InlineErrorView(message: errorMessage)
                 }
-            }
-        }
-        .listStyle(.plain)
-        .searchable(text: $searchText, prompt: "Поиск")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    onAdd()
-                } label: {
-                    Label("Создать рецепт", systemImage: "plus")
-                }
-            }
-        }
-        .task {
-            await model.load(matching: searchText)
-        }
-        .onAppear {
-            Task {
-                await model.load(matching: searchText)
-            }
-        }
-        .onChange(of: searchText) { _, query in
-            Task {
-                await model.load(matching: query)
             }
         }
     }
@@ -200,7 +198,7 @@ private struct RecipeListRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.recipe.name)
-                .font(.body.weight(.medium))
+                .font(.headline)
             Group {
                 if let selectionDisplay {
                     if let nutrition = selectionDisplay.nutrition {
@@ -233,15 +231,20 @@ struct RecipeDetailView: View {
 
     var body: some View {
         content
+            .appScreenBackground()
             .navigationTitle(model.details?.recipe.name ?? "Рецепт")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 if model.details != nil {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             router.catalogPath.append(.recipeEditor(recipeID))
                         } label: {
-                            Image(systemName: "pencil")
+                            AppCircularControl {
+                                Image(systemName: "pencil")
+                                    .font(.body.weight(.semibold))
+                            }
                         }
                         .accessibilityLabel("Редактировать")
                     }
@@ -268,7 +271,10 @@ struct RecipeDetailView: View {
                                 }
                             }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
+                            AppCircularControl {
+                                Image(systemName: "ellipsis")
+                                    .font(.body.weight(.semibold))
+                            }
                         }
                     }
                 }
@@ -336,6 +342,7 @@ struct RecipeDetailView: View {
                     }
                 }
             }
+            .appPlainListStyle()
         } else {
             ContentUnavailableView(
                 "Рецепт недоступен",
@@ -438,15 +445,13 @@ struct RecipeEditorView: View {
                                 }
                             },
                         )
-                        .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
-                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                     }
                 } addRow: {
                     FoodCompositionAddRow {
                         requestIngredientSelection()
                     }
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
                 }
 
                 Section("Пищевая ценность") {
@@ -469,9 +474,11 @@ struct RecipeEditorView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .appScreenBackground()
         .listSectionSpacing(.compact)
         .navigationTitle(model.recipeID == nil ? "Новый рецепт" : "Редактировать рецепт")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .disabled(model.isLoading || model.isSaving)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -487,10 +494,13 @@ struct RecipeEditorView: View {
                         }
                     }
                 } label: {
-                    if model.isSaving {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "checkmark")
+                    AppCircularControl {
+                        if model.isSaving {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                        }
                     }
                 }
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
@@ -723,9 +733,10 @@ struct RecipeVersionHistoryView: View {
                 }
             }
         }
-        .listStyle(.plain)
+        .appPlainListStyle()
         .navigationTitle("Версии")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .task {
             await model.load()
         }

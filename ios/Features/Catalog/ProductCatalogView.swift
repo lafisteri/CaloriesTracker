@@ -143,6 +143,8 @@ struct ProductCatalogRootView: View {
 }
 
 struct CatalogView: View {
+    @Environment(\.dismiss) private var dismiss
+
     let mode: CatalogMode
     let router: AppRouter
     let productService: ProductService
@@ -150,36 +152,90 @@ struct CatalogView: View {
     let diaryService: DiaryService?
 
     @State private var selectedSection: CatalogSection = .products
+    @State private var productSearchText = ""
+    @State private var recipeSearchText = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Каталог", selection: $selectedSection) {
-                ForEach(CatalogSection.allCases) { section in
-                    Text(section.title).tag(section)
+        ZStack {
+            AppStyle.background
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                catalogHeader
+
+                Picker("Каталог", selection: $selectedSection) {
+                    ForEach(CatalogSection.allCases) { section in
+                        Text(section.title).tag(section)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .clipShape(Capsule())
+                .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
+                .padding(.bottom, DateNavigatorLayout.headerBottomSpacing)
+
+                switch selectedSection {
+                case .products:
+                    ProductListView(
+                        productService: productService,
+                        diaryService: diaryService,
+                        mode: mode.productListMode,
+                        onSelect: selectProduct,
+                        searchText: $productSearchText,
+                    )
+                case .recipes:
+                    RecipeListView(
+                        recipeService: recipeService,
+                        diaryService: diaryService,
+                        mode: mode.recipeListMode,
+                        onSelect: selectRecipe,
+                        searchText: $recipeSearchText,
+                    )
                 }
             }
-            .pickerStyle(.segmented)
-            .padding([.horizontal, .top])
+        }
+        .toolbar(.hidden, for: .navigationBar)
+    }
 
-            switch selectedSection {
-            case .products:
-                ProductListView(
-                    productService: productService,
-                    diaryService: diaryService,
-                    mode: mode.productListMode,
-                    onSelect: selectProduct,
-                    onAdd: createProduct,
-                )
-            case .recipes:
-                RecipeListView(
-                    recipeService: recipeService,
-                    diaryService: diaryService,
-                    mode: mode.recipeListMode,
-                    onSelect: selectRecipe,
-                    onAdd: createRecipe,
+    private var isManagementMode: Bool {
+        if case .management = mode {
+            true
+        } else {
+            false
+        }
+    }
+
+    private var catalogHeader: some View {
+        VStack(spacing: AppStyle.sectionSpacing) {
+            HStack {
+                if !isManagementMode {
+                    AppCircularButton(
+                        systemName: "chevron.left",
+                        accessibilityLabel: "Назад",
+                        action: { dismiss() }
+                    )
+                }
+
+                Spacer()
+
+                AppCircularButton(
+                    systemName: "plus",
+                    accessibilityLabel: "Добавить",
+                    action: addSelectedSection
                 )
             }
+
+            Group {
+                switch selectedSection {
+                case .products:
+                    CatalogInlineSearchField(text: $productSearchText)
+                case .recipes:
+                    CatalogInlineSearchField(text: $recipeSearchText)
+                }
+            }
         }
+        .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
+        .padding(.bottom, AppStyle.sectionSpacing)
+        .buttonStyle(.borderless)
     }
 
     private func selectProduct(_ productID: UUID, selectionDefault: FoodSelectionAmountDefault?) {
@@ -217,15 +273,23 @@ struct CatalogView: View {
             context.onCreateRecipe()
         }
     }
+
+    private func addSelectedSection() {
+        switch selectedSection {
+        case .products:
+            createProduct()
+        case .recipes:
+            createRecipe()
+        }
+    }
 }
 
 private struct ProductListView: View {
     let onSelect: (UUID, FoodSelectionAmountDefault?) -> Void
-    let onAdd: () -> Void
     let mode: ProductListMode
 
     @State private var model: ProductListViewModel
-    @State private var searchText = ""
+    @Binding private var searchText: String
     @State private var quickAddingProductID: UUID?
 
     init(
@@ -233,15 +297,33 @@ private struct ProductListView: View {
         diaryService: DiaryService?,
         mode: ProductListMode,
         onSelect: @escaping (UUID, FoodSelectionAmountDefault?) -> Void,
-        onAdd: @escaping () -> Void,
+        searchText: Binding<String>,
     ) {
         self.onSelect = onSelect
-        self.onAdd = onAdd
         self.mode = mode
         _model = State(initialValue: ProductListViewModel(productService: productService, diaryService: diaryService))
+        _searchText = searchText
     }
 
     var body: some View {
+        productList
+            .appPlainListStyle()
+        .task {
+            await model.load(matching: searchText)
+        }
+        .onAppear {
+            Task {
+                await model.load(matching: searchText)
+            }
+        }
+        .onChange(of: searchText) { _, newValue in
+            Task {
+                await model.load(matching: newValue)
+            }
+        }
+    }
+
+    private var productList: some View {
         List {
             if model.isLoading && model.products.isEmpty {
                 HStack {
@@ -250,6 +332,7 @@ private struct ProductListView: View {
                     Spacer()
                 }
                 .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             } else if model.products.isEmpty, model.errorMessage == nil {
                 ContentUnavailableView(
                     "Продуктов пока нет",
@@ -257,6 +340,7 @@ private struct ProductListView: View {
                     description: Text("Добавьте первый продукт с помощью кнопки выше."),
                 )
                 .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             } else {
                 ForEach(model.products) { item in
                     switch mode {
@@ -274,6 +358,7 @@ private struct ProductListView: View {
                             }
                             .accessibilityLabel("Удалить")
                         }
+                        .catalogListRow()
                     case let .selection(context):
                         let selectionDisplay = model.selectionDisplay(for: item)
                         let defaultValue = selectionDisplay.defaultValue
@@ -309,7 +394,7 @@ private struct ProductListView: View {
                                     }
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
-                                        .font(.title3)
+                                        .font(.title2)
                                 }
                                 .buttonStyle(.borderless)
                                 .frame(minWidth: 44, minHeight: 44)
@@ -318,6 +403,7 @@ private struct ProductListView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .catalogListRow()
                     }
                 }
             }
@@ -326,30 +412,6 @@ private struct ProductListView: View {
                 Section {
                     InlineErrorView(message: errorMessage)
                 }
-            }
-        }
-        .listStyle(.plain)
-        .searchable(text: $searchText, prompt: "Поиск")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    onAdd()
-                } label: {
-                    Label("Добавить продукт", systemImage: "plus")
-                }
-            }
-        }
-        .task {
-            await model.load(matching: searchText)
-        }
-        .onAppear {
-            Task {
-                await model.load(matching: searchText)
-            }
-        }
-        .onChange(of: searchText) { _, newValue in
-            Task {
-                await model.load(matching: newValue)
             }
         }
     }
@@ -392,6 +454,54 @@ private struct ProductListView: View {
     }
 }
 
+struct CatalogInlineSearchField: View {
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Поиск", text: $text)
+
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Очистить поиск")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: AppStyle.controlHeight)
+        .background(
+            AppStyle.controlBackground,
+            in: Capsule(),
+        )
+        .shadow(
+            color: AppStyle.controlShadowColor,
+            radius: AppStyle.controlShadowRadius,
+            y: AppStyle.controlShadowY
+        )
+    }
+}
+
+extension View {
+    func catalogListRow() -> some View {
+        listRowInsets(
+            EdgeInsets(
+                top: 10,
+                leading: DateNavigatorLayout.screenHorizontalMargin,
+                bottom: 10,
+                trailing: DateNavigatorLayout.screenHorizontalMargin,
+            )
+        )
+        .listRowBackground(AppStyle.background)
+    }
+}
+
 private let catalogQuickAddErrorLogger = Logger(
     subsystem: "com.caloriestracker.ios",
     category: "CatalogQuickAdd",
@@ -429,7 +539,7 @@ private struct ProductListRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.product.name)
-                .font(.body.weight(.medium))
+                .font(.headline)
 
             Group {
                 if let selectionDisplay {

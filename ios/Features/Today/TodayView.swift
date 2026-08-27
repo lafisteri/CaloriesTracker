@@ -80,8 +80,7 @@ struct TodayRootView: View {
                                     }
                                 },
                             )
-                            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
-                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                         }
                         .dropDestination(for: String.self) { identifiers, displayedTargetIndex in
                             guard let identifier = identifiers.first,
@@ -114,8 +113,7 @@ struct TodayRootView: View {
                                 clearDraggedEntryID(entryID)
                             },
                         )
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
                     }
                 }
             }
@@ -125,7 +123,7 @@ struct TodayRootView: View {
                     .listRowSeparator(.hidden)
             }
         }
-        .listStyle(.insetGrouped)
+        .appPlainListStyle()
         .listSectionSpacing(.compact)
         .contentMargins(.top, 0, for: .scrollContent)
         .toolbar(.hidden, for: .navigationBar)
@@ -300,7 +298,7 @@ struct TodayRootView: View {
     private var dateNavigation: some View {
         let isSelectedDayToday = model.selectedDay == .current()
 
-        return HStack(spacing: 12) {
+        return HStack(spacing: DateNavigatorLayout.pairedControlSpacing) {
             DateNavigator(
                 previousAccessibilityLabel: "Предыдущий день",
                 nextAccessibilityLabel: "Следующий день",
@@ -328,9 +326,10 @@ struct TodayRootView: View {
             Button {
                 isSettingsPresented = true
             } label: {
-                Image(systemName: "gearshape")
-                    .frame(width: 44, height: 44)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
+                AppCircularControl {
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.semibold))
+                }
             }
             .accessibilityLabel("Настройки")
             .contentShape(Circle())

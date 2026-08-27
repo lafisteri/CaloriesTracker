@@ -38,9 +38,10 @@ struct SettingsView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .appPlainListStyle()
         .navigationTitle("Настройки")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
     }
 }
 
@@ -137,8 +138,10 @@ struct SyncSettingsView: View {
                 }
             }
         }
+        .appScreenBackground()
         .navigationTitle("Синхронизация")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .task {
             await model.loadCurrentSession()
         }

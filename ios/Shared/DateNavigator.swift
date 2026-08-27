@@ -2,8 +2,15 @@ import SwiftUI
 
 enum DateNavigatorLayout {
     static let height: CGFloat = 44
-    static let cornerRadius: CGFloat = 12
-    static let listRowInsets = EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16)
+    static let screenHorizontalMargin = AppStyle.screenHorizontalMargin
+    static let pairedControlSpacing = AppStyle.controlSpacing
+    static let headerBottomSpacing: CGFloat = 10
+    static let listRowInsets = EdgeInsets(
+        top: 0,
+        leading: screenHorizontalMargin,
+        bottom: headerBottomSpacing,
+        trailing: screenHorizontalMargin,
+    )
 }
 
 struct DateNavigator<Title: View>: View {
@@ -61,8 +68,13 @@ struct DateNavigator<Title: View>: View {
         }
         .frame(maxWidth: .infinity, minHeight: DateNavigatorLayout.height)
         .background(
-            Color(uiColor: .secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: DateNavigatorLayout.cornerRadius, style: .continuous),
+            AppStyle.controlBackground,
+            in: Capsule(),
+        )
+        .shadow(
+            color: AppStyle.controlShadowColor,
+            radius: AppStyle.controlShadowRadius,
+            y: AppStyle.controlShadowY
         )
         .buttonStyle(.borderless)
     }

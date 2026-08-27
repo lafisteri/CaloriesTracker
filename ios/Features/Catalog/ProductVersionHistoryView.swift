@@ -34,8 +34,10 @@ struct ProductVersionHistoryView: View {
                 }
             }
         }
+        .appPlainListStyle()
         .navigationTitle("Версии")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .task {
             await model.load()
         }

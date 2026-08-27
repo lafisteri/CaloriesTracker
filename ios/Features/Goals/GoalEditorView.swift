@@ -55,8 +55,10 @@ struct GoalEditorView: View {
                 }
             }
         }
+        .appScreenBackground()
         .navigationTitle("Цели")
         .navigationBarTitleDisplayMode(.inline)
+        .appNavigationChrome()
         .disabled(model.isSaving || model.isLoading)
         .task {
             await model.load()
@@ -70,10 +72,13 @@ struct GoalEditorView: View {
                         }
                     }
                 } label: {
-                    if model.isSaving {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "checkmark")
+                    AppCircularControl {
+                        if model.isSaving {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                        }
                     }
                 }
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
@@ -87,7 +92,7 @@ private struct WeekdaySelector: View {
     @Binding var selectedWeekday: LocalDay.Weekday
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(LocalDay.Weekday.allCases, id: \.self) { weekday in
                 let isSelected = weekday == selectedWeekday
 
@@ -96,19 +101,20 @@ private struct WeekdaySelector: View {
                 } label: {
                     Text(weekday.russianShortLabel)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(isSelected ? Color.white : Color.primary)
-                        .frame(width: 36, height: 36)
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                        .frame(maxWidth: .infinity, minHeight: 36)
                         .background(
-                            isSelected ? Color.accentColor : Color.secondary.opacity(0.15),
-                            in: Circle(),
+                            isSelected ? AppStyle.controlBackground : Color.clear,
+                            in: Capsule(),
                         )
                 }
                 .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
                 .accessibilityLabel(weekday.russianLabel)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
+        .padding(3)
+        .background(AppStyle.selectedControlBackground, in: Capsule())
     }
 }
 
