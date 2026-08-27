@@ -73,6 +73,12 @@ struct TodayRootView: View {
                     FoodCompositionSection(
                         title: meal.mealType.russianLabel,
                         nutrition: meal.totalNutrition,
+                        showsAddRow: false,
+                        onAdd: {
+                            router.todayPath.append(
+                                .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
+                            )
+                        },
                     ) {
                         ForEach(meal.entries) { entry in
                             DiaryListEntryRow(
@@ -108,24 +114,7 @@ struct TodayRootView: View {
                         }
 
                     } addRow: {
-                        FoodCompositionAddRow(
-                            alignment: .trailing,
-                            onAdd: {
-                                router.todayPath.append(
-                                    .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
-                                )
-                            },
-                            onDrop: { entryID in
-                                move(
-                                    entryID: entryID,
-                                    to: meal.mealType,
-                                    displayedTargetIndex: meal.entries.count,
-                                )
-                                clearDraggedEntryID(entryID)
-                            },
-                        )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
-                        .listRowSeparator(.hidden)
+                        EmptyView()
                     }
                 }
             }
@@ -416,17 +405,23 @@ private struct DiaryEntryDragPreview: View {
 struct FoodCompositionSection<Rows: View, AddRow: View>: View {
     let title: String
     let nutrition: Nutrition
+    let showsAddRow: Bool
+    let onAdd: (@MainActor () -> Void)?
     private let rows: Rows
     private let addRow: AddRow
 
     init(
         title: String,
         nutrition: Nutrition,
+        showsAddRow: Bool = true,
+        onAdd: (@MainActor () -> Void)? = nil,
         @ViewBuilder rows: () -> Rows,
         @ViewBuilder addRow: () -> AddRow,
     ) {
         self.title = title
         self.nutrition = nutrition
+        self.showsAddRow = showsAddRow
+        self.onAdd = onAdd
         self.rows = rows()
         self.addRow = addRow()
     }
@@ -434,17 +429,35 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
     var body: some View {
         Section {
             rows
-            addRow
-        } header: {
-            HStack {
-                Text(title)
-                    .font(.headline)
-                Spacer()
-                Text("\(diaryNumber(nutrition.calories)) ккал")
-                    .foregroundStyle(.secondary)
+            if showsAddRow {
+                addRow
             }
-            .textCase(nil)
+        } header: {
+            headerContent
         }
+    }
+
+    private var headerContent: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.headline)
+
+            Text("\(diaryNumber(nutrition.calories)) ккал")
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            if let onAdd {
+                Button(action: onAdd) {
+                    Image(systemName: "plus")
+                        .font(.title2.weight(.regular))
+                        .foregroundStyle(.tint)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Добавить в \(title)")
+            }
+        }
+        .textCase(nil)
     }
 }
 
