@@ -51,22 +51,22 @@ struct TodayRootView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            Text("За день")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 0, trailing: 16))
-                .listRowSeparator(.hidden)
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("За день")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                    .accessibilityAddTraits(.isHeader)
 
-            if let day = model.day {
-                DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
-            } else {
-                ProgressView()
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
+                if let day = model.day {
+                    DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
+                } else {
+                    ProgressView()
+                }
             }
+            .padding(.bottom, 8)
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .listRowSeparator(.hidden)
 
             if let day = model.day {
                 ForEach(day.meals) { meal in
