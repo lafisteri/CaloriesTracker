@@ -49,6 +49,7 @@ struct StatisticsView: View {
         }
         .listStyle(.insetGrouped)
         .contentMargins(.top, 0, for: .scrollContent)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             Task {
                 await model.load()
@@ -56,53 +57,32 @@ struct StatisticsView: View {
         }
     }
 
-    @ViewBuilder
     private func weekNavigation(for statistics: WeekStatistics) -> some View {
-        Section {
-            HStack {
-                Button {
-                    Task {
-                        await model.previousWeek()
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
+        DateNavigator(
+            previousAccessibilityLabel: "Предыдущая неделя",
+            nextAccessibilityLabel: "Следующая неделя",
+            previousAction: {
+                Task {
+                    await model.previousWeek()
                 }
-
-                Spacer()
-
-                VStack(spacing: 2) {
-                    Text(weekRangeLabel(for: statistics))
-                        .font(.headline)
-                    if !model.isCurrentWeek {
-                        Button("Текущая неделя") {
-                            Task {
-                                await model.goToCurrentWeek()
-                            }
-                        }
-                        .font(.caption)
-                    }
+            },
+            nextAction: {
+                Task {
+                    await model.nextWeek()
                 }
-
-                Spacer()
-
-                Button {
-                    Task {
-                        await model.nextWeek()
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
+            },
+            secondaryActionTitle: model.isCurrentWeek ? nil : "Текущая неделя",
+            secondaryAction: model.isCurrentWeek ? nil : {
+                Task {
+                    await model.goToCurrentWeek()
                 }
-            }
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(
-                Color(uiColor: .secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous),
-            )
-            .buttonStyle(.borderless)
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-            .listRowBackground(Color.clear)
+            },
+        ) {
+            Text(weekRangeLabel(for: statistics))
         }
+        .listRowInsets(DateNavigatorLayout.listRowInsets)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     private func weekRangeLabel(for statistics: WeekStatistics) -> String {

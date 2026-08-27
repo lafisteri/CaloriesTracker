@@ -39,7 +39,7 @@ struct TodayRootView: View {
     var body: some View {
         List {
             dateNavigation
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
+                .listRowInsets(DateNavigatorLayout.listRowInsets)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -298,14 +298,32 @@ struct TodayRootView: View {
     }
 
     private var dateNavigation: some View {
-        HStack(spacing: 12) {
-            calendarNavigation
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(
-                    Color(uiColor: .secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous),
-                )
+        let isSelectedDayToday = model.selectedDay == .current()
+
+        return HStack(spacing: 12) {
+            DateNavigator(
+                previousAccessibilityLabel: "Предыдущий день",
+                nextAccessibilityLabel: "Следующий день",
+                previousAction: {
+                    Task {
+                        await model.previousDay()
+                    }
+                },
+                nextAction: {
+                    Task {
+                        await model.nextDay()
+                    }
+                },
+                secondaryActionTitle: isSelectedDayToday ? nil : "Сегодня",
+                secondaryAction: isSelectedDayToday ? nil : {
+                    Task {
+                        await model.goToToday()
+                    }
+                },
+            ) {
+                Text(model.selectedDay.presentationDate(), format: .dateTime.day().month(.wide).year())
+            }
+            .frame(maxWidth: .infinity)
 
             Button {
                 isSettingsPresented = true
@@ -319,43 +337,6 @@ struct TodayRootView: View {
             .fixedSize()
         }
         .buttonStyle(.borderless)
-    }
-
-    private var calendarNavigation: some View {
-        HStack {
-            Button {
-                Task {
-                    await model.previousDay()
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-
-            Spacer()
-
-            VStack(spacing: 2) {
-                Text(model.selectedDay.presentationDate(), format: .dateTime.day().month(.wide).year())
-                    .font(.headline)
-                if model.selectedDay != .current() {
-                    Button("Сегодня") {
-                        Task {
-                            await model.goToToday()
-                        }
-                    }
-                    .font(.caption)
-                }
-            }
-
-            Spacer()
-
-            Button {
-                Task {
-                    await model.nextDay()
-                }
-            } label: {
-                Image(systemName: "chevron.right")
-            }
-        }
     }
 
     private func move(entryID: UUID, to meal: MealType, displayedTargetIndex: Int) {

@@ -67,6 +67,7 @@
 		A10000000000000000000066 /* SyncBootstrapCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000066 /* SyncBootstrapCoordinator.swift */; };
 		A10000000000000000000067 /* SyncOrchestration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000067 /* SyncOrchestration.swift */; };
 		A10000000000000000000068 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000068 /* SettingsView.swift */; };
+		A10000000000000000000069 /* DateNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000069 /* DateNavigator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -132,6 +133,7 @@
 		A20000000000000000000066 /* SyncBootstrapCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncBootstrapCoordinator.swift; sourceTree = "<group>"; };
 		A20000000000000000000067 /* SyncOrchestration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncOrchestration.swift; sourceTree = "<group>"; };
 		A20000000000000000000068 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A20000000000000000000069 /* DateNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateNavigator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -376,6 +378,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000048 /* EditableDecimal.swift */,
+				A20000000000000000000069 /* DateNavigator.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -614,6 +617,7 @@
 				A10000000000000000000044 /* StatisticsViewModels.swift in Sources */,
 				A10000000000000000000045 /* StatisticsView.swift in Sources */,
 				A10000000000000000000046 /* EditableDecimal.swift in Sources */,
+				A10000000000000000000069 /* DateNavigator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
