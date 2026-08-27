@@ -40,14 +40,7 @@ struct TodayRootView: View {
     var body: some View {
         List {
             dateNavigation
-                .listRowInsets(
-                    EdgeInsets(
-                        top: 0,
-                        leading: DateNavigatorLayout.screenHorizontalMargin,
-                        bottom: 2,
-                        trailing: DateNavigatorLayout.screenHorizontalMargin,
-                    ),
-                )
+                .listRowInsets(DateNavigatorLayout.listRowInsets)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -55,7 +48,6 @@ struct TodayRootView: View {
                 Text("За день")
                     .font(.headline)
                     .foregroundStyle(Color.black)
-                    .padding(.top, 4)
                     .accessibilityAddTraits(.isHeader)
 
                 if let day = model.day {

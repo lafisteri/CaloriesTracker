@@ -231,7 +231,8 @@ struct CatalogView: View {
             )
         }
         .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
-        .padding(.bottom, AppStyle.sectionSpacing)
+        .padding(.bottom, DateNavigatorLayout.rootHeaderContentSpacing)
+        .frame(maxWidth: .infinity, minHeight: DateNavigatorLayout.height)
         .buttonStyle(.borderless)
     }
 

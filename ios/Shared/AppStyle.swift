@@ -5,7 +5,7 @@ enum AppStyle {
     static let controlBackground = Color(uiColor: .systemBackground)
     static let selectedControlBackground = Color(uiColor: .tertiarySystemFill)
     static let screenHorizontalMargin: CGFloat = 16
-    static let controlHeight: CGFloat = 48
+    static let controlHeight: CGFloat = 44
     static let compactControlSize: CGFloat = 44
     static let controlSpacing: CGFloat = 12
     static let sectionSpacing: CGFloat = 14

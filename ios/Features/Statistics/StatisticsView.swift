@@ -20,10 +20,17 @@ struct StatisticsView: View {
             } else if let statistics = model.statistics {
                 weekNavigation(for: statistics)
 
-                Section {
-                    WeeklyCaloriesChart(days: statistics.days)
-                        .frame(height: 190)
-                }
+                WeeklyCaloriesChart(days: statistics.days)
+                    .frame(height: 190)
+                    .listRowInsets(
+                        EdgeInsets(
+                            top: 0,
+                            leading: DateNavigatorLayout.screenHorizontalMargin,
+                            bottom: 0,
+                            trailing: DateNavigatorLayout.screenHorizontalMargin,
+                        ),
+                    )
+                    .listRowSeparator(.hidden)
 
                 Section {
                     LabeledContent("Баланс недели", value: calorieBalanceLabel(statistics.weeklyCalorieBalance))
