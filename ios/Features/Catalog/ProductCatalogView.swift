@@ -205,22 +205,12 @@ struct CatalogView: View {
     }
 
     private var catalogHeader: some View {
-        VStack(spacing: AppStyle.sectionSpacing) {
-            HStack {
-                if !isManagementMode {
-                    AppCircularButton(
-                        systemName: "chevron.left",
-                        accessibilityLabel: "Назад",
-                        action: { dismiss() }
-                    )
-                }
-
-                Spacer()
-
+        HStack(spacing: AppStyle.controlSpacing) {
+            if !isManagementMode {
                 AppCircularButton(
-                    systemName: "plus",
-                    accessibilityLabel: "Добавить",
-                    action: addSelectedSection
+                    systemName: "chevron.left",
+                    accessibilityLabel: "Назад",
+                    action: { dismiss() }
                 )
             }
 
@@ -232,6 +222,13 @@ struct CatalogView: View {
                     CatalogInlineSearchField(text: $recipeSearchText)
                 }
             }
+            .frame(maxWidth: .infinity)
+
+            AppCircularButton(
+                systemName: "plus",
+                accessibilityLabel: "Добавить",
+                action: addSelectedSection
+            )
         }
         .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
         .padding(.bottom, AppStyle.sectionSpacing)
