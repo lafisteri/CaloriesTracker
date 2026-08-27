@@ -230,14 +230,10 @@ struct RecipeDetailView: View {
     }
 
     var body: some View {
-        content
-            .appScreenBackground()
-            .navigationTitle(model.details?.recipe.name ?? "Рецепт")
-            .navigationBarTitleDisplayMode(.inline)
-            .appNavigationChrome()
-            .toolbar {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: model.details?.recipe.name ?? "Рецепт") {
                 if model.details != nil {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: AppStyle.controlSpacing) {
                         Button {
                             router.catalogPath.append(.recipeEditor(recipeID))
                         } label: {
@@ -247,9 +243,7 @@ struct RecipeDetailView: View {
                             }
                         }
                         .accessibilityLabel("Редактировать")
-                    }
 
-                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button("Версии", systemImage: "clock.arrow.circlepath") {
                                 router.catalogPath.append(.recipeVersionHistory(recipeID))
@@ -273,20 +267,25 @@ struct RecipeDetailView: View {
                         } label: {
                             AppCircularControl {
                                 Image(systemName: "ellipsis")
-                                    .font(.body.weight(.semibold))
+                                .font(.body.weight(.semibold))
                             }
                         }
                     }
                 }
             }
-            .task {
+
+            content
+        }
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
+        .task {
+            await model.load()
+        }
+        .onAppear {
+            Task {
                 await model.load()
             }
-            .onAppear {
-                Task {
-                    await model.load()
-                }
-            }
+        }
     }
 
     @ViewBuilder
@@ -402,86 +401,10 @@ struct RecipeEditorView: View {
     var body: some View {
         @Bindable var model = model
 
-        List {
-            if model.isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                }
-            } else {
-                Section {
-                    TextField("Название", text: $model.name)
-                        .textInputAutocapitalization(.sentences)
-                        .focused($focusedField, equals: .name)
-
-                    Picker("Единица", selection: $model.outputUnit) {
-                        ForEach(RecipeDiaryUnit.allCases, id: \.self) { unit in
-                            Text(recipeOutputUnitLabel(unit)).tag(unit)
-                        }
-                    }
-
-                    TextField("Количество", text: EditableDecimal.binding($model.outputAmountText))
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .outputAmount)
-                }
-
-                FoodCompositionSection(
-                    title: "Ингредиенты",
-                    nutrition: model.preview?.totalNutrition ?? .zero,
-                ) {
-                    ForEach(model.ingredients) { item in
-                        RecipeIngredientListEntryRow(
-                            item: item,
-                            onSelect: {
-                                editingIngredient = item
-                            },
-                            onDelete: {
-                                model.removeIngredient(id: item.id)
-                                Task {
-                                    await model.refreshCompositionPreview()
-                                }
-                            },
-                        )
-                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                    }
-                } addRow: {
-                    FoodCompositionAddRow {
-                        requestIngredientSelection()
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
-                }
-
-                Section("Пищевая ценность") {
-                    if let preview = model.preview {
-                        RecipeNutritionRows(nutrition: preview.totalNutrition)
-                    } else {
-                        Text("Добавьте ингредиенты и укажите выход рецепта.")
-                            .foregroundStyle(.secondary)
-                    }
-                    if let previewErrorMessage = model.previewErrorMessage {
-                        InlineErrorView(message: previewErrorMessage)
-                    }
-                }
-            }
-
-            if let errorMessage = model.errorMessage {
-                Section {
-                    InlineErrorView(message: errorMessage)
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .appScreenBackground()
-        .listSectionSpacing(.compact)
-        .navigationTitle(model.recipeID == nil ? "Новый рецепт" : "Редактировать рецепт")
-        .navigationBarTitleDisplayMode(.inline)
-        .appNavigationChrome()
-        .disabled(model.isLoading || model.isSaving)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(
+                title: model.recipeID == nil ? "Новый рецепт" : "Редактировать рецепт",
+            ) {
                 Button {
                     Task {
                         if await model.save() {
@@ -506,7 +429,84 @@ struct RecipeEditorView: View {
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isLoading || model.isSaving)
             }
+
+            List {
+                if model.isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
+                } else {
+                    Section {
+                        TextField("Название", text: $model.name)
+                            .textInputAutocapitalization(.sentences)
+                            .focused($focusedField, equals: .name)
+
+                        Picker("Единица", selection: $model.outputUnit) {
+                            ForEach(RecipeDiaryUnit.allCases, id: \.self) { unit in
+                                Text(recipeOutputUnitLabel(unit)).tag(unit)
+                            }
+                        }
+
+                        TextField("Количество", text: EditableDecimal.binding($model.outputAmountText))
+                            .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .outputAmount)
+                    }
+
+                    FoodCompositionSection(
+                        title: "Ингредиенты",
+                        nutrition: model.preview?.totalNutrition ?? .zero,
+                    ) {
+                        ForEach(model.ingredients) { item in
+                            RecipeIngredientListEntryRow(
+                                item: item,
+                                onSelect: {
+                                    editingIngredient = item
+                                },
+                                onDelete: {
+                                    model.removeIngredient(id: item.id)
+                                    Task {
+                                        await model.refreshCompositionPreview()
+                                    }
+                                },
+                            )
+                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        }
+                    } addRow: {
+                        FoodCompositionAddRow {
+                            requestIngredientSelection()
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
+                    }
+
+                    Section("Пищевая ценность") {
+                        if let preview = model.preview {
+                            RecipeNutritionRows(nutrition: preview.totalNutrition)
+                        } else {
+                            Text("Добавьте ингредиенты и укажите выход рецепта.")
+                                .foregroundStyle(.secondary)
+                        }
+                        if let previewErrorMessage = model.previewErrorMessage {
+                            InlineErrorView(message: previewErrorMessage)
+                        }
+                    }
+                }
+
+                if let errorMessage = model.errorMessage {
+                    Section {
+                        InlineErrorView(message: errorMessage)
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(.compact)
         }
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
+        .disabled(model.isLoading || model.isSaving)
         .task {
             await model.loadForEditing()
         }
@@ -923,6 +923,9 @@ private struct RecipeIngredientAmountView: View {
             autoFocusAmount: true,
             actionTitle: "Добавить",
             isSaving: isCompleting,
+            headerTrailing: {
+                EmptyView()
+            },
             onConfirm: {
                 guard !isCompleting, let draft = model.makeDraft() else {
                     return
@@ -993,6 +996,9 @@ private struct RecipeCompositionAmountView: View {
             autoFocusAmount: true,
             actionTitle: "Добавить",
             isSaving: false,
+            headerTrailing: {
+                EmptyView()
+            },
             onConfirm: {
                 if let drafts = model.makeDrafts() {
                     amountIsFocused = false

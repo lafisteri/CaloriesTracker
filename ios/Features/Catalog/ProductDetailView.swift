@@ -25,14 +25,10 @@ struct ProductDetailView: View {
     }
 
     var body: some View {
-        content
-            .appScreenBackground()
-            .navigationTitle(model.details?.product.name ?? "Продукт")
-            .navigationBarTitleDisplayMode(.inline)
-            .appNavigationChrome()
-            .toolbar {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: model.details?.product.name ?? "Продукт") {
                 if model.details != nil {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: AppStyle.controlSpacing) {
                         Button {
                             openEditor()
                         } label: {
@@ -42,10 +38,8 @@ struct ProductDetailView: View {
                             }
                         }
                         .accessibilityLabel("Редактировать")
-                    }
 
-                    if case .catalog = presentation {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        if case .catalog = presentation {
                             Menu {
                                 Button("Версии", systemImage: "clock.arrow.circlepath") {
                                     router.catalogPath.append(.productVersionHistory(productID))
@@ -61,18 +55,23 @@ struct ProductDetailView: View {
                             } label: {
                                 AppCircularControl {
                                     Image(systemName: "ellipsis")
-                                        .font(.body.weight(.semibold))
+                                    .font(.body.weight(.semibold))
                                 }
                             }
                         }
                     }
                 }
             }
-            .onAppear {
-                Task {
-                    await model.load()
-                }
+
+            content
+        }
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            Task {
+                await model.load()
             }
+        }
     }
 
     @ViewBuilder

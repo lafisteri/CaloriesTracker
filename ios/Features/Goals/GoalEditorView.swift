@@ -12,59 +12,8 @@ struct GoalEditorView: View {
     var body: some View {
         @Bindable var model = model
 
-        Form {
-            if model.isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView("Загрузка целей")
-                        Spacer()
-                    }
-                }
-            } else {
-                Section {
-                    WeekdaySelector(selectedWeekday: $model.selectedWeekday)
-
-                    let selectedDayIndex = model.days.firstIndex { $0.weekday == model.selectedWeekday } ?? 0
-
-                    Group {
-                        TextField("Калории", text: EditableDecimal.binding($model.days[selectedDayIndex].caloriesText))
-                            .keyboardType(.decimalPad)
-                        TextField("Белки", text: EditableDecimal.binding($model.days[selectedDayIndex].proteinText))
-                            .keyboardType(.decimalPad)
-                        TextField("Жиры", text: EditableDecimal.binding($model.days[selectedDayIndex].fatText))
-                            .keyboardType(.decimalPad)
-                        TextField("Углеводы", text: EditableDecimal.binding($model.days[selectedDayIndex].carbsText))
-                            .keyboardType(.decimalPad)
-                    }
-                    .id(model.selectedWeekday)
-
-                    Button {
-                        model.applyToAllDays()
-                    } label: {
-                        Text("Применить ко всем дням")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-
-            if let errorMessage = model.errorMessage {
-                Section {
-                    GoalInlineErrorView(message: errorMessage)
-                }
-            }
-        }
-        .appScreenBackground()
-        .navigationTitle("Цели")
-        .navigationBarTitleDisplayMode(.inline)
-        .appNavigationChrome()
-        .disabled(model.isSaving || model.isLoading)
-        .task {
-            await model.load()
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: "Цели") {
                 Button {
                     Task {
                         if await model.save() {
@@ -84,6 +33,56 @@ struct GoalEditorView: View {
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isSaving)
             }
+
+            Form {
+                if model.isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView("Загрузка целей")
+                            Spacer()
+                        }
+                    }
+                } else {
+                    Section {
+                        WeekdaySelector(selectedWeekday: $model.selectedWeekday)
+
+                        let selectedDayIndex = model.days.firstIndex { $0.weekday == model.selectedWeekday } ?? 0
+
+                        Group {
+                            TextField("Калории", text: EditableDecimal.binding($model.days[selectedDayIndex].caloriesText))
+                                .keyboardType(.decimalPad)
+                            TextField("Белки", text: EditableDecimal.binding($model.days[selectedDayIndex].proteinText))
+                                .keyboardType(.decimalPad)
+                            TextField("Жиры", text: EditableDecimal.binding($model.days[selectedDayIndex].fatText))
+                                .keyboardType(.decimalPad)
+                            TextField("Углеводы", text: EditableDecimal.binding($model.days[selectedDayIndex].carbsText))
+                                .keyboardType(.decimalPad)
+                        }
+                        .id(model.selectedWeekday)
+
+                        Button {
+                            model.applyToAllDays()
+                        } label: {
+                            Text("Применить ко всем дням")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+
+                if let errorMessage = model.errorMessage {
+                    Section {
+                        GoalInlineErrorView(message: errorMessage)
+                    }
+                }
+            }
+        }
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
+        .disabled(model.isSaving || model.isLoading)
+        .task {
+            await model.load()
         }
     }
 }

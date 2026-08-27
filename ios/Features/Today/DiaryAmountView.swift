@@ -33,20 +33,8 @@ struct DiaryAmountView: View {
             amountFocus: isAmountFocusEnabled ? $amountIsFocused : nil,
             actionTitle: model.actionTitle,
             isSaving: model.isSaving,
-            onConfirm: {
-                Task {
-                    let didSave = await model.save()
-                    if didSave {
-                        amountIsFocused = false
-                        router.todayPath = []
-                    }
-                }
-            },
-        )
-        .disabled(model.isLoading || model.isSaving)
-        .toolbar {
-            if model.isProductEditRefreshBlocked {
-                ToolbarItem(placement: .topBarTrailing) {
+            headerTrailing: {
+                if model.isProductEditRefreshBlocked {
                     Button {
                         refreshAfterProductEdit()
                     } label: {
@@ -57,9 +45,7 @@ struct DiaryAmountView: View {
                     }
                     .accessibilityLabel("Повторить обновление продукта")
                 }
-            }
-            if let productID {
-                ToolbarItem(placement: .topBarTrailing) {
+                if let productID {
                     Button {
                         isAmountFocusEnabled = false
                         amountIsFocused = false
@@ -72,8 +58,18 @@ struct DiaryAmountView: View {
                     }
                     .accessibilityLabel("Редактировать")
                 }
-            }
-        }
+            },
+            onConfirm: {
+                Task {
+                    let didSave = await model.save()
+                    if didSave {
+                        amountIsFocused = false
+                        router.todayPath = []
+                    }
+                }
+            },
+        )
+        .disabled(model.isLoading || model.isSaving)
         .task {
             guard !hasLoadedInitialState else {
                 return
@@ -211,7 +207,7 @@ struct AmountUnitOption: Identifiable, Hashable, Sendable {
     }
 }
 
-struct AmountEditorView: View {
+struct AmountEditorView<HeaderTrailing: View>: View {
     let title: String
     let contextDescription: String?
     let isLoading: Bool
@@ -229,6 +225,7 @@ struct AmountEditorView: View {
     let autoFocusAmount: Bool
     let actionTitle: String
     let isSaving: Bool
+    let headerTrailing: HeaderTrailing
     let onConfirm: () -> Void
 
     init(
@@ -249,6 +246,7 @@ struct AmountEditorView: View {
         autoFocusAmount: Bool = false,
         actionTitle: String,
         isSaving: Bool,
+        @ViewBuilder headerTrailing: () -> HeaderTrailing,
         onConfirm: @escaping () -> Void,
     ) {
         self.title = title
@@ -268,40 +266,47 @@ struct AmountEditorView: View {
         self.autoFocusAmount = autoFocusAmount
         self.actionTitle = actionTitle
         self.isSaving = isSaving
+        self.headerTrailing = headerTrailing()
         self.onConfirm = onConfirm
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if isLoading && !isAvailable {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 160)
-                } else if isAvailable {
-                    if let contextDescription {
-                        Text(contextDescription)
-                            .foregroundStyle(.secondary)
-                    }
-                    AmountNutritionPreview(nutrition: preview ?? .zero)
-
-                    if let previewErrorMessage {
-                        DiaryInlineErrorView(message: previewErrorMessage)
-                    }
-                } else {
-                    ContentUnavailableView(
-                        unavailableTitle,
-                        systemImage: unavailableSystemImage,
-                        description: errorMessage.map(Text.init),
-                    )
-                }
-
-                if let errorMessage, isAvailable {
-                    DiaryInlineErrorView(message: errorMessage)
-                }
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: title) {
+                headerTrailing
             }
-            .padding(.horizontal)
-            .padding(.top, 16)
-            .padding(.bottom)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if isLoading && !isAvailable {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, minHeight: 160)
+                    } else if isAvailable {
+                        if let contextDescription {
+                            Text(contextDescription)
+                                .foregroundStyle(.secondary)
+                        }
+                        AmountNutritionPreview(nutrition: preview ?? .zero)
+
+                        if let previewErrorMessage {
+                            DiaryInlineErrorView(message: previewErrorMessage)
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            unavailableTitle,
+                            systemImage: unavailableSystemImage,
+                            description: errorMessage.map(Text.init),
+                        )
+                    }
+
+                    if let errorMessage, isAvailable {
+                        DiaryInlineErrorView(message: errorMessage)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 16)
+                .padding(.bottom)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isAvailable {
@@ -310,9 +315,7 @@ struct AmountEditorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppStyle.background.ignoresSafeArea())
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        .appNavigationChrome()
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             guard autoFocusAmount, let amountFocus else {
                 return

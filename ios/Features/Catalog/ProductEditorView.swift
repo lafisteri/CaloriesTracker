@@ -25,56 +25,10 @@ struct ProductEditorView: View {
     var body: some View {
         @Bindable var model = model
 
-        Form {
-            if model.isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                }
-            } else {
-                Section {
-                    TextField("Название", text: $model.name)
-                        .textInputAutocapitalization(.sentences)
-                        .focused($focusedField, equals: .name)
-
-                    TextField("Штрихкод", text: $model.barcode)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .focused($focusedField, equals: .barcode)
-
-                    Picker("Единица", selection: $model.baseUnit) {
-                        ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
-                            Text(unit.russianLabel).tag(unit)
-                        }
-                    }
-
-                    decimalField("Количество", text: $model.baseAmount, field: .baseAmount)
-                }
-
-                Section("Пищевая ценность") {
-                    decimalField("Калории", text: $model.calories, field: .calories)
-                    decimalField("Белки", text: $model.protein, field: .protein)
-                    decimalField("Жиры", text: $model.fat, field: .fat)
-                    decimalField("Углеводы", text: $model.carbs, field: .carbs)
-                }
-            }
-
-            if let errorMessage = model.errorMessage {
-                Section {
-                    InlineErrorView(message: errorMessage)
-                }
-            }
-        }
-        .appScreenBackground()
-        .navigationTitle(model.productID == nil ? "Новый продукт" : "Редактировать продукт")
-        .navigationBarTitleDisplayMode(.inline)
-        .appNavigationChrome()
-        .disabled(model.isLoading || model.isSaving)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(
+                title: model.productID == nil ? "Новый продукт" : "Редактировать продукт",
+            ) {
                 Button {
                     focusedField = nil
                     Task {
@@ -101,7 +55,54 @@ struct ProductEditorView: View {
                 .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
                 .disabled(model.isLoading || model.isSaving)
             }
+
+            Form {
+                if model.isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
+                } else {
+                    Section {
+                        TextField("Название", text: $model.name)
+                            .textInputAutocapitalization(.sentences)
+                            .focused($focusedField, equals: .name)
+
+                        TextField("Штрихкод", text: $model.barcode)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .focused($focusedField, equals: .barcode)
+
+                        Picker("Единица", selection: $model.baseUnit) {
+                            ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
+                                Text(unit.russianLabel).tag(unit)
+                            }
+                        }
+
+                        decimalField("Количество", text: $model.baseAmount, field: .baseAmount)
+                    }
+
+                    Section("Пищевая ценность") {
+                        decimalField("Калории", text: $model.calories, field: .calories)
+                        decimalField("Белки", text: $model.protein, field: .protein)
+                        decimalField("Жиры", text: $model.fat, field: .fat)
+                        decimalField("Углеводы", text: $model.carbs, field: .carbs)
+                    }
+                }
+
+                if let errorMessage = model.errorMessage {
+                    Section {
+                        InlineErrorView(message: errorMessage)
+                    }
+                }
+            }
         }
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
+        .disabled(model.isLoading || model.isSaving)
         .task {
             await model.loadForEditing()
         }

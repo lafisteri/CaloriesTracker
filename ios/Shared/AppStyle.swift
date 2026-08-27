@@ -52,6 +52,43 @@ struct AppCircularButton: View {
     }
 }
 
+struct AppTopNavigationHeader<Trailing: View>: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let title: String
+    private let trailing: Trailing
+
+    init(
+        title: String,
+        @ViewBuilder trailing: () -> Trailing,
+    ) {
+        self.title = title
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(spacing: AppStyle.controlSpacing) {
+            AppCircularButton(
+                systemName: "chevron.left",
+                accessibilityLabel: "Назад",
+                action: { dismiss() },
+            )
+
+            Text(title)
+                .font(.headline)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+
+            trailing
+                .frame(minWidth: AppStyle.compactControlSize, alignment: .trailing)
+        }
+        .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
+        .padding(.bottom, DateNavigatorLayout.rootHeaderContentSpacing)
+        .frame(maxWidth: .infinity, minHeight: DateNavigatorLayout.height)
+        .buttonStyle(.borderless)
+    }
+}
+
 private struct AppNavigationChromeModifier: ViewModifier {
     @Environment(\.dismiss) private var dismiss
 

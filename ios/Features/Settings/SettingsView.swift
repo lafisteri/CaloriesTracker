@@ -11,37 +11,42 @@ struct SettingsView: View {
     let syncOrchestrator: SyncOrchestrator?
 
     var body: some View {
-        List {
-            Section {
-                NavigationLink {
-                    GoalEditorView(goalService: goalService)
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Цели")
-                        Text("Калории и БЖУ по дням недели")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: "Настройки") {
+                EmptyView()
+            }
 
-                NavigationLink {
-                    SyncSettingsView(
-                        supabaseAuth: supabaseAuth,
-                        syncStatus: syncStatus,
-                        syncOrchestrator: syncOrchestrator,
-                    )
-                } label: {
-                    LabeledContent("Синхронизация") {
-                        Text(SyncStatusPresentation.title(for: syncStatus))
-                            .foregroundStyle(.secondary)
+            List {
+                Section {
+                    NavigationLink {
+                        GoalEditorView(goalService: goalService)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Цели")
+                            Text("Калории и БЖУ по дням недели")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    NavigationLink {
+                        SyncSettingsView(
+                            supabaseAuth: supabaseAuth,
+                            syncStatus: syncStatus,
+                            syncOrchestrator: syncOrchestrator,
+                        )
+                    } label: {
+                        LabeledContent("Синхронизация") {
+                            Text(SyncStatusPresentation.title(for: syncStatus))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
+            .appPlainListStyle()
         }
-        .appPlainListStyle()
-        .navigationTitle("Настройки")
-        .navigationBarTitleDisplayMode(.inline)
-        .appNavigationChrome()
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -68,9 +73,14 @@ struct SyncSettingsView: View {
     var body: some View {
         @Bindable var model = model
 
-        Form {
-            Section("Синхронизация") {
-                if model.isConfigured {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: "Синхронизация") {
+                EmptyView()
+            }
+
+            Form {
+                Section("Синхронизация") {
+                    if model.isConfigured {
                     if model.isLoadingSession {
                         HStack(spacing: 10) {
                             ProgressView()
@@ -129,19 +139,18 @@ struct SyncSettingsView: View {
                     if let errorMessage = model.errorMessage {
                         SettingsInlineErrorView(message: errorMessage)
                     }
-                } else {
-                    Text("Синхронизация недоступна")
-                        .font(.body.weight(.medium))
-                    Text("Сервис синхронизации не настроен.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    } else {
+                        Text("Синхронизация недоступна")
+                            .font(.body.weight(.medium))
+                        Text("Сервис синхронизации не настроен.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
         .appScreenBackground()
-        .navigationTitle("Синхронизация")
-        .navigationBarTitleDisplayMode(.inline)
-        .appNavigationChrome()
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await model.loadCurrentSession()
         }
