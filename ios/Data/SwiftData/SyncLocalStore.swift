@@ -69,12 +69,36 @@ final class SyncLocalStore {
                 .sorted { $0.rawValue < $1.rawValue }
         }
 
+        let canonicalWeeklyGoalKeys = try weeklyGoalKeys(for: weeklyGoals)
+
         return keys(productVersions, type: .productVersion, id: { $0.id })
             + keys(products, type: .product, id: { $0.id })
             + keys(recipeVersions, type: .recipeVersion, id: { $0.id })
             + keys(recipes, type: .recipe, id: { $0.id })
-            + keys(weeklyGoals, type: .weeklyGoal, id: { $0.id })
+            + canonicalWeeklyGoalKeys
             + keys(diaryEntries, type: .diaryEntry, id: { $0.id })
+    }
+
+    /// Replaces legacy random WeeklyGoal UUIDs with their effective-day UUIDv5
+    /// identities and reconciles their outbox markers in the same save.
+    ///
+    /// This is deliberately data normalization rather than a SwiftData schema
+    /// migration. It is safe to call before every sync entry point: after the
+    /// first pass it neither mutates records nor saves the context.
+    @discardableResult
+    @MainActor
+    func normalizeWeeklyGoalIdentities() throws -> Bool {
+        let modelContext = ModelContext(modelContainer)
+        do {
+            let changed = try normalizeWeeklyGoalIdentities(in: modelContext)
+            if changed {
+                try modelContext.save()
+            }
+            return changed
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
     }
 
     func applyRemote(_ envelope: SyncPayloadEnvelope) throws -> SyncMergeResult {
@@ -117,7 +141,12 @@ final class SyncLocalStore {
         _ payload: SyncPayload,
         in modelContext: ModelContext,
     ) throws -> SyncMergeResult {
-        try apply(payload.canonicalizedTimestamps(), in: modelContext)
+        try apply(
+            payload
+                .canonicalizedTimestamps()
+                .canonicalizedIdentity(),
+            in: modelContext,
+        )
     }
 
     func applyRemote(_ payloads: [SyncPayload]) throws -> [SyncMergeResult] {
@@ -155,7 +184,11 @@ final class SyncLocalStore {
             guard let record = try weeklyGoalRecord(id: key.entityID, in: modelContext) else {
                 throw SyncLocalStoreError.missingEntity(key)
             }
-            return .weeklyGoal(try weeklyGoalPayload(from: record))
+            let payload = try weeklyGoalPayload(from: record)
+            guard payload.id == key.entityID else {
+                throw SyncLocalStoreError.inconsistentIdentity(key)
+            }
+            return .weeklyGoal(payload)
         }
     }
 
@@ -379,12 +412,6 @@ final class SyncLocalStore {
             let localPayload = try weeklyGoalPayload(from: localRecord)
             if localPayload == remote {
                 return .identical(key)
-            }
-            if localRecord.id == remote.id,
-               SyncTimestamp.millisecondsSinceEpoch(localPayload.createdAt)
-                   != SyncTimestamp.millisecondsSinceEpoch(remote.createdAt)
-            {
-                throw SyncLocalStoreError.inconsistentIdentity(key)
             }
             if try timestampWinner(
                 local: .weeklyGoal(localPayload),
@@ -722,7 +749,8 @@ final class SyncLocalStore {
 
     private func validate(_ payload: WeeklyGoalPayload) throws {
         let key = SyncEntityKey(entityType: .weeklyGoal, entityID: payload.id)
-        guard payload.days.count == LocalDay.Weekday.allCases.count,
+        guard payload.id == WeeklyGoalIdentity.id(for: payload.effectiveFrom),
+              payload.days.count == LocalDay.Weekday.allCases.count,
               Set(payload.days.map(\.id)).count == payload.days.count,
               Set(payload.days.map(\.weekday)) == Set(LocalDay.Weekday.allCases),
               payload.days.map(\.position) == Array(payload.days.indices)
@@ -807,6 +835,91 @@ final class SyncLocalStore {
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first
+    }
+
+    private func weeklyGoalKeys(for records: [WeeklyGoalRecord]) throws -> [SyncEntityKey] {
+        try records
+            .map { record in
+                guard let effectiveFrom = LocalDay(rawValue: record.effectiveFromKey) else {
+                    throw SyncLocalStoreError.invalidPayload(
+                        SyncEntityKey(entityType: .weeklyGoal, entityID: record.id),
+                        reason: "local effectiveFrom is invalid",
+                    )
+                }
+                return SyncEntityKey(
+                    entityType: .weeklyGoal,
+                    entityID: WeeklyGoalIdentity.id(for: effectiveFrom),
+                )
+            }
+            .sorted { $0.rawValue < $1.rawValue }
+    }
+
+    @MainActor
+    private func normalizeWeeklyGoalIdentities(in modelContext: ModelContext) throws -> Bool {
+        let weeklyGoals = try modelContext.fetch(FetchDescriptor<WeeklyGoalRecord>())
+        let normalizations: [(record: WeeklyGoalRecord, canonicalID: UUID)] = try weeklyGoals.map { record in
+            guard let effectiveFrom = LocalDay(rawValue: record.effectiveFromKey) else {
+                throw SyncLocalStoreError.invalidPayload(
+                    SyncEntityKey(entityType: .weeklyGoal, entityID: record.id),
+                    reason: "local effectiveFrom is invalid",
+                )
+            }
+            return (record, WeeklyGoalIdentity.id(for: effectiveFrom))
+        }
+
+        let idChanges = normalizations.filter { $0.record.id != $0.canonicalID }
+        var didChange = false
+
+        // Moving every legacy owner through a temporary UUID makes the final
+        // replacement safe even if a random legacy value happens to equal
+        // another goal's canonical UUID.
+        var reservedIDs = Set(weeklyGoals.map(\.id))
+        reservedIDs.formUnion(normalizations.map(\.canonicalID))
+        for normalization in idChanges {
+            var temporaryID = UUID()
+            while reservedIDs.contains(temporaryID) {
+                temporaryID = UUID()
+            }
+            reservedIDs.insert(temporaryID)
+            normalization.record.id = temporaryID
+        }
+
+        for normalization in normalizations {
+            if normalization.record.id != normalization.canonicalID {
+                normalization.record.id = normalization.canonicalID
+                didChange = true
+            }
+            for dailyGoal in normalization.record.dailyGoals where dailyGoal.weeklyGoalID != normalization.canonicalID {
+                dailyGoal.weeklyGoalID = normalization.canonicalID
+                didChange = true
+            }
+        }
+
+        let canonicalIDs = Set(normalizations.map(\.canonicalID))
+        let pendingWeeklyGoalItems = try SyncOutboxStore.pending(in: modelContext).filter {
+            $0.entityTypeRaw == SyncEntityType.weeklyGoal.rawValue
+        }
+        for item in pendingWeeklyGoalItems where !canonicalIDs.contains(item.entityID) {
+            didChange = try SyncOutboxStore.acknowledge(
+                key: item.key,
+                token: item.changeToken,
+                in: modelContext,
+            ) || didChange
+        }
+
+        // A renamed legacy entity must be published under its canonical key.
+        // `ensurePending` preserves a pre-existing canonical token, so two old
+        // and canonical markers coalesce without weakening exact-token ack.
+        for normalization in idChanges {
+            if try SyncOutboxStore.ensurePending(
+                key: SyncEntityKey(entityType: .weeklyGoal, entityID: normalization.canonicalID),
+                in: modelContext,
+            ) {
+                didChange = true
+            }
+        }
+
+        return didChange
     }
 
     private func dailyGoalRecord(id: UUID, in modelContext: ModelContext) throws -> DailyMacroGoalRecord? {
@@ -956,6 +1069,12 @@ final class SyncLocalStore {
                 reason: "local effectiveFrom is invalid",
             )
         }
+        let canonicalID = WeeklyGoalIdentity.id(for: effectiveFrom)
+        guard record.id == canonicalID else {
+            throw SyncLocalStoreError.inconsistentIdentity(
+                SyncEntityKey(entityType: .weeklyGoal, entityID: record.id),
+            )
+        }
         let days = try record.dailyGoals
             .sorted { $0.position < $1.position }
             .map { record -> WeeklyGoalPayload.Day in
@@ -967,7 +1086,7 @@ final class SyncLocalStore {
                 }
                 return WeeklyGoalPayload.Day(
                     id: record.id,
-                    weeklyGoalID: record.weeklyGoalID,
+                    weeklyGoalID: canonicalID,
                     weekday: weekday,
                     position: record.position,
                     goal: DailyMacroGoal(
@@ -979,7 +1098,7 @@ final class SyncLocalStore {
                 )
             }
         return WeeklyGoalPayload(
-            id: record.id,
+            id: canonicalID,
             effectiveFrom: effectiveFrom,
             days: days,
             createdAt: SyncTimestamp.canonical(record.createdAt),
@@ -1127,6 +1246,7 @@ final class SyncLocalStore {
         to record: WeeklyGoalRecord,
         in modelContext: ModelContext,
     ) throws {
+        record.createdAt = payload.createdAt
         record.effectiveFromKey = payload.effectiveFrom.rawValue
         record.updatedAt = payload.updatedAt
 

@@ -98,6 +98,12 @@ final class SyncPushCoordinator {
         }
 
         try await verifyCurrentAccount(expectedAccountID)
+        do {
+            try localStore.normalizeWeeklyGoalIdentities()
+        } catch {
+            syncPushLogger.error("Sync push could not normalize WeeklyGoal identities")
+            throw SyncPushCoordinatorError.pendingReadFailed
+        }
         let pendingItems: [SyncOutboxItem]
         do {
             let modelContext = ModelContext(modelContainer)

@@ -929,7 +929,7 @@ final class SwiftDataGoalRepository: GoalRepository {
                 return try goalRecord.toDomain()
             }
 
-            let goalID = UUID()
+            let goalID = WeeklyGoalIdentity.id(for: draft.effectiveFrom)
             let goalRecord = WeeklyGoalRecord(
                 id: goalID,
                 effectiveFromKey: effectiveFromKey,

@@ -39,6 +39,9 @@ final class AppDependencies {
 
         self.modelContainer = modelContainer
         let syncLocalStore = SyncLocalStore(modelContainer: modelContainer)
+        // This data-only, idempotent boundary runs before repositories or sync
+        // orchestration can export WeeklyGoal identities.
+        try syncLocalStore.normalizeWeeklyGoalIdentities()
         self.syncLocalStore = syncLocalStore
         let supabaseClientProvider = SupabaseClientProvider.makeFromMainBundle()
         let syncChangeNotifier = supabaseClientProvider.map { _ in SyncChangeNotifier() }

@@ -1,7 +1,7 @@
 # Native iOS architecture and data design
 
 **Status:** Current native iOS architecture
-**Last updated:** 2026-08-26
+**Last updated:** 2026-08-27
 **Scope:** the Swift / SwiftUI application. PRODUCT_SPEC.md defines user-visible
 behaviour; this document defines technical boundaries and invariants.
 
@@ -155,6 +155,20 @@ next orchestration wake reuses the persistent cursor, remote revisions and
 outbox tokens. Completed accounts return a no-op without rescanning local
 records. Bootstrap never advances the pull cursor itself.
 
+Before repository export or any pull, push or bootstrap work,
+`SyncLocalStore` idempotently normalizes legacy local WeeklyGoal UUIDs to their
+effective-day UUIDv5 values. It preserves the historical date, timestamps and
+seven daily values without changing `updatedAt`, rewrites owned daily-goal
+foreign IDs, removes obsolete legacy outbox markers by their exact token and
+ensures one canonical pending key when a legacy aggregate was renamed. This is
+data normalization, not a V6 schema migration. A legacy Supabase row may retain
+its random physical record key indefinitely: Pull merges it into the canonical
+local aggregate, records its `server_revision` only under that actual remote
+alias key, removes any stale alias outbox item, and republishes the winner only
+under the canonical key. Multiple aliases for one effective day therefore
+converge to one local aggregate without a cursor block, missing-entity loop or
+second active identity.
+
 When Supabase is configured, `AppDependencies` owns exactly one
 `SyncChangeNotifier`, `SyncStatusStore` and actor-isolated `SyncOrchestrator`.
 The app's `scenePhase` wakes it immediately on `.active`; a restored session is
@@ -227,10 +241,15 @@ an unknown version, but a known version must be canonical-payload equivalent or
 is treated as a corruption/invariant error.
 
 WeeklyGoal and its seven DailyMacroGoal values are one mutable whole aggregate
-per historical `effectiveFrom` key. A same-day edit preserves its stable UUID,
+per historical `effectiveFrom` key. `effectiveFrom` is the logical identity:
+the persisted and sync UUID is UUIDv5 with the fixed namespace
+`6E770171-4E9D-4E0C-8BC7-0C64A5CB6D52` and the UTF-8 `YYYY-MM-DD`
+`LocalDay.rawValue` name. It is therefore independent of device, process,
+locale and time zone. A same-day edit preserves that canonical UUID,
 `effectiveFrom` and immutable `createdAt`, replaces all seven daily values and
-sets `updatedAt`. Saving on a new effective day creates a new UUID; old goals
-remain available for historical lookup. There is no goal soft delete.
+sets `updatedAt`. Saving on a new effective day creates a different canonical
+UUID; old goals remain available for historical lookup. There is no goal soft
+delete.
 
 Business timestamps are distinct from sync operational metadata. That metadata
 is infrastructure-only and never appears in domain values or canonical payloads.
@@ -284,6 +303,8 @@ uses a `SyncPayloadEnvelope` with `schemaVersion: 1`, an explicit entity type
 (`product`, `productVersion`, `recipe`, `recipeVersion`, `diaryEntry`, or
 `weeklyGoal`) and a UUID. The same `SyncEntityKey` is used by the outbox and
 payload export, so there is no runtime-type-name or second identity mapping.
+For WeeklyGoal specifically, that UUID is always the canonical UUIDv5 derived
+from `effectiveFrom`, not a random creation UUID.
 
 All domain `Date` values at this boundary are normalized by `SyncTimestamp` to
 canonical Unix-millisecond precision before local export, remote application,
@@ -317,10 +338,11 @@ Product, Recipe, DiaryEntry and WeeklyGoal use whole-record last-writer-wins by 
 integer-millisecond `updatedAt`; raw high-precision local Dates never compare
 against canonical remote Dates. Tombstones are sticky: a tombstone always wins
 over a non-tombstone; two tombstones use the same timestamp rule. WeeklyGoal
-competes as a whole aggregate by its UUID and natural `effectiveFrom` key; its
-seven days are never merged independently. For an equal canonical timestamp,
-the canonical sorted-key JSON bytes of the version-1 envelope break the tie;
-the lexicographically greater payload wins. This is deterministic and
+competes as a whole aggregate by its canonical `effectiveFrom` UUID; its seven
+days are never merged independently. Identity never comes from the winning
+timestamp or payload content. For an equal canonical timestamp, the canonical
+sorted-key JSON bytes of the version-1 envelope break the tie; the
+lexicographically greater payload wins. This is deterministic and
 direction-independent. Old WeeklyGoal payloads without `updatedAt` decode with
 `createdAt` as their effective update time.
 
@@ -571,7 +593,9 @@ V1→V2, V2→V3, V3→V4 and V4→V5 migrations. V5 adds optional stored
 `WeeklyGoalRecord.updatedAt`; old rows use `createdAt` as the domain fallback,
 so the migration does not rewrite user records, outbox rows or account metadata.
 The historical schemas retain their pre-V5 WeeklyGoal shape so each version has
-its original, distinct SwiftData checksum.
+its original, distinct SwiftData checksum. Canonical WeeklyGoal UUIDv5 adoption
+does not add a schema version: its idempotent local normalization happens at the
+sync/domain boundary and preserves all historical goal content and timestamps.
 
 | Record group | Purpose |
 | --- | --- |

@@ -190,6 +190,12 @@ final class SyncPullCoordinator {
         defer { isPullRunning = false }
 
         try await verifyCurrentAccount(expectedAccountID)
+        do {
+            try localStore.normalizeWeeklyGoalIdentities()
+        } catch {
+            syncPullLogger.error("Sync pull could not normalize WeeklyGoal identities")
+            throw SyncPullCoordinatorError.cursorReadFailed
+        }
         let startingCursor: Int64
         do {
             let modelContext = ModelContext(modelContainer)
@@ -377,6 +383,7 @@ final class SyncPullCoordinator {
 
         let modelContext = ModelContext(modelContainer)
         do {
+            let canonicalWeeklyGoalKey = canonicalWeeklyGoalKey(for: record)
             // This token is captured before the merge and acknowledged only if that
             // exact local state loses to the remote record.
             let staleOutboxItem = try SyncOutboxStore.pendingItem(key: record.key, in: modelContext)
@@ -393,14 +400,39 @@ final class SyncPullCoordinator {
                 in: modelContext,
             )
 
-            let republishKeys = mergeResult.republishKeys
-            for key in republishKeys {
+            var republishKeys = Set(mergeResult.republishKeys)
+            if let canonicalWeeklyGoalKey,
+               try shouldRepublishCanonicalWeeklyGoal(
+                   after: mergeResult,
+                   canonicalKey: canonicalWeeklyGoalKey,
+                   accountID: accountID,
+                   in: modelContext,
+               )
+            {
+                // The remote alias remains authoritative only for its own server
+                // revision. The local aggregate is canonical, so make sure the
+                // winning content is eventually present under the canonical key.
+                republishKeys.insert(canonicalWeeklyGoalKey)
+            }
+            let orderedRepublishKeys = republishKeys.sorted { $0.rawValue < $1.rawValue }
+            for key in orderedRepublishKeys {
                 try SyncOutboxStore.ensurePending(key: key, in: modelContext)
             }
 
             let staleOutboxAcknowledged: Bool
-            if case .remoteApplied = mergeResult,
-               !republishKeys.contains(record.key),
+            if canonicalWeeklyGoalKey != nil,
+               let staleOutboxItem
+            {
+                // An alias key cannot be exported after local normalization. Its
+                // exact token is removed in this same transaction, while any
+                // canonical marker above stays pending for normal push handling.
+                staleOutboxAcknowledged = try SyncOutboxStore.acknowledge(
+                    key: staleOutboxItem.key,
+                    token: staleOutboxItem.changeToken,
+                    in: modelContext,
+                )
+            } else if case .remoteApplied = mergeResult,
+                      !republishKeys.contains(record.key),
                let staleOutboxItem
             {
                 staleOutboxAcknowledged = try SyncOutboxStore.acknowledge(
@@ -419,7 +451,7 @@ final class SyncPullCoordinator {
                 for: mergeResult,
                 remoteKey: record.key,
                 serverRevision: record.serverRevision,
-                republishKeys: republishKeys,
+                republishKeys: orderedRepublishKeys,
                 staleOutboxAcknowledged: staleOutboxAcknowledged,
             )
         } catch {
@@ -437,6 +469,43 @@ final class SyncPullCoordinator {
                 serverRevision: record.serverRevision,
                 reason: diagnostic.reason,
             )
+        }
+    }
+
+    /// Returns the canonical local identity only when a valid WeeklyGoal row is
+    /// a legacy server alias. The caller must still store its revision under the
+    /// actual remote key.
+    private func canonicalWeeklyGoalKey(for record: SupabaseRemoteSyncRecord) -> SyncEntityKey? {
+        guard case let .weeklyGoal(payload) = record.payload else {
+            return nil
+        }
+        let canonicalKey = SyncEntityKey(
+            entityType: .weeklyGoal,
+            entityID: WeeklyGoalIdentity.id(for: payload.effectiveFrom),
+        )
+        return canonicalKey == record.key ? nil : canonicalKey
+    }
+
+    /// An unchanged alias needs a canonical push only when the account has not
+    /// observed a canonical server row. A merge that inserted, changed or kept
+    /// a locally newer aggregate already needs that republish independently.
+    private func shouldRepublishCanonicalWeeklyGoal(
+        after mergeResult: SyncMergeResult,
+        canonicalKey: SyncEntityKey,
+        accountID: UUID,
+        in modelContext: ModelContext,
+    ) throws -> Bool {
+        switch mergeResult {
+        case .identical:
+            try SyncMetadataStore.remoteRevision(
+                accountID: accountID,
+                entityKey: canonicalKey,
+                in: modelContext,
+            ) == nil
+        case .inserted, .remoteApplied, .localKept:
+            true
+        case .deferred:
+            false
         }
     }
 

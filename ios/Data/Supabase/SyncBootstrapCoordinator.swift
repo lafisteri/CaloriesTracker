@@ -112,6 +112,7 @@ final class SyncBootstrapCoordinator {
         defer { isBootstrapRunning = false }
 
         try await verifyCurrentAccount(expectedAccountID)
+        try localStore.normalizeWeeklyGoalIdentities()
 
         let startingCursor: Int64
         do {

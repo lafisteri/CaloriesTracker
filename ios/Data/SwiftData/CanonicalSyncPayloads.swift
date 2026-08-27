@@ -306,6 +306,18 @@ enum SyncPayload: Codable, Equatable, Sendable {
             )
         }
     }
+
+    /// Rewrites only WeeklyGoal's logical identity at the sync boundary.
+    /// Remote legacy aliases keep their physical record key outside this value;
+    /// the payload itself always represents the canonical local aggregate.
+    func canonicalizedIdentity() -> SyncPayload {
+        switch self {
+        case let .weeklyGoal(payload):
+            .weeklyGoal(payload.canonicalizedIdentity())
+        case .product, .productVersion, .recipe, .recipeVersion, .diaryEntry:
+            self
+        }
+    }
 }
 
 struct ProductPayload: Codable, Equatable, Sendable {
@@ -392,6 +404,27 @@ struct WeeklyGoalPayload: Codable, Equatable, Sendable {
     let days: [Day]
     let createdAt: Date
     let updatedAt: Date
+}
+
+extension WeeklyGoalPayload {
+    func canonicalizedIdentity() -> WeeklyGoalPayload {
+        let canonicalID = WeeklyGoalIdentity.id(for: effectiveFrom)
+        return WeeklyGoalPayload(
+            id: canonicalID,
+            effectiveFrom: effectiveFrom,
+            days: days.map { day in
+                Day(
+                    id: day.id,
+                    weeklyGoalID: canonicalID,
+                    weekday: day.weekday,
+                    position: day.position,
+                    goal: day.goal,
+                )
+            },
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+        )
+    }
 }
 
 // Domain timestamp fields use this explicit codec instead of the enclosing
