@@ -67,6 +67,7 @@ private enum SyncWakeReason: Sendable {
     case localChange
     case periodic
     case retry
+    case continuation
     case userRequested
 }
 
@@ -75,6 +76,7 @@ private enum SyncRunOutcome: Sendable {
     case succeeded
     case signedOut
     case accountChanged
+    case moreWork
     case retry(SyncErrorCategory)
     case blocked(SyncErrorCategory)
 }
@@ -92,6 +94,7 @@ actor SyncOrchestrator {
         30_000_000_000,
         60_000_000_000,
     ]
+    static let continuationDelayNanoseconds: UInt64 = 1_000_000_000
     static let maximumConvergenceCycles = 3
 
     private let modelContainer: ModelContainer
@@ -106,6 +109,7 @@ actor SyncOrchestrator {
     private var needsAnotherRun = false
     private var retryAttempt = 0
     private var debounceTask: Task<Void, Never>?
+    private var continuationTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var periodicTask: Task<Void, Never>?
     private var observedAccountID: UUID?
@@ -138,6 +142,8 @@ actor SyncOrchestrator {
         needsAnotherRun = false
         debounceTask?.cancel()
         debounceTask = nil
+        continuationTask?.cancel()
+        continuationTask = nil
         retryTask?.cancel()
         retryTask = nil
         periodicTask?.cancel()
@@ -161,6 +167,8 @@ actor SyncOrchestrator {
         needsAnotherRun = false
         debounceTask?.cancel()
         debounceTask = nil
+        continuationTask?.cancel()
+        continuationTask = nil
         retryTask?.cancel()
         retryTask = nil
         periodicTask?.cancel()
@@ -218,9 +226,15 @@ actor SyncOrchestrator {
         requestRun(reason: .periodic)
     }
 
-    private func requestRun(reason _: SyncWakeReason) {
+    private func requestRun(reason: SyncWakeReason) {
         guard isForeground else {
             return
+        }
+        if case .continuation = reason {
+            // The task clears itself before waking this run.
+        } else {
+            continuationTask?.cancel()
+            continuationTask = nil
         }
         guard !isRunning else {
             needsAnotherRun = true
@@ -265,6 +279,10 @@ actor SyncOrchestrator {
                 } else {
                     await setStatus(.idle)
                 }
+                return
+            case .moreWork:
+                retryAttempt = 0
+                scheduleContinuation()
                 return
             case let .retry(category):
                 scheduleRetry(for: category)
@@ -383,6 +401,13 @@ actor SyncOrchestrator {
                 return .blocked(.invariant)
             }
 
+            // Deferred records mean their dependency has still not arrived
+            // after Pull → Push → Pull. Advancing normal work would not resolve
+            // this safely, so preserve the established blocker behavior.
+            if finalPull.deferred > 0 {
+                return .blocked(.dependency)
+            }
+
             let pendingCount: Int
             do {
                 pendingCount = try await pendingOutboxCount()
@@ -406,7 +431,10 @@ actor SyncOrchestrator {
             return .succeeded
         }
 
-        return .blocked(.dependency)
+        // The bounded convergence budget was consumed while all work remained
+        // otherwise healthy. Continue later; this is not an unresolved
+        // dependency and must not surface as an attention-required state.
+        return .moreWork
     }
 
     private func currentAccountID() async -> UUID? {
@@ -468,9 +496,9 @@ actor SyncOrchestrator {
         switch reason {
         case let .transport(error), let .pullRunFailure(.transport(error)):
             return outcome(for: error)
-        case .pullBoundReached:
-            return .blocked(.dependency)
-        case .pushConflict, .pushMissing, .remoteStateMissing, .pendingOutbox, .pullDeferred:
+        case .pullBoundReached, .pendingOutbox:
+            return .moreWork
+        case .pushConflict, .pushMissing, .remoteStateMissing, .pullDeferred:
             return .blocked(.dependency)
         case .none, .pullBlocked, .seedPersistence, .pushFailed, .pushPersistence, .metadata, .convergenceLimit,
              .pullRunFailure(.cursorPersistence):
@@ -509,7 +537,7 @@ actor SyncOrchestrator {
             switch outcome(for: error) {
             case let .retry(category), let .blocked(category):
                 category
-            case .inactive, .succeeded, .signedOut, .accountChanged:
+            case .inactive, .succeeded, .signedOut, .accountChanged, .moreWork:
                 .authentication
             }
         case .none, .pullBlocked, .pushFailed, .convergenceLimit, .pullRunFailure(.cursorPersistence):
@@ -551,6 +579,25 @@ actor SyncOrchestrator {
     private func retryElapsed() {
         retryTask = nil
         requestRun(reason: .retry)
+    }
+
+    private func scheduleContinuation() {
+        guard isForeground, continuationTask == nil else {
+            return
+        }
+        continuationTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: Self.continuationDelayNanoseconds)
+            } catch {
+                return
+            }
+            await self?.continuationElapsed()
+        }
+    }
+
+    private func continuationElapsed() {
+        continuationTask = nil
+        requestRun(reason: .continuation)
     }
 
     private func setStatus(

@@ -275,6 +275,23 @@ final class SyncBootstrapCoordinator {
                 )
             }
 
+            // Do not start another bootstrap pull/round after a batch-global
+            // transport failure. The orchestrator will apply its normal retry
+            // schedule, and all unsent outbox rows remain pending.
+            if case let .transport(error)? = pushBatchResult.reason {
+                return report(
+                    status: .incompleteNeedsRetry,
+                    rounds: round,
+                    pulled: pulled,
+                    pushed: pushed,
+                    seeded: seeded,
+                    remainingOutbox: remainingOutbox,
+                    startingCursor: startingCursor,
+                    endingCursor: endingCursor,
+                    reason: .transport(error),
+                )
+            }
+
             let finalPull: SyncPullReport
             do {
                 finalPull = try await pullCoordinator.pullIncrementally(expectedAccountID: expectedAccountID)
@@ -435,6 +452,9 @@ final class SyncBootstrapCoordinator {
             )
             try await verifyCurrentAccount(expectedAccountID)
             pushed += report.accepted + report.acceptedButStillPending
+            if let error = report.transientTransportFailure {
+                return (pushed, .transport(error))
+            }
             if report.conflicts > 0 {
                 return (pushed, .pushConflict)
             }

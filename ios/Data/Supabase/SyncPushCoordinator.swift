@@ -42,6 +42,19 @@ struct SyncPushReport: Equatable, Sendable {
     var conflicts: Int { outcomes.count(where: { if case .conflict = $0 { true } else { false } }) }
     var missing: Int { outcomes.count(where: { if case .missingRemote = $0 { true } else { false } }) }
     var failed: Int { outcomes.count(where: { if case .failed = $0 { true } else { false } }) }
+
+    /// A transport failure that makes the rest of this batch predictably unsafe
+    /// to send. Record-local outcomes intentionally do not appear here.
+    var transientTransportFailure: SupabaseInfrastructureError? {
+        outcomes.lazy.compactMap { outcome in
+            guard case let .failed(_, .transport(error)) = outcome,
+                  error == .network || error == .server
+            else {
+                return nil
+            }
+            return error
+        }.first
+    }
 }
 
 private let syncPushLogger = Logger(subsystem: "com.caloriestracker.ios", category: "SyncPush")
@@ -120,6 +133,15 @@ final class SyncPushCoordinator {
             try await verifyCurrentAccount(expectedAccountID)
             let outcome = try await push(item, accountID: expectedAccountID)
             outcomes.append(outcome)
+
+            // A connection/server failure is batch-global. Later pending items
+            // stay untouched for the orchestrator's normal retry rather than
+            // issuing a known-bad request for every remaining outbox item.
+            if case let .failed(_, .transport(error)) = outcome,
+               error == .network || error == .server
+            {
+                break
+            }
         }
 
         let report = SyncPushReport(outcomes: outcomes)

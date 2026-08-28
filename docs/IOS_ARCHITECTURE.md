@@ -182,8 +182,13 @@ fetch, silent push or Realtime subscription.
 The orchestrator is single-flight: a wake while bootstrap, pull or push is
 already executing only marks `needsAnotherRun`. It performs bootstrap first when
 needed, then normal `Pull → Push → Pull` cycles, with at most three convergence
-cycles per wake and one coalesced follow-up run. Before proceeding after each
-network phase, it checks the original account UUID against the current session.
+cycles per wake and one coalesced follow-up run. Reaching that bounded budget
+with only ordinary pending outbox records or additional remote pages is a
+healthy `moreWork` result, not a dependency blocker: the active orchestrator
+keeps its syncing state and schedules one coalesced continuation after one
+second. This prevents a tight busy loop while allowing a large healthy backlog
+to converge over several bounded runs. Before proceeding after each network
+phase, it checks the original account UUID against the current session.
 It also tracks an account-identity generation: a sign-out or different account
 invalidates an active old-account run, while a token refresh for the same UUID
 does not. `accountChanged` is a benign, non-retry abort: a signed-out app shows
@@ -204,7 +209,11 @@ outbox-staging paths. The signal debounces rapid edits for 1.8 seconds, so local
 repository saves never await network work.
 
 Only transient network and server failures schedule a bounded retry sequence of
-2, 5, 15, 30 and 60 seconds. Authentication, configuration, persistence,
+2, 5, 15, 30 and 60 seconds. Push stops the current batch immediately after a
+batch-global transient transport failure, leaving all later rows pending for
+that retry; accepted rows retain their existing exact-token acknowledgement.
+Record-local outcomes, including conflicts and missing/CAS outcomes, do not
+stop the rest of a batch. Authentication, configuration, persistence,
 invariant, missing-remote and unresolved-dependency failures do not receive a
 blind automatic retry. A push conflict remains subject to the established merge
 rules: a final pull runs first and a later normal cycle may republish if local

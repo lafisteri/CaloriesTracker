@@ -1,8 +1,28 @@
 # CaloriesTracker Current Code Audit
 
-**Snapshot date:** 2026-08-27  
-**Scope:** P1 WeeklyGoal identity, legacy synchronization safety and remote
-merge domain invariants.
+**Snapshot date:** 2026-08-28
+
+**Scope:** P1 WeeklyGoal identity, legacy synchronization safety, remote merge
+domain invariants and bounded sync orchestration.
+
+## P2: Bounded sync continuation and transient Push failure handling — FIXED
+
+The three-cycle normal convergence budget now returns a healthy internal
+`moreWork` outcome when ordinary pending outbox work or additional remote pages
+remain. The single-flight orchestrator keeps the status as `syncing` and
+coalesces one continuation after one second, so a large healthy backlog is not
+misreported as `.blocked(.dependency)` and cannot create a tight busy loop.
+Actual unresolved Pull dependencies, immutable/invariant failures, required
+missing remote records and permanent protocol failures remain blockers.
+
+`SyncPushCoordinator` now stops the current batch after its first `.network`
+or `.server` transport failure. Already accepted items retain their exact-token
+acknowledgements and every later item remains pending. The report exposes that
+transient batch failure to bootstrap and the orchestrator, which use the
+existing 2/5/15/30/60-second retry schedule. Entity-local accepted,
+accepted-but-still-pending, conflict and missing outcomes continue through the
+batch as before. Account-change guards still throw immediately, so an old
+account run neither retries nor commits local metadata.
 
 ## P1: Remote merge domain invariants — FIXED
 
