@@ -104,18 +104,6 @@ final class SyncLocalStore {
         }
     }
 
-    func applyRemote(_ envelope: SyncPayloadEnvelope) throws -> SyncMergeResult {
-        let modelContext = ModelContext(modelContainer)
-        do {
-            let result = try applyRemote(envelope, in: modelContext)
-            try modelContext.save()
-            return result
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
-    }
-
     /// Applies a remote envelope without saving. The caller owns the transaction boundary.
     func applyRemote(
         _ envelope: SyncPayloadEnvelope,
@@ -125,18 +113,6 @@ final class SyncLocalStore {
             throw SyncLocalStoreError.unsupportedPayloadSchema(envelope.schemaVersion)
         }
         return try applyRemote(envelope.payload, in: modelContext)
-    }
-
-    func applyRemote(_ payload: SyncPayload) throws -> SyncMergeResult {
-        let modelContext = ModelContext(modelContainer)
-        do {
-            let result = try applyRemote(payload, in: modelContext)
-            try modelContext.save()
-            return result
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
     }
 
     /// Applies a remote payload without saving. The caller owns the transaction boundary.
@@ -150,10 +126,6 @@ final class SyncLocalStore {
                 .canonicalizedIdentity(),
             in: modelContext,
         )
-    }
-
-    func applyRemote(_ payloads: [SyncPayload]) throws -> [SyncMergeResult] {
-        try payloads.map { try applyRemote($0) }
     }
 
     private func payload(for key: SyncEntityKey, in modelContext: ModelContext) throws -> SyncPayload {

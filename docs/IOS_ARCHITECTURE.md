@@ -338,12 +338,12 @@ including tombstones. A missing physical record for a requested key is an
 invariant error, never an empty or synthetic payload. Remote payloads are
 untrusted input: before either inserting or mutating a record, `applyRemote`
 validates payload values, immutable identity, and dependencies, then resolves
-LWW and only then writes mutable fields. Its caller-owned context variant lets
-pull combine the merge with metadata/outbox updates in one save; the convenience
-form saves by itself. It never marks an outbox record and therefore cannot echo
-a pull back into a future push. Its result distinguishes insertion, remote
-application, identical content, local-wins, dependency deferral and explicit
-republish effects.
+LWW and only then writes mutable fields. Remote application requires a
+caller-owned context, so Pull combines the merge with metadata/outbox updates
+in one save. It never marks an outbox record and therefore cannot echo a pull
+back into a future push. Its result distinguishes insertion, remote application,
+identical content, local-wins, dependency deferral and explicit republish
+effects.
 
 For existing Product and Recipe records, `id` and canonical-millisecond
 `createdAt` are immutable; LWW may update only their logical mutable state
