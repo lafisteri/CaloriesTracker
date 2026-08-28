@@ -122,11 +122,6 @@ struct TodayRootView: View {
         .task {
             await model.load()
         }
-        .onAppear {
-            Task {
-                await model.load()
-            }
-        }
         .onChange(of: router.todayPath) { _, path in
             guard path.isEmpty else {
                 return

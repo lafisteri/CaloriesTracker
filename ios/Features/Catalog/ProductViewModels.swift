@@ -267,6 +267,9 @@ final class ProductEditorViewModel {
 
     @discardableResult
     func save() async -> Bool {
+        guard !isSaving else {
+            return false
+        }
         errorMessage = nil
 
         do {

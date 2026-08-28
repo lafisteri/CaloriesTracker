@@ -8,10 +8,6 @@ final class GoalService {
         self.repository = repository
     }
 
-    func latestGoal() async throws -> WeeklyGoal? {
-        try await repository.latestGoal()
-    }
-
     func goal(for day: LocalDay) async throws -> WeeklyGoal? {
         try await repository.goal(effectiveOn: day)
     }

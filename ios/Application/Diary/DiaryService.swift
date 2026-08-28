@@ -57,16 +57,6 @@ private struct ResolvedDiarySource: Hashable, Sendable {
     let calculationSource: DiaryAmountCalculationSource
 }
 
-struct FoodSelectionItem: Identifiable, Hashable, Sendable {
-    let source: FoodSourceReference
-    let displayName: String
-    let subtitle: String
-
-    var id: FoodSourceReference {
-        source
-    }
-}
-
 @MainActor
 final class DiaryService {
     private let diaryRepository: any DiaryRepository
@@ -101,46 +91,6 @@ final class DiaryService {
             meals: meals,
             totalNutrition: try nutritionTotal(for: entries),
         )
-    }
-
-    func foodSources(matching query: String) async throws -> [FoodSelectionItem] {
-        let products = try await productRepository.activeProducts(matching: query)
-        let recipes = try await recipeRepository.activeRecipes(matching: query)
-        var items: [FoodSelectionItem] = []
-
-        for product in products {
-            guard let version = try await productRepository.version(id: product.currentVersionID),
-                  version.productID == product.id
-            else {
-                throw DiaryServiceError.currentVersionNotFound
-            }
-            items.append(
-                FoodSelectionItem(
-                    source: FoodSourceReference(sourceType: .product, sourceID: product.id),
-                    displayName: product.name,
-                    subtitle: "Продукт · \(displayNumber(version.nutrition.calories)) ккал",
-                ),
-            )
-        }
-
-        for recipe in recipes {
-            guard let version = try await recipeRepository.version(id: recipe.currentVersionID),
-                  version.recipeID == recipe.id
-            else {
-                throw DiaryServiceError.currentVersionNotFound
-            }
-            items.append(
-                FoodSelectionItem(
-                    source: FoodSourceReference(sourceType: .recipe, sourceID: recipe.id),
-                    displayName: recipe.name,
-                    subtitle: "Рецепт · \(displayNumber(version.totalNutrition.calories)) ккал",
-                ),
-            )
-        }
-
-        return items.sorted {
-            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
-        }
     }
 
     func amountSource(for source: FoodSourceReference) async throws -> DiaryAmountSource {
@@ -546,10 +496,6 @@ final class DiaryService {
         guard amount.isFinite, amount > 0 else {
             throw DiaryServiceError.invalidAmount
         }
-    }
-
-    private func displayNumber(_ value: Double) -> String {
-        value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 2)))
     }
 
     private func nutritionTotal(for entries: [DiaryEntry]) throws -> Nutrition {

@@ -44,8 +44,6 @@ protocol DiaryRepository: Sendable {
 
 @MainActor
 protocol GoalRepository: Sendable {
-    func weeklyGoal(id: UUID) async throws -> WeeklyGoal?
-    func latestGoal() async throws -> WeeklyGoal?
     func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal?
     func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal]
     func save(draft: WeeklyGoalDraft, at timestamp: Date) async throws -> WeeklyGoal

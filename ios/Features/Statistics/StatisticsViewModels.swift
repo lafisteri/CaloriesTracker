@@ -11,6 +11,7 @@ final class StatisticsViewModel {
     private(set) var statistics: WeekStatistics?
     private(set) var isLoading = false
     var errorMessage: String?
+    private var currentLoadID: UUID?
 
     init(statisticsService: StatisticsService, selectedDay: LocalDay = .current()) {
         self.statisticsService = statisticsService
@@ -22,19 +23,32 @@ final class StatisticsViewModel {
     }
 
     func load() async {
+        let loadID = UUID()
+        let requestedDay = selectedDay
+        currentLoadID = loadID
         isLoading = true
         errorMessage = nil
+        statistics = nil
 
         do {
-            statistics = try await statisticsService.week(containing: selectedDay)
+            let loadedStatistics = try await statisticsService.week(containing: requestedDay)
+            guard currentLoadID == loadID else {
+                return
+            }
+            statistics = loadedStatistics
         } catch {
+            guard currentLoadID == loadID else {
+                return
+            }
             statisticsErrorLogger.error(
                 "user_facing_error technical_error=\(String(reflecting: error), privacy: .public)",
             )
             errorMessage = "Не удалось загрузить статистику."
         }
 
-        isLoading = false
+        if currentLoadID == loadID {
+            isLoading = false
+        }
     }
 
     func previousWeek() async {

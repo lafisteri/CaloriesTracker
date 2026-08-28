@@ -271,7 +271,12 @@ struct RecipeDetailView: View {
         .task {
             await model.load()
         }
-        .onAppear {
+        .onChange(of: router.catalogPath) { oldPath, newPath in
+            guard oldPath.last == .recipeEditor(recipeID),
+                  newPath.last == .recipe(recipeID)
+            else {
+                return
+            }
             Task {
                 await model.load()
             }

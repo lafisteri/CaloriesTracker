@@ -73,6 +73,9 @@ final class GoalEditorViewModel {
 
     @discardableResult
     func save() async -> Bool {
+        guard !isSaving else {
+            return false
+        }
         errorMessage = nil
 
         do {

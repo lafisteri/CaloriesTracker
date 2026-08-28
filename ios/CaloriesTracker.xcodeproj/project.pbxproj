@@ -12,7 +12,6 @@
 		A10000000000000000000003 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* AppDependencies.swift */; };
 		A10000000000000000000004 /* CaloriesTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* CaloriesTrackerApp.swift */; };
 		A10000000000000000000005 /* RootApplicationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* RootApplicationView.swift */; };
-		A10000000000000000000006 /* RootPlaceholderViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* RootPlaceholderViews.swift */; };
 		A10000000000000000000007 /* Nutrition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* Nutrition.swift */; };
 		A10000000000000000000008 /* LocalDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* LocalDay.swift */; };
 		A10000000000000000000009 /* PersistentEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PersistentEnums.swift */; };
@@ -78,7 +77,6 @@
 		A20000000000000000000003 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* CaloriesTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaloriesTrackerApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* RootApplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootApplicationView.swift; sourceTree = "<group>"; };
-		A20000000000000000000006 /* RootPlaceholderViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootPlaceholderViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* Nutrition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Nutrition.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* LocalDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDay.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PersistentEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistentEnums.swift; sourceTree = "<group>"; };
@@ -191,7 +189,6 @@
 		A40000000000000000000005 /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000006 /* RootPlaceholderViews.swift */,
 				A40000000000000000000015 /* Catalog */,
 				A40000000000000000000017 /* Today */,
 				A4000000000000000000001B /* Goals */,
@@ -571,7 +568,6 @@
 				A10000000000000000000005 /* RootApplicationView.swift in Sources */,
 				A10000000000000000000067 /* SyncOrchestration.swift in Sources */,
 				A10000000000000000000068 /* SettingsView.swift in Sources */,
-				A10000000000000000000006 /* RootPlaceholderViews.swift in Sources */,
 				A10000000000000000000007 /* Nutrition.swift in Sources */,
 				A10000000000000000000008 /* LocalDay.swift in Sources */,
 				A10000000000000000000009 /* PersistentEnums.swift in Sources */,

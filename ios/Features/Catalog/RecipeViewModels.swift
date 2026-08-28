@@ -195,6 +195,7 @@ final class RecipeDetailViewModel {
     private(set) var isLoading = false
     private(set) var isUpdatingIngredients = false
     var errorMessage: String?
+    private var currentLoadID: UUID?
 
     init(recipeID: UUID, recipeService: RecipeService) {
         self.recipeID = recipeID
@@ -202,16 +203,27 @@ final class RecipeDetailViewModel {
     }
 
     func load() async {
+        let loadID = UUID()
+        currentLoadID = loadID
         isLoading = true
         errorMessage = nil
 
         do {
-            details = try await recipeService.details(id: recipeID)
+            let loadedDetails = try await recipeService.details(id: recipeID)
+            guard currentLoadID == loadID else {
+                return
+            }
+            details = loadedDetails
         } catch {
+            guard currentLoadID == loadID else {
+                return
+            }
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить рецепт.")
         }
 
-        isLoading = false
+        if currentLoadID == loadID {
+            isLoading = false
+        }
     }
 
     @discardableResult
@@ -228,6 +240,9 @@ final class RecipeDetailViewModel {
     }
 
     func updateIngredients() async {
+        guard !isUpdatingIngredients else {
+            return
+        }
         isUpdatingIngredients = true
         errorMessage = nil
 
@@ -484,6 +499,9 @@ final class RecipeEditorViewModel {
 
     @discardableResult
     func save() async -> Bool {
+        guard !isSaving else {
+            return false
+        }
         errorMessage = nil
 
         do {

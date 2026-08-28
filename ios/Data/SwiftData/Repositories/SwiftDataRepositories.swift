@@ -959,19 +959,6 @@ final class SwiftDataGoalRepository: GoalRepository {
         self.syncChangeNotifier = syncChangeNotifier
     }
 
-    func weeklyGoal(id: UUID) async throws -> WeeklyGoal? {
-        let descriptor = FetchDescriptor<WeeklyGoalRecord>(predicate: #Predicate { $0.id == id })
-        return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
-    }
-
-    func latestGoal() async throws -> WeeklyGoal? {
-        var descriptor = FetchDescriptor<WeeklyGoalRecord>(
-            sortBy: [SortDescriptor(\WeeklyGoalRecord.effectiveFromKey, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first.map { try $0.toDomain() }
-    }
-
     func goal(effectiveOn day: LocalDay) async throws -> WeeklyGoal? {
         let effectiveFromKey = day.rawValue
         var descriptor = FetchDescriptor<WeeklyGoalRecord>(
