@@ -71,18 +71,27 @@ struct ProductEditorView: View {
                             .textInputAutocapitalization(.sentences)
                             .focused($focusedField, equals: .name)
 
-                        TextField("Штрихкод", text: $model.barcode)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .focused($focusedField, equals: .barcode)
+                        // TextField("Штрихкод", text: $model.barcode)
+                        //     .textInputAutocapitalization(.never)
+                        //     .autocorrectionDisabled()
+                        //     .focused($focusedField, equals: .barcode)
 
-                        Picker("Единица", selection: $model.baseUnit) {
-                            ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
-                                Text(unit.russianLabel).tag(unit)
+                        HStack(spacing: AppStyle.controlSpacing) {
+                            decimalField("Количество", text: $model.baseAmount, field: .baseAmount)
+
+                            Picker("Единица", selection: $model.baseUnit) {
+                                ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
+                                    Text(unit.russianLabel).tag(unit)
+                                }
                             }
                         }
-
-                        decimalField("Количество", text: $model.baseAmount, field: .baseAmount)
+                        .listRowSeparator(.visible, edges: .bottom)
+                        .alignmentGuide(.listRowSeparatorLeading) { dimensions in
+                            dimensions[.leading]
+                        }
+                        .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
+                            dimensions[.trailing]
+                        }
                     }
 
                     Section("Пищевая ценность") {
@@ -90,6 +99,13 @@ struct ProductEditorView: View {
                         decimalField("Белки", text: $model.protein, field: .protein)
                         decimalField("Жиры", text: $model.fat, field: .fat)
                         decimalField("Углеводы", text: $model.carbs, field: .carbs)
+                            .listRowSeparator(.visible, edges: .bottom)
+                            .alignmentGuide(.listRowSeparatorLeading) { dimensions in
+                                dimensions[.leading]
+                            }
+                            .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
+                                dimensions[.trailing]
+                            }
                     }
                 }
 
