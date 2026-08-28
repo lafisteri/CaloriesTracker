@@ -143,14 +143,18 @@ Today
 текущий черновик Recipe не теряется.
 
 Soft-deleted Product и Recipe не показываются в Catalog. При отсутствии данных
-экран объясняет, что нужно создать первый Product или Recipe, а основное
-действие создания остаётся в toolbar.
+экран объясняет, что нужно создать первый Product или Recipe. Основные controls
+Catalog находятся в одной header-строке: `[ Поиск ] [ + ]`, а не в отдельной
+toolbar над поиском.
 
 ### Defaults and consistency in selection
 
 Для выбранного источника Catalog использует совместимое последнее
-использованное amount/unit. Если такого значения нет или единица больше не
-доступна, применяется fallback:
+использованное amount/unit: это последняя созданная подходящая active
+DiaryEntry (`createdAt`, затем стабильный UUID tie-break), а не запись с
+наиболее поздним generic `updatedAt`. Поэтому reorder, move или contextual
+source rebase не меняют default. Если такого значения нет или единица больше
+не доступна, применяется fallback:
 
 ```text
 г       → 100 г

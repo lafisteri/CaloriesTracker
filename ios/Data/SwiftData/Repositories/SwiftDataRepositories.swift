@@ -721,9 +721,6 @@ final class SwiftDataDiaryRepository: DiaryRepository {
     }
 
     private func isNewerUsage(_ candidate: DiaryEntryRecord, than current: DiaryEntryRecord) -> Bool {
-        if candidate.updatedAt != current.updatedAt {
-            return candidate.updatedAt > current.updatedAt
-        }
         if candidate.createdAt != current.createdAt {
             return candidate.createdAt > current.createdAt
         }

@@ -2,95 +2,44 @@
 
 **Snapshot date:** 2026-08-28
 
-**Scope:** P1 WeeklyGoal identity, legacy synchronization safety, remote merge
-domain invariants and bounded sync orchestration.
+## Open findings
 
-## P2: Strict ProductVersion and RecipeVersion lineage — FIXED
+- P0: 0
+- P1: 0
+- P2: 0 confirmed open findings
 
-Both local repository creation boundaries and remote insertion validation enforce
-the same immutable lineage: a first version has no base and number 1; a derived
-version has a non-self same-owner base and a version number exactly one greater
-than that base. ProductService and RecipeService already construct that sequence,
-while the repository append boundary prevents any other caller from persisting a
-skipped or cross-owner lineage.
+## Latest P2: Catalog last-used semantics — FIXED
 
-Remote Pull defers an unknown base so later pages can satisfy the dependency. An
-existing base with a different owner, invalid number, or non-sequential next
-number is invalid remote data/corruption; it is not republished. Existing UUID
-collision semantics and RecipeVersion ingredient validation remain independent.
-No schema migration, startup scan, or rewrite of historical version records was
-introduced.
+`latestActiveUsages` selects the active DiaryEntry that was created most
+recently: `createdAt`, then a deterministic UUID tie-break. It does not use
+`updatedAt`. Product and Recipe Catalog defaults therefore retain the amount and
+unit from the last added compatible entry; reorder, meal move and contextual
+source rebase cannot make an older entry appear newly used. Soft-deleted entries
+remain excluded, and the repository continues to return amount, unit and source
+identity unchanged.
 
-## P2: Bounded sync continuation and transient Push failure handling — FIXED
+## Current integrity baseline
 
-The three-cycle normal convergence budget now returns a healthy internal
-`moreWork` outcome when ordinary pending outbox work or additional remote pages
-remain. The single-flight orchestrator keeps the status as `syncing` and
-coalesces one continuation after one second, so a large healthy backlog is not
-misreported as `.blocked(.dependency)` and cannot create a tight busy loop.
-Actual unresolved Pull dependencies, immutable/invariant failures, required
-missing remote records and permanent protocol failures remain blockers.
+- ProductVersion and RecipeVersion validate strict same-owner sequential
+  lineage; missing remote bases defer, contradictory existing bases are corrupt.
+- WeeklyGoal uses deterministic effective-date identity, preserves historical
+  lookup and normalizes legacy local/remote aliases at the sync boundary.
+- Remote merge validates domain invariants in the Pull-owned transaction;
+  account-pinned sync, exact-token Outbox acknowledgement and cursor semantics
+  remain intact.
+- Healthy bounded sync work continues as `moreWork`; only real blockers become
+  blocked, and transient Push failures stop the remaining batch for scheduled
+  retry.
+- Today, Statistics, RecipeDetail and Catalog loads protect their published
+  state from stale requests; production save/create flows reject a second
+  in-flight invocation.
 
-`SyncPushCoordinator` now stops the current batch after its first `.network`
-or `.server` transport failure. Already accepted items retain their exact-token
-acknowledgements and every later item remains pending. The report exposes that
-transient batch failure to bootstrap and the orchestrator, which use the
-existing 2/5/15/30/60-second retry schedule. Entity-local accepted,
-accepted-but-still-pending, conflict and missing outcomes continue through the
-batch as before. Account-change guards still throw immediately, so an old
-account run neither retries nor commits local metadata.
+## Deliberately deferred
 
-## P1: Remote merge domain invariants — FIXED
-
-`SyncLocalStore` treats every remote payload as untrusted input. Existing
-Product and Recipe records reject a different canonical-millisecond `createdAt`
-before LWW and never assign that immutable field during remote application.
-Existing DiaryEntry records similarly reject changed `LocalDay`, `sourceType`,
-`sourceID` or `createdAt` before any dependency, LWW or assignment step. A
-changed DiaryEntry source version/name remains valid only as a contextual rebase
-whose ProductVersion/RecipeVersion is present and belongs to the same immutable
-source.
-
-ProductVersion and RecipeVersion remain whole-record immutable on UUID
-collision. New versions validate the local repository's initial/append shape,
-reject self-references and cross-owner bases, defer only missing bases, and
-retain the existing pinned-ingredient/total validation for recipes. Pull rolls
-back the caller-owned context for every invalid or invariant-violating remote
-record, so no partial domain mutation, metadata write or stale-outbox
-acknowledgement is persisted.
-
-This hardening does not change account pinning, outbox token semantics, pull
-cursors, sync transport, conflict ordering, WeeklyGoal canonical identity,
-schema or UI.
-
-## P1: Canonical WeeklyGoal identity — FIXED
-
-`WeeklyGoal.effectiveFrom` is the aggregate's logical identity. Its persisted
-and sync UUID is UUIDv5 using fixed namespace
-`6E770171-4E9D-4E0C-8BC7-0C64A5CB6D52` and the UTF-8 canonical LocalDay value
-`YYYY-MM-DD`. New goals and same-day edits therefore use the same UUID on every
-device; a different effective day uses a different UUID.
-
-At app startup and before each pull, push or bootstrap boundary,
-`SyncLocalStore` idempotently normalizes legacy random local goal UUIDs. It
-preserves `effectiveFrom`, `createdAt`, `updatedAt` and all seven daily values,
-updates only the owned daily-goal foreign IDs, removes stale legacy outbox keys
-through their exact tokens, and coalesces pending work into one canonical key.
-This is data normalization, not a SwiftData V6 migration.
-
-Pull separates an old physical Supabase alias key from the canonical local key:
-the alias's server revision remains stored under the actual remote key, while
-its payload merges into the canonical local aggregate. The winning aggregate is
-republished only under the canonical key, and any obsolete alias outbox marker
-is removed in the same pull transaction. Legacy cloud alias rows may remain
-inert; they cannot create a second local WeeklyGoal, become an active local
-identity, block the cursor, or cause a `missingEntity` retry loop.
-
-WeeklyGoal content remains a complete seven-day aggregate under canonical
-millisecond `updatedAt` LWW, followed by the existing canonical-payload
-tie-break. The winner's UUID never chooses logical identity. Same-day edits,
-historical effective-date lookup and the old-payload `updatedAt = createdAt`
-fallback remain unchanged.
-
-No Product, Recipe, Diary, SQL/RLS/RPC, authentication, cursor, conflict-rule
-or UI behavior changed. No automated test target or simulator run was added.
+- Move from MainActor repositories to ModelActor only if measured performance
+  requires it.
+- Adopt Swift 6 strict concurrency in a dedicated compatibility pass.
+- Freeze historical SwiftData schemas before the next structural migration.
+- Add live UI refresh for multi-device Pull only if that product scenario is
+  introduced.
+- Define server-reset/cloud-recovery UX only if recovery is required.

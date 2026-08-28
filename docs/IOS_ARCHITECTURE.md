@@ -224,12 +224,13 @@ has no pending outbox work or known pull blocker. Settings calls the idle state
 “Синхронизировано” only when such a successful cycle exists and no later error
 is retained; otherwise it shows that synchronization is waiting.
 
-Today root presents a modal `SettingsView` from its trailing `gearshape` toolbar
-button; it does not add a fourth tab or alter `todayPath`. The Settings root is
-a simple native list with `Цели` and `Синхронизация` NavigationLinks, so later
-app-setting sections can be added without changing Today or AppRouter.
-`Цели` reuses the existing `GoalEditorView` and `GoalService` within that modal
-NavigationStack. `SyncSettingsView` uses `SupabaseAuthService` for passwordless
+Today places its DateNavigator and `gearshape` Settings control in one header
+row: `[ DateNavigator ] [ gear ]`. The gear appends `SettingsView` to
+`todayPath`; it does not add a fourth tab. The Settings root is a simple native
+list with `Цели` and `Синхронизация` NavigationLinks, so later app-setting
+sections can be added without changing Today or AppRouter. `Цели` reuses the
+existing `GoalEditorView` and `GoalService`. `SyncSettingsView` uses
+`SupabaseAuthService` for passwordless
 email OTP only and receives the observable status store plus
 `SyncOrchestrator`'s explicit manual wake API. It never calls bootstrap, pull
 or push coordinators. Signed-out users enter an email, request a code, enter up
@@ -429,21 +430,21 @@ AppRouter owns the selected tab and the typed paths that need route state:
 Продукты   → catalogPath
 ~~~
 
-Statistics is a root-only stack. Goals is reached from the Settings modal and
-uses that modal's own NavigationStack, so Settings state does not leak into a
-tab path. Catalog owns Product/Recipe details, editors and histories. Today
-owns selection, Amount and contextual editor routes. Routes carry IDs and
-explicit context, never URLs or captured SwiftData objects. DiaryContext carries
-LocalDay and MealType; FoodSourceReference carries SourceType and logical source
-ID.
+Statistics is a root-only stack. Settings is a `TodayRoute` with its own child
+navigation for Goals and Sync. Catalog owns Product/Recipe details, editors and
+histories. Today owns selection, Amount, Settings and contextual editor routes.
+Routes carry IDs and explicit context, never URLs or captured SwiftData objects.
+DiaryContext carries LocalDay and MealType; FoodSourceReference carries SourceType
+and logical source ID.
 
 Paths are independent with one intentional exception: leaving the Today tab
 clears todayPath. This discards unfinished transient flows so returning shows
 Today root. The selected LocalDay lives in TodayViewModel, independent of the
 path, and is not reset.
 
-The Today-root gear presents Settings modally, so it is not an AppRouter route
-and does not affect the three bottom tabs or their reset rules.
+The Today-root gear is adjacent to DateNavigator and appends `.settings` to
+`todayPath`. It does not add a fourth tab; leaving Today still clears transient
+Today routes under the same reset rule.
 
 Completion callbacks use guarded router pop helpers: an async completion may pop
 only if its expected route is still at the top. This prevents stale callbacks
@@ -608,6 +609,12 @@ amount, unit, nutrition, day, meal and order. New entries resolve the selected
 source's current version once. Existing-entry amount edits resolve saved
 sourceVersionID, not a current source version. Historical snapshots are stable
 by default: ordinary Product/Recipe edits never rewrite them.
+
+`DiaryEntry.updatedAt` is a generic mutation timestamp: amount edits, reorder,
+meal moves and contextual source rebase may update it. Catalog's latest-usage
+default instead orders active compatible entries by `createdAt`, then a stable
+UUID tie-break, so those technical mutations cannot change the last-used
+amount/unit.
 
 An explicit Product edit initiated from one DiaryEntry is the narrow exception:
 DiaryService may rebase that one Product-sourced entry to Product.currentVersionID,
