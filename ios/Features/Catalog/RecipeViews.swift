@@ -375,6 +375,7 @@ struct RecipeEditorView: View {
     @State private var editingIngredient: RecipeIngredientEditorItem?
     @State private var isKeyboardVisible = false
     @State private var isIngredientSelectionPending = false
+    @State private var isOutputUnitPickerPresented = false
     @FocusState private var focusedField: RecipeEditorField?
 
     init(
@@ -439,16 +440,25 @@ struct RecipeEditorView: View {
                         TextField("Название", text: $model.name)
                             .textInputAutocapitalization(.sentences)
                             .focused($focusedField, equals: .name)
-
-                        Picker("Единица", selection: $model.outputUnit) {
-                            ForEach(RecipeDiaryUnit.allCases, id: \.self) { unit in
-                                Text(recipeOutputUnitLabel(unit)).tag(unit)
+                            .listRowSeparator(.visible, edges: .bottom)
+                            .alignmentGuide(.listRowSeparatorLeading) { dimensions in
+                                dimensions[.leading]
                             }
-                        }
+                            .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
+                                dimensions[.trailing]
+                            }
 
-                        TextField("Количество", text: EditableDecimal.binding($model.outputAmountText))
-                            .keyboardType(.decimalPad)
-                            .focused($focusedField, equals: .outputAmount)
+                        HStack(alignment: .bottom, spacing: AppStyle.controlSpacing) {
+                            recipeOutputAmountField(text: $model.outputAmountText)
+                                .frame(maxWidth: .infinity)
+
+                            VStack(spacing: 0) {
+                                recipeOutputUnitPicker(selection: $model.outputUnit)
+                                Divider()
+                            }
+                            .frame(width: RecipeEditorLayout.unitPickerWidth)
+                        }
+                        .listRowSeparator(.hidden)
                     }
 
                     FoodCompositionSection(
@@ -498,6 +508,28 @@ struct RecipeEditorView: View {
             }
             .listStyle(.insetGrouped)
             .listSectionSpacing(.compact)
+        }
+        .overlayPreferenceValue(RecipeOutputUnitAnchorPreferenceKey.self) { anchor in
+            GeometryReader { proxy in
+                if isOutputUnitPickerPresented, let anchor {
+                    let frame = proxy[anchor]
+
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                isOutputUnitPickerPresented = false
+                            }
+
+                        recipeOutputUnitPickerMenu(selection: $model.outputUnit)
+                            .offset(
+                                x: frame.maxX - RecipeEditorLayout.unitMenuWidth,
+                                y: frame.maxY + AppStyle.controlSpacing,
+                            )
+                    }
+                    .zIndex(1)
+                }
+            }
         }
         .appScreenBackground()
         .toolbar(.hidden, for: .navigationBar)
@@ -642,6 +674,90 @@ struct RecipeEditorView: View {
         showsIngredientSelection = true
     }
 
+    private func recipeOutputAmountField(text: Binding<String>) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: AppStyle.controlSpacing) {
+                Text("Количество")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(1)
+                Spacer(minLength: 0)
+                TextField("", text: EditableDecimal.binding(text))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 44, maxWidth: 120, alignment: .trailing)
+                    .focused($focusedField, equals: .outputAmount)
+                    .accessibilityLabel("Количество")
+            }
+            .frame(height: AppStyle.controlHeight)
+            Divider()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusedField = .outputAmount
+        }
+    }
+
+    private func recipeOutputUnitPicker(selection: Binding<RecipeDiaryUnit>) -> some View {
+        Button {
+            focusedField = nil
+            isOutputUnitPickerPresented = true
+        } label: {
+            HStack(spacing: 4) {
+                Text(recipeOutputUnitLabel(selection.wrappedValue))
+                Image(systemName: "chevron.up.chevron.down")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(
+            width: RecipeEditorLayout.unitPickerWidth,
+            height: AppStyle.controlHeight,
+            alignment: .trailing,
+        )
+        .contentShape(Rectangle())
+        .anchorPreference(key: RecipeOutputUnitAnchorPreferenceKey.self, value: .bounds) { $0 }
+        .accessibilityLabel("Единица")
+        .accessibilityValue(recipeOutputUnitLabel(selection.wrappedValue))
+    }
+
+    private func recipeOutputUnitPickerMenu(selection: Binding<RecipeDiaryUnit>) -> some View {
+        VStack(spacing: 0) {
+            ForEach(RecipeDiaryUnit.allCases, id: \.self) { unit in
+                Button {
+                    selection.wrappedValue = unit
+                    isOutputUnitPickerPresented = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(recipeOutputUnitLabel(unit))
+                        Spacer(minLength: 0)
+                        if selection.wrappedValue == unit {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                    .frame(height: AppStyle.controlHeight)
+                    .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+
+                if unit != RecipeDiaryUnit.allCases.last {
+                    Divider()
+                }
+            }
+        }
+        .frame(width: RecipeEditorLayout.unitMenuWidth)
+        .background(AppStyle.controlBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(
+            color: AppStyle.controlShadowColor,
+            radius: AppStyle.controlShadowRadius,
+            y: AppStyle.controlShadowY,
+        )
+    }
+
 }
 
 private struct RecipeIngredientListEntryRow: View {
@@ -678,6 +794,19 @@ private struct RecipeIngredientListEntryRow: View {
 private enum RecipeEditorField: Hashable {
     case name
     case outputAmount
+}
+
+private enum RecipeEditorLayout {
+    static let unitPickerWidth: CGFloat = 100
+    static let unitMenuWidth: CGFloat = 132
+}
+
+private struct RecipeOutputUnitAnchorPreferenceKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>?
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
 }
 
 struct RecipeVersionHistoryView: View {
