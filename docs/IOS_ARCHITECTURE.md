@@ -358,13 +358,14 @@ tombstone remain normal mutable diary state.
 ProductVersion and RecipeVersion are immutable whole records. A known UUID must
 have exactly equal canonical content or is a corruption error. New remote
 versions must satisfy the same initial-versus-appended version shape as the
-local repositories (`versionNumber == 1` with no base, or `versionNumber > 1`
-with a non-self base); a missing base is deferred, while a base owned by a
-different Product or Recipe is rejected. RecipeVersion additionally validates
-its ordered, pinned ingredients and derived totals before insertion. The
-logical Product/Recipe is attached when its current version is available, which
-preserves the dependency ordering required for first-time sync without creating
-outbox work from remote import.
+local repositories: the first version has no base and `versionNumber == 1`; a
+derived version has a non-self base owned by the same Product/Recipe and its
+`versionNumber` is exactly `basedOn.versionNumber + 1`. A missing base is
+deferred, while an existing cross-owner or non-sequential lineage is rejected as
+corruption. RecipeVersion additionally validates its ordered, pinned ingredients
+and derived totals before insertion. The logical Product/Recipe is attached when
+its current version is available, which preserves the dependency ordering
+required for first-time sync without creating outbox work from remote import.
 
 Product, Recipe, DiaryEntry and WeeklyGoal use whole-record last-writer-wins by canonical
 integer-millisecond `updatedAt`; raw high-precision local Dates never compare
@@ -585,7 +586,8 @@ Recipe (logical identity)
 
 Product.currentVersionID and Recipe.currentVersionID select sources for new
 actions. Versions are append-only immutable values with basedOnVersionID
-lineage and display version number.
+lineage and display version number. The initial version is always number 1 with
+no base; every derived version is exactly one greater than its same-owner base.
 
 A metadata-only save updates the logical Product or Recipe while retaining its
 currentVersionID. For Product this is name and barcode; for Recipe it is name.

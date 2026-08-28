@@ -5,6 +5,22 @@
 **Scope:** P1 WeeklyGoal identity, legacy synchronization safety, remote merge
 domain invariants and bounded sync orchestration.
 
+## P2: Strict ProductVersion and RecipeVersion lineage — FIXED
+
+Both local repository creation boundaries and remote insertion validation enforce
+the same immutable lineage: a first version has no base and number 1; a derived
+version has a non-self same-owner base and a version number exactly one greater
+than that base. ProductService and RecipeService already construct that sequence,
+while the repository append boundary prevents any other caller from persisting a
+skipped or cross-owner lineage.
+
+Remote Pull defers an unknown base so later pages can satisfy the dependency. An
+existing base with a different owner, invalid number, or non-sequential next
+number is invalid remote data/corruption; it is not republished. Existing UUID
+collision semantics and RecipeVersion ingredient validation remain independent.
+No schema migration, startup scan, or rewrite of historical version records was
+introduced.
+
 ## P2: Bounded sync continuation and transient Push failure handling — FIXED
 
 The three-cycle normal convergence budget now returns a healthy internal

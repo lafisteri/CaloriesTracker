@@ -239,6 +239,11 @@ final class SyncLocalStore {
             guard try productVersionPayload(from: localRecord) == remote else {
                 throw SyncLocalStoreError.immutableCollision(key)
             }
+
+            let missing = try missingDependencies(for: remote, in: modelContext)
+            guard missing.isEmpty else {
+                return .deferred(key, missing: missing)
+            }
             return .identical(key)
         }
 
@@ -309,6 +314,11 @@ final class SyncLocalStore {
         if let localRecord = try recipeVersionRecord(id: remote.id, in: modelContext) {
             guard recipeVersionPayload(from: localRecord) == remote else {
                 throw SyncLocalStoreError.immutableCollision(key)
+            }
+
+            let missing = try missingDependencies(for: remote, in: modelContext)
+            guard missing.isEmpty else {
+                return .deferred(key, missing: missing)
             }
             return .identical(key)
         }
@@ -521,6 +531,16 @@ final class SyncLocalStore {
                 reason: "basedOnVersionID belongs to a different product",
             )
         }
+        let (expectedVersionNumber, didOverflow) = basedOn.versionNumber.addingReportingOverflow(1)
+        guard basedOn.versionNumber > 0,
+              !didOverflow,
+              payload.versionNumber == expectedVersionNumber
+        else {
+            throw SyncLocalStoreError.invalidPayload(
+                key,
+                reason: "versionNumber must equal basedOnVersionID version number plus 1",
+            )
+        }
         return []
     }
 
@@ -595,6 +615,16 @@ final class SyncLocalStore {
                     throw SyncLocalStoreError.invalidPayload(
                         key,
                         reason: "basedOnVersionID belongs to a different recipe",
+                    )
+                }
+                let (expectedVersionNumber, didOverflow) = basedOn.versionNumber.addingReportingOverflow(1)
+                guard basedOn.versionNumber > 0,
+                      !didOverflow,
+                      payload.versionNumber == expectedVersionNumber
+                else {
+                    throw SyncLocalStoreError.invalidPayload(
+                        key,
+                        reason: "versionNumber must equal basedOnVersionID version number plus 1",
                     )
                 }
             } else {

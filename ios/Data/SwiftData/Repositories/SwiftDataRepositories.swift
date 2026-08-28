@@ -163,6 +163,18 @@ final class SwiftDataProductRepository: ProductRepository {
         guard productRecord.currentVersionID == version.basedOnVersionID else {
             throw ProductRepositoryError.invalidCurrentVersion
         }
+        guard let basedOnVersionID = version.basedOnVersionID,
+              basedOnVersionID != version.id,
+              let basedOnRecord = try productVersionRecord(id: basedOnVersionID),
+              basedOnRecord.productID == version.productID,
+              basedOnRecord.versionNumber > 0
+        else {
+            throw ProductRepositoryError.invalidVersionAppend
+        }
+        let (expectedVersionNumber, didOverflow) = basedOnRecord.versionNumber.addingReportingOverflow(1)
+        guard !didOverflow, version.versionNumber == expectedVersionNumber else {
+            throw ProductRepositoryError.invalidVersionAppend
+        }
         try await ensureUniqueBarcode(product.barcode, excludingProductID: product.id)
 
         let versionRecord = makeRecord(version)
@@ -209,6 +221,12 @@ final class SwiftDataProductRepository: ProductRepository {
 
     private func productRecord(id: UUID) throws -> ProductRecord? {
         let descriptor = FetchDescriptor<ProductRecord>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func productVersionRecord(id: UUID) throws -> ProductVersionRecord? {
+        var descriptor = FetchDescriptor<ProductVersionRecord>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first
     }
 
@@ -414,6 +432,18 @@ final class SwiftDataRecipeRepository: RecipeRepository {
         guard recipeRecord.currentVersionID == version.basedOnVersionID else {
             throw RecipeRepositoryError.invalidCurrentVersion
         }
+        guard let basedOnVersionID = version.basedOnVersionID,
+              basedOnVersionID != version.id,
+              let basedOnRecord = try recipeVersionRecord(id: basedOnVersionID),
+              basedOnRecord.recipeID == version.recipeID,
+              basedOnRecord.versionNumber > 0
+        else {
+            throw RecipeRepositoryError.invalidVersionAppend
+        }
+        let (expectedVersionNumber, didOverflow) = basedOnRecord.versionNumber.addingReportingOverflow(1)
+        guard !didOverflow, version.versionNumber == expectedVersionNumber else {
+            throw RecipeRepositoryError.invalidVersionAppend
+        }
 
         let versionRecord = makeRecord(version)
         versionRecord.recipe = recipeRecord
@@ -464,6 +494,12 @@ final class SwiftDataRecipeRepository: RecipeRepository {
 
     private func recipeRecord(id: UUID) throws -> RecipeRecord? {
         let descriptor = FetchDescriptor<RecipeRecord>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first
+    }
+
+    private func recipeVersionRecord(id: UUID) throws -> RecipeVersionRecord? {
+        var descriptor = FetchDescriptor<RecipeVersionRecord>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first
     }
 
