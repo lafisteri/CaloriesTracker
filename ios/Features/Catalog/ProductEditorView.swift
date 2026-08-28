@@ -8,6 +8,7 @@ struct ProductEditorView: View {
     @State private var model: ProductEditorViewModel
     @FocusState private var focusedField: EditorField?
     @State private var didSave = false
+    @State private var isUnitPickerPresented = false
 
     init(
         productID: UUID?,
@@ -70,35 +71,6 @@ struct ProductEditorView: View {
                         TextField("Название", text: $model.name)
                             .textInputAutocapitalization(.sentences)
                             .focused($focusedField, equals: .name)
-
-                        // TextField("Штрихкод", text: $model.barcode)
-                        //     .textInputAutocapitalization(.never)
-                        //     .autocorrectionDisabled()
-                        //     .focused($focusedField, equals: .barcode)
-
-                        HStack(spacing: AppStyle.controlSpacing) {
-                            decimalField("Количество", text: $model.baseAmount, field: .baseAmount)
-
-                            Picker("Единица", selection: $model.baseUnit) {
-                                ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
-                                    Text(unit.russianLabel).tag(unit)
-                                }
-                            }
-                        }
-                        .listRowSeparator(.visible, edges: .bottom)
-                        .alignmentGuide(.listRowSeparatorLeading) { dimensions in
-                            dimensions[.leading]
-                        }
-                        .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
-                            dimensions[.trailing]
-                        }
-                    }
-
-                    Section("Пищевая ценность") {
-                        decimalField("Калории", text: $model.calories, field: .calories)
-                        decimalField("Белки", text: $model.protein, field: .protein)
-                        decimalField("Жиры", text: $model.fat, field: .fat)
-                        decimalField("Углеводы", text: $model.carbs, field: .carbs)
                             .listRowSeparator(.visible, edges: .bottom)
                             .alignmentGuide(.listRowSeparatorLeading) { dimensions in
                                 dimensions[.leading]
@@ -106,6 +78,30 @@ struct ProductEditorView: View {
                             .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
                                 dimensions[.trailing]
                             }
+
+                        // TextField("Штрихкод", text: $model.barcode)
+                        //     .textInputAutocapitalization(.never)
+                        //     .autocorrectionDisabled()
+                        //     .focused($focusedField, equals: .barcode)
+
+                        HStack(alignment: .bottom, spacing: AppStyle.controlSpacing) {
+                            amountField(text: $model.baseAmount)
+                                .frame(maxWidth: .infinity)
+
+                            VStack(spacing: 0) {
+                                unitPicker(selection: $model.baseUnit)
+                                Divider()
+                            }
+                            .frame(width: ProductEditorLayout.unitPickerWidth)
+                        }
+                        .listRowSeparator(.hidden)
+                    }
+
+                    Section("Пищевая ценность") {
+                        nutritionField("Калории", text: $model.calories, field: .calories)
+                        nutritionField("Белки", text: $model.protein, field: .protein)
+                        nutritionField("Жиры", text: $model.fat, field: .fat)
+                        nutritionField("Углеводы", text: $model.carbs, field: .carbs)
                     }
                 }
 
@@ -113,6 +109,28 @@ struct ProductEditorView: View {
                     Section {
                         InlineErrorView(message: errorMessage)
                     }
+                }
+            }
+        }
+        .overlayPreferenceValue(UnitPickerAnchorPreferenceKey.self) { anchor in
+            GeometryReader { proxy in
+                if isUnitPickerPresented, let anchor {
+                    let frame = proxy[anchor]
+
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                isUnitPickerPresented = false
+                            }
+
+                        unitPickerMenu(selection: $model.baseUnit)
+                            .offset(
+                                x: frame.maxX - ProductEditorLayout.unitMenuWidth,
+                                y: frame.maxY + AppStyle.controlSpacing,
+                            )
+                    }
+                    .zIndex(1)
                 }
             }
         }
@@ -139,6 +157,110 @@ struct ProductEditorView: View {
             .keyboardType(.decimalPad)
             .focused($focusedField, equals: field)
     }
+
+    private func amountField(text: Binding<String>) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: AppStyle.controlSpacing) {
+                Text("Количество")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(1)
+                Spacer(minLength: 0)
+                decimalField("", text: text, field: .baseAmount)
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 44, maxWidth: 120, alignment: .trailing)
+                    .accessibilityLabel("Количество")
+            }
+            .frame(height: AppStyle.controlHeight)
+            Divider()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusedField = .baseAmount
+        }
+    }
+
+    private func unitPicker(selection: Binding<ProductBaseUnit>) -> some View {
+        Button {
+            focusedField = nil
+            isUnitPickerPresented = true
+        } label: {
+            HStack(spacing: 4) {
+                Text(selection.wrappedValue.russianLabel)
+                Image(systemName: "chevron.up.chevron.down")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(
+            width: ProductEditorLayout.unitPickerWidth,
+            height: AppStyle.controlHeight,
+            alignment: .trailing,
+        )
+        .contentShape(Rectangle())
+        .anchorPreference(key: UnitPickerAnchorPreferenceKey.self, value: .bounds) { $0 }
+        .accessibilityLabel("Единица")
+        .accessibilityValue(selection.wrappedValue.russianLabel)
+    }
+
+    private func unitPickerMenu(selection: Binding<ProductBaseUnit>) -> some View {
+        VStack(spacing: 0) {
+            ForEach(ProductBaseUnit.allCases, id: \.self) { unit in
+                Button {
+                    selection.wrappedValue = unit
+                    isUnitPickerPresented = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(unit.russianLabel)
+                        Spacer(minLength: 0)
+                        if selection.wrappedValue == unit {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                    .frame(height: AppStyle.controlHeight)
+                    .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+
+                if unit != ProductBaseUnit.allCases.last {
+                    Divider()
+                }
+            }
+        }
+        .frame(width: ProductEditorLayout.unitMenuWidth)
+        .background(AppStyle.controlBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(
+            color: AppStyle.controlShadowColor,
+            radius: AppStyle.controlShadowRadius,
+            y: AppStyle.controlShadowY,
+        )
+    }
+
+    private func nutritionField(_ title: String, text: Binding<String>, field: EditorField) -> some View {
+        HStack(spacing: AppStyle.controlSpacing) {
+            Text(title)
+            Spacer(minLength: 0)
+            decimalField("", text: text, field: field)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 120)
+                .accessibilityLabel(title)
+        }
+        .listRowSeparator(.visible, edges: .bottom)
+        .alignmentGuide(.listRowSeparatorLeading) { dimensions in
+            dimensions[.leading]
+        }
+        .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
+            dimensions[.trailing]
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusedField = field
+        }
+    }
 }
 
 private enum EditorField: Hashable {
@@ -149,4 +271,17 @@ private enum EditorField: Hashable {
     case protein
     case fat
     case carbs
+}
+
+private enum ProductEditorLayout {
+    static let unitPickerWidth: CGFloat = 100
+    static let unitMenuWidth: CGFloat = 132
+}
+
+private struct UnitPickerAnchorPreferenceKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>?
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
 }
