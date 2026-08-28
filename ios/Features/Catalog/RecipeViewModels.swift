@@ -18,6 +18,7 @@ final class RecipeListViewModel {
     private let recipeService: RecipeService
     private let diaryService: DiaryService?
     private var currentQuery = ""
+    private var latestLoadRequestID: UUID?
 
     private(set) var recipes: [RecipeListItem] = []
     private(set) var isLoading = false
@@ -31,27 +32,47 @@ final class RecipeListViewModel {
     }
 
     func load(matching query: String) async {
+        let requestID = UUID()
+        latestLoadRequestID = requestID
         currentQuery = query
         isLoading = true
         errorMessage = nil
 
         do {
             let items = try await recipeService.recipes(matching: query)
-            recipes = items
+            guard shouldPublish(requestID) else {
+                return
+            }
+
+            let loadedUsageDefaults: [FoodSourceReference: DiaryUsageDefault]
             if let diaryService {
-                usageDefaults = try await diaryService.latestUsageDefaults(
+                loadedUsageDefaults = try await diaryService.latestUsageDefaults(
                     for: items.map { item in
                         FoodSourceReference(sourceType: .recipe, sourceID: item.recipe.id)
                     },
                 )
             } else {
-                usageDefaults = [:]
+                loadedUsageDefaults = [:]
             }
+            guard shouldPublish(requestID) else {
+                return
+            }
+
+            recipes = items
+            usageDefaults = loadedUsageDefaults
             refreshSelectionDisplays(for: items)
+        } catch is CancellationError {
+            return
         } catch {
+            guard shouldPublish(requestID) else {
+                return
+            }
             errorMessage = recipeErrorMessage(error, fallback: "Не удалось загрузить рецепты.")
         }
 
+        guard shouldPublish(requestID) else {
+            return
+        }
         isLoading = false
     }
 
@@ -157,6 +178,10 @@ final class RecipeListViewModel {
             units.append((RecipeDiaryUnit.serving.rawValue, "порция"))
         }
         return units
+    }
+
+    private func shouldPublish(_ requestID: UUID) -> Bool {
+        latestLoadRequestID == requestID && !Task.isCancelled
     }
 }
 

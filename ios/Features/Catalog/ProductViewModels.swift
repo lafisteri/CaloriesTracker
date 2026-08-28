@@ -19,6 +19,7 @@ final class ProductListViewModel {
     private let productService: ProductService
     private let diaryService: DiaryService?
     private var currentQuery = ""
+    private var latestLoadRequestID: UUID?
 
     private(set) var products: [ProductListItem] = []
     private(set) var isLoading = false
@@ -32,27 +33,47 @@ final class ProductListViewModel {
     }
 
     func load(matching query: String) async {
+        let requestID = UUID()
+        latestLoadRequestID = requestID
         currentQuery = query
         isLoading = true
         errorMessage = nil
 
         do {
             let items = try await productService.products(matching: query)
-            products = items
+            guard shouldPublish(requestID) else {
+                return
+            }
+
+            let loadedUsageDefaults: [FoodSourceReference: DiaryUsageDefault]
             if let diaryService {
-                usageDefaults = try await diaryService.latestUsageDefaults(
+                loadedUsageDefaults = try await diaryService.latestUsageDefaults(
                     for: items.map { item in
                         FoodSourceReference(sourceType: .product, sourceID: item.product.id)
                     },
                 )
             } else {
-                usageDefaults = [:]
+                loadedUsageDefaults = [:]
             }
+            guard shouldPublish(requestID) else {
+                return
+            }
+
+            products = items
+            usageDefaults = loadedUsageDefaults
             refreshSelectionDisplays(for: items)
+        } catch is CancellationError {
+            return
         } catch {
+            guard shouldPublish(requestID) else {
+                return
+            }
             errorMessage = productErrorMessage(error, fallback: "Не удалось загрузить продукты.")
         }
 
+        guard shouldPublish(requestID) else {
+            return
+        }
         isLoading = false
     }
 
@@ -142,6 +163,10 @@ final class ProductListViewModel {
 
     private func productUnitLabel(for token: String, version: ProductVersion) -> String? {
         token == version.baseUnit.rawValue ? version.baseUnit.russianLabel : nil
+    }
+
+    private func shouldPublish(_ requestID: UUID) -> Bool {
+        latestLoadRequestID == requestID && !Task.isCancelled
     }
 }
 

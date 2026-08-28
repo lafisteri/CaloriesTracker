@@ -306,18 +306,8 @@ private struct ProductListView: View {
     var body: some View {
         productList
             .appPlainListStyle()
-        .task {
+        .task(id: searchText) {
             await model.load(matching: searchText)
-        }
-        .onAppear {
-            Task {
-                await model.load(matching: searchText)
-            }
-        }
-        .onChange(of: searchText) { _, newValue in
-            Task {
-                await model.load(matching: newValue)
-            }
         }
     }
 

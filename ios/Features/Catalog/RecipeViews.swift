@@ -25,18 +25,8 @@ struct RecipeListView: View {
     var body: some View {
         recipeList
             .appPlainListStyle()
-        .task {
+        .task(id: searchText) {
             await model.load(matching: searchText)
-        }
-        .onAppear {
-            Task {
-                await model.load(matching: searchText)
-            }
-        }
-        .onChange(of: searchText) { _, query in
-            Task {
-                await model.load(matching: query)
-            }
         }
     }
 

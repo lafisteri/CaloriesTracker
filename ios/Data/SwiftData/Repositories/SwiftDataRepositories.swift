@@ -16,15 +16,18 @@ final class SwiftDataProductRepository: ProductRepository {
 
     func activeProducts(matching query: String) async throws -> [Product] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let records = try modelContext.fetch(FetchDescriptor<ProductRecord>())
+        let descriptor = FetchDescriptor<ProductRecord>(
+            predicate: #Predicate { $0.deletedAt == nil },
+            sortBy: [
+                SortDescriptor(\ProductRecord.name),
+                SortDescriptor(\ProductRecord.id),
+            ],
+        )
+        let records = try modelContext.fetch(descriptor)
 
         return records
             .map { $0.toDomain() }
             .filter { product in
-                guard product.deletedAt == nil else {
-                    return false
-                }
-
                 guard !query.isEmpty else {
                     return true
                 }
@@ -33,7 +36,9 @@ final class SwiftDataProductRepository: ProductRepository {
                     || product.barcode?.localizedCaseInsensitiveContains(query) == true
             }
             .sorted {
-                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                let comparison = $0.name.localizedCaseInsensitiveCompare($1.name)
+                return comparison == .orderedAscending
+                    || (comparison == .orderedSame && $0.id.uuidString < $1.id.uuidString)
             }
     }
 
@@ -286,17 +291,24 @@ final class SwiftDataRecipeRepository: RecipeRepository {
 
     func activeRecipes(matching query: String) async throws -> [Recipe] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let descriptor = FetchDescriptor<RecipeRecord>(
+            predicate: #Predicate { $0.deletedAt == nil },
+            sortBy: [
+                SortDescriptor(\RecipeRecord.name),
+                SortDescriptor(\RecipeRecord.id),
+            ],
+        )
+
         return try modelContext
-            .fetch(FetchDescriptor<RecipeRecord>())
+            .fetch(descriptor)
             .map { $0.toDomain() }
             .filter { recipe in
-                guard recipe.deletedAt == nil else {
-                    return false
-                }
                 return query.isEmpty || recipe.name.localizedCaseInsensitiveContains(query)
             }
             .sorted {
-                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                let comparison = $0.name.localizedCaseInsensitiveCompare($1.name)
+                return comparison == .orderedAscending
+                    || (comparison == .orderedSame && $0.id.uuidString < $1.id.uuidString)
             }
     }
 
@@ -628,31 +640,58 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             return []
         }
 
-        return try sourceSet.compactMap { source in
-            let sourceTypeRaw = source.sourceType.rawValue
-            let sourceID = source.sourceID
-            var descriptor = FetchDescriptor<DiaryEntryRecord>(
+        var latestBySource: [FoodSourceReference: DiaryEntryRecord] = [:]
+        for sourceType in [SourceType.product, .recipe] {
+            let sourceIDs = Array(
+                Set(sourceSet.lazy
+                    .filter { $0.sourceType == sourceType }
+                    .map(\.sourceID)),
+            )
+            guard !sourceIDs.isEmpty else {
+                continue
+            }
+
+            let sourceTypeRaw = sourceType.rawValue
+            let descriptor = FetchDescriptor<DiaryEntryRecord>(
                 predicate: #Predicate {
                     $0.deletedAt == nil
                         && $0.sourceTypeRaw == sourceTypeRaw
-                        && $0.sourceID == sourceID
+                        && sourceIDs.contains($0.sourceID)
                 },
-                sortBy: [
-                    SortDescriptor(\DiaryEntryRecord.updatedAt, order: .reverse),
-                    SortDescriptor(\DiaryEntryRecord.createdAt, order: .reverse),
-                    SortDescriptor(\DiaryEntryRecord.id, order: .reverse),
-                ],
             )
-            descriptor.fetchLimit = 1
 
-            return try modelContext.fetch(descriptor).first.map { record in
-                LatestDiaryUsage(
-                    source: source,
-                    amount: record.amount,
-                    unitToken: record.unitToken,
-                )
+            for record in try modelContext.fetch(descriptor) {
+                let source = FoodSourceReference(sourceType: sourceType, sourceID: record.sourceID)
+                guard sourceSet.contains(source) else {
+                    continue
+                }
+                if let current = latestBySource[source], !isNewerUsage(record, than: current) {
+                    continue
+                }
+                latestBySource[source] = record
             }
         }
+
+        return latestBySource
+            .map { source, record in
+                LatestDiaryUsage(source: source, amount: record.amount, unitToken: record.unitToken)
+            }
+            .sorted { lhs, rhs in
+                if lhs.source.sourceType.rawValue != rhs.source.sourceType.rawValue {
+                    return lhs.source.sourceType.rawValue < rhs.source.sourceType.rawValue
+                }
+                return lhs.source.sourceID.uuidString < rhs.source.sourceID.uuidString
+            }
+    }
+
+    private func isNewerUsage(_ candidate: DiaryEntryRecord, than current: DiaryEntryRecord) -> Bool {
+        if candidate.updatedAt != current.updatedAt {
+            return candidate.updatedAt > current.updatedAt
+        }
+        if candidate.createdAt != current.createdAt {
+            return candidate.createdAt > current.createdAt
+        }
+        return candidate.id.uuidString > current.id.uuidString
     }
 
     func create(_ entry: DiaryEntry) async throws {
