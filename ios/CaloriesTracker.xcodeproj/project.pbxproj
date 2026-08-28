@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3AC4F106304189B900E9D002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AC4F105304189B900E9D002 /* Assets.xcassets */; };
 		A10000000000000000000001 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AppTab.swift */; };
 		A10000000000000000000002 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppRouter.swift */; };
 		A10000000000000000000003 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* AppDependencies.swift */; };
@@ -24,11 +25,6 @@
 		A10000000000000000000018 /* SwiftDataRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* SwiftDataRecords.swift */; };
 		A10000000000000000000019 /* SchemaV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* SchemaV1.swift */; };
 		A10000000000000000000020 /* MigrationPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* MigrationPlan.swift */; };
-		A10000000000000000000049 /* SchemaV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000049 /* SchemaV2.swift */; };
-		A10000000000000000000050 /* SyncOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* SyncOutbox.swift */; };
-		A10000000000000000000051 /* SyncEntityIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* SyncEntityIdentity.swift */; };
-		A10000000000000000000052 /* CanonicalSyncPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* CanonicalSyncPayloads.swift */; };
-		A10000000000000000000053 /* SyncLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* SyncLocalStore.swift */; };
 		A10000000000000000000021 /* RecordMappers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* RecordMappers.swift */; };
 		A10000000000000000000022 /* SwiftDataRepositories.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* SwiftDataRepositories.swift */; };
 		A10000000000000000000023 /* ProductService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* ProductService.swift */; };
@@ -54,6 +50,11 @@
 		A10000000000000000000044 /* StatisticsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* StatisticsViewModels.swift */; };
 		A10000000000000000000045 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000046 /* StatisticsView.swift */; };
 		A10000000000000000000046 /* EditableDecimal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* EditableDecimal.swift */; };
+		A10000000000000000000049 /* SchemaV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000049 /* SchemaV2.swift */; };
+		A10000000000000000000050 /* SyncOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* SyncOutbox.swift */; };
+		A10000000000000000000051 /* SyncEntityIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* SyncEntityIdentity.swift */; };
+		A10000000000000000000052 /* CanonicalSyncPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* CanonicalSyncPayloads.swift */; };
+		A10000000000000000000053 /* SyncLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* SyncLocalStore.swift */; };
 		A10000000000000000000057 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000002 /* Supabase */; };
 		A10000000000000000000058 /* SupabaseClientProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* SupabaseClientProvider.swift */; };
 		A10000000000000000000059 /* SupabaseAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* SupabaseAuthService.swift */; };
@@ -72,6 +73,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3AC4F105304189B900E9D002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000001 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
@@ -89,11 +91,6 @@
 		A20000000000000000000018 /* SwiftDataRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRecords.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* SchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV1.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* MigrationPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationPlan.swift; sourceTree = "<group>"; };
-		A20000000000000000000049 /* SchemaV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV2.swift; sourceTree = "<group>"; };
-		A20000000000000000000050 /* SyncOutbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncOutbox.swift; sourceTree = "<group>"; };
-		A20000000000000000000051 /* SyncEntityIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEntityIdentity.swift; sourceTree = "<group>"; };
-		A20000000000000000000052 /* CanonicalSyncPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalSyncPayloads.swift; sourceTree = "<group>"; };
-		A20000000000000000000053 /* SyncLocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncLocalStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000021 /* RecordMappers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordMappers.swift; sourceTree = "<group>"; };
 		A20000000000000000000022 /* SwiftDataRepositories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositories.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* CaloriesTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CaloriesTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,6 +118,11 @@
 		A20000000000000000000046 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		A20000000000000000000047 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000048 /* EditableDecimal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableDecimal.swift; sourceTree = "<group>"; };
+		A20000000000000000000049 /* SchemaV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV2.swift; sourceTree = "<group>"; };
+		A20000000000000000000050 /* SyncOutbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncOutbox.swift; sourceTree = "<group>"; };
+		A20000000000000000000051 /* SyncEntityIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEntityIdentity.swift; sourceTree = "<group>"; };
+		A20000000000000000000052 /* CanonicalSyncPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalSyncPayloads.swift; sourceTree = "<group>"; };
+		A20000000000000000000053 /* SyncLocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncLocalStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000057 /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
 		A20000000000000000000058 /* SupabaseClientProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClientProvider.swift; sourceTree = "<group>"; };
 		A20000000000000000000059 /* SupabaseAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAuthService.swift; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				3AC4F105304189B900E9D002 /* Assets.xcassets */,
 				A40000000000000000000004 /* App */,
 				A40000000000000000000013 /* Application */,
 				A40000000000000000000005 /* Features */,
@@ -196,108 +199,6 @@
 				A40000000000000000000021 /* Settings */,
 			);
 			path = Features;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000013 /* Application */ = {
-			isa = PBXGroup;
-			children = (
-				A40000000000000000000014 /* Products */,
-				A40000000000000000000016 /* Diary */,
-				A40000000000000000000018 /* Recipes */,
-				A40000000000000000000019 /* Goals */,
-				A4000000000000000000001A /* Statistics */,
-			);
-			path = Application;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000014 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000024 /* ProductService.swift */,
-			);
-			path = Products;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000015 /* Catalog */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000025 /* ProductViewModels.swift */,
-				A20000000000000000000026 /* ProductCatalogView.swift */,
-				A20000000000000000000027 /* ProductDetailView.swift */,
-				A20000000000000000000028 /* ProductEditorView.swift */,
-				A20000000000000000000029 /* ProductVersionHistoryView.swift */,
-				A20000000000000000000038 /* RecipeViewModels.swift */,
-				A20000000000000000000039 /* RecipeViews.swift */,
-			);
-			path = Catalog;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000016 /* Diary */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000031 /* DiaryService.swift */,
-			);
-			path = Diary;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000018 /* Recipes */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000037 /* RecipeService.swift */,
-			);
-			path = Recipes;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000019 /* Goals */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000040 /* GoalService.swift */,
-			);
-			path = Goals;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000001A /* Statistics */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000041 /* StatisticsService.swift */,
-			);
-			path = Statistics;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000017 /* Today */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000032 /* TodayViewModels.swift */,
-				A20000000000000000000033 /* TodayView.swift */,
-				A20000000000000000000035 /* DiaryAmountView.swift */,
-			);
-			path = Today;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000001B /* Goals */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000043 /* GoalViewModels.swift */,
-				A20000000000000000000044 /* GoalEditorView.swift */,
-			);
-			path = Goals;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000001C /* Statistics */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000045 /* StatisticsViewModels.swift */,
-				A20000000000000000000046 /* StatisticsView.swift */,
-			);
-			path = Statistics;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000021 /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000068 /* SettingsView.swift */,
-			);
-			path = Settings;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000006 /* Domain */ = {
@@ -367,32 +268,6 @@
 			path = Goals;
 			sourceTree = "<group>";
 		};
-		A4000000000000000000001D /* Statistics */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000042 /* StatisticsModels.swift */,
-			);
-			path = Statistics;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000001E /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000048 /* EditableDecimal.swift */,
-				A20000000000000000000069 /* DateNavigator.swift */,
-				A20000000000000000000070 /* AppStyle.swift */,
-			);
-			path = Shared;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000001F /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000057 /* Supabase.xcconfig */,
-			);
-			path = Config;
-			sourceTree = "<group>";
-		};
 		A4000000000000000000000D /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
@@ -431,19 +306,6 @@
 			path = SwiftData;
 			sourceTree = "<group>";
 		};
-		A40000000000000000000020 /* Supabase */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000058 /* SupabaseClientProvider.swift */,
-				A20000000000000000000059 /* SupabaseAuthService.swift */,
-				A20000000000000000000060 /* SupabaseSyncTransport.swift */,
-				A20000000000000000000063 /* SyncPushCoordinator.swift */,
-				A20000000000000000000064 /* SyncPullCoordinator.swift */,
-				A20000000000000000000066 /* SyncBootstrapCoordinator.swift */,
-			);
-			path = Supabase;
-			sourceTree = "<group>";
-		};
 		A40000000000000000000010 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -466,6 +328,147 @@
 				A20000000000000000000022 /* SwiftDataRepositories.swift */,
 			);
 			path = Repositories;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000013 /* Application */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000014 /* Products */,
+				A40000000000000000000016 /* Diary */,
+				A40000000000000000000018 /* Recipes */,
+				A40000000000000000000019 /* Goals */,
+				A4000000000000000000001A /* Statistics */,
+			);
+			path = Application;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000014 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000024 /* ProductService.swift */,
+			);
+			path = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000015 /* Catalog */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000025 /* ProductViewModels.swift */,
+				A20000000000000000000026 /* ProductCatalogView.swift */,
+				A20000000000000000000027 /* ProductDetailView.swift */,
+				A20000000000000000000028 /* ProductEditorView.swift */,
+				A20000000000000000000029 /* ProductVersionHistoryView.swift */,
+				A20000000000000000000038 /* RecipeViewModels.swift */,
+				A20000000000000000000039 /* RecipeViews.swift */,
+			);
+			path = Catalog;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000016 /* Diary */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000031 /* DiaryService.swift */,
+			);
+			path = Diary;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000017 /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000032 /* TodayViewModels.swift */,
+				A20000000000000000000033 /* TodayView.swift */,
+				A20000000000000000000035 /* DiaryAmountView.swift */,
+			);
+			path = Today;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000018 /* Recipes */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000037 /* RecipeService.swift */,
+			);
+			path = Recipes;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000019 /* Goals */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000040 /* GoalService.swift */,
+			);
+			path = Goals;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001A /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000041 /* StatisticsService.swift */,
+			);
+			path = Statistics;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001B /* Goals */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000043 /* GoalViewModels.swift */,
+				A20000000000000000000044 /* GoalEditorView.swift */,
+			);
+			path = Goals;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001C /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000045 /* StatisticsViewModels.swift */,
+				A20000000000000000000046 /* StatisticsView.swift */,
+			);
+			path = Statistics;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001D /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000042 /* StatisticsModels.swift */,
+			);
+			path = Statistics;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001E /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000048 /* EditableDecimal.swift */,
+				A20000000000000000000069 /* DateNavigator.swift */,
+				A20000000000000000000070 /* AppStyle.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000001F /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000057 /* Supabase.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000020 /* Supabase */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000058 /* SupabaseClientProvider.swift */,
+				A20000000000000000000059 /* SupabaseAuthService.swift */,
+				A20000000000000000000060 /* SupabaseSyncTransport.swift */,
+				A20000000000000000000063 /* SyncPushCoordinator.swift */,
+				A20000000000000000000064 /* SyncPullCoordinator.swift */,
+				A20000000000000000000066 /* SyncBootstrapCoordinator.swift */,
+			);
+			path = Supabase;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000021 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000068 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -515,10 +518,10 @@
 				Base,
 			);
 			mainGroup = A40000000000000000000001;
-			productRefGroup = A40000000000000000000003 /* Products */;
 			packageReferences = (
 				A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
+			productRefGroup = A40000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -527,30 +530,12 @@
 		};
 /* End PBXProject section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/supabase/supabase-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.54.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		A90000000000000000000002 /* Supabase */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = Supabase;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin PBXResourcesBuildPhase section */
 		A30000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3AC4F106304189B900E9D002 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -724,14 +709,16 @@
 			name = Release;
 		};
 		A80000000000000000000003 /* Debug */ = {
-			baseConfigurationReference = A20000000000000000000057 /* Supabase.xcconfig */;
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000057 /* Supabase.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CaloriesTracker;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -742,20 +729,23 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		A80000000000000000000004 /* Release */ = {
-			baseConfigurationReference = A20000000000000000000057 /* Supabase.xcconfig */;
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000057 /* Supabase.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CaloriesTracker;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -766,6 +756,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -793,6 +784,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.54.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A90000000000000000000002 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A70000000000000000000001 /* Project object */;
 }
