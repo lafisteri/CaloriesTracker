@@ -788,7 +788,14 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             else {
                 throw DiaryRepositoryError.invalidOrderUpdate
             }
+            guard record.mealTypeRaw != entry.mealType.rawValue || record.sortOrder != entry.sortOrder else {
+                continue
+            }
             updates.append((record, entry))
+        }
+
+        guard !updates.isEmpty else {
+            return
         }
 
         for (record, entry) in updates {
@@ -798,7 +805,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         }
 
         do {
-            for entry in entries {
+            for (_, entry) in updates {
                 try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
             }
             try commitSyncableMutation()
