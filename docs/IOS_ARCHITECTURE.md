@@ -397,7 +397,7 @@ this foundation.
 ## Project structure
 
 ~~~text
-ios/
+CaloriesTracker/
   App/                         # app entry point, dependencies, orchestration, router and tabs
     SyncOrchestration.swift
   Domain/

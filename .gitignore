@@ -16,4 +16,4 @@ xcuserdata/
 .swiftpm/
 
 # Local Supabase publishable-key override
-ios/Config/Supabase.private.xcconfig
+Config/Supabase.private.xcconfig
