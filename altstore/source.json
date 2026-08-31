@@ -1,0 +1,37 @@
+{
+  "name": "CaloriesTracker",
+  "subtitle": "Обновления CaloriesTracker",
+  "description": "Источник обновлений CaloriesTracker для AltStore.",
+  "iconURL": "https://raw.githubusercontent.com/lafisteri/CaloriesTracker/main/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+  "website": "https://github.com/lafisteri/CaloriesTracker",
+  "apps": [
+    {
+      "name": "CaloriesTracker",
+      "bundleIdentifier": "com.caloriestracker.ios",
+      "developerName": "lafisteri",
+      "subtitle": "Учёт калорий и КБЖУ",
+      "localizedDescription": "Личное iOS-приложение для учёта калорий, белков, жиров и углеводов.",
+      "iconURL": "https://raw.githubusercontent.com/lafisteri/CaloriesTracker/main/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+      "category": "lifestyle",
+      "versions": [
+        {
+          "version": "1.1",
+          "buildVersion": "1",
+          "date": "2026-08-31",
+          "localizedDescription": "Первый релиз через AltStore Source.",
+          "downloadURL": "https://github.com/lafisteri/CaloriesTracker/releases/download/v1.1-build.1/CaloriesTracker-1.1.1.ipa",
+          "size": 4023875,
+          "minOSVersion": "17.0",
+          "sha256": "07f134b53fd23a2e24cfaceeb9bb13252cf1775d81a5da1bb6557fae788c979c"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          "get-task-allow"
+        ],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}
