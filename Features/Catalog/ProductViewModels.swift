@@ -229,7 +229,12 @@ final class ProductEditorViewModel {
     private(set) var isLoading = false
     private(set) var isSaving = false
     var errorMessage: String?
+    private(set) var fieldErrors: [ProductEditorField: String] = [:]
     private var loadedVersion: ProductVersion?
+
+    var currentVersionNumber: Int? {
+        loadedVersion?.versionNumber
+    }
 
     init(productID: UUID?, productService: ProductService) {
         self.productID = productID
@@ -243,6 +248,7 @@ final class ProductEditorViewModel {
 
         isLoading = true
         errorMessage = nil
+        fieldErrors = [:]
 
         do {
             guard let details = try await productService.details(id: productID) else {
@@ -271,6 +277,7 @@ final class ProductEditorViewModel {
             return false
         }
         errorMessage = nil
+        fieldErrors = [:]
 
         do {
             let draft = try makeDraft()
@@ -286,9 +293,13 @@ final class ProductEditorViewModel {
             return true
         } catch {
             isSaving = false
-            errorMessage = productErrorMessage(error, fallback: "Не удалось сохранить продукт.")
+            publishSaveError(error)
             return false
         }
+    }
+
+    func clearFieldError(for field: ProductEditorField) {
+        fieldErrors[field] = nil
     }
 
     private func makeDraft() throws -> ProductDraft {
@@ -305,12 +316,17 @@ final class ProductEditorViewModel {
         } else {
             versionedValues = (
                 baseUnit: baseUnit,
-                baseAmount: try numericValue(baseAmount, field: "Количество"),
+                baseAmount: try numericValue(
+                    baseAmount,
+                    field: .baseAmount,
+                    title: "Количество",
+                    defaultValue: FoodAmountDefaults.fallbackAmount(for: baseUnit.rawValue),
+                ),
                 nutrition: Nutrition(
-                    calories: try numericValue(calories, field: "Калории"),
-                    protein: try numericValue(protein, field: "Белки"),
-                    fat: try numericValue(fat, field: "Жиры"),
-                    carbs: try numericValue(carbs, field: "Углеводы"),
+                    calories: try numericValue(calories, field: .calories, title: "Калории", defaultValue: 0),
+                    protein: try numericValue(protein, field: .protein, title: "Белки", defaultValue: 0),
+                    fat: try numericValue(fat, field: .fat, title: "Жиры", defaultValue: 0),
+                    carbs: try numericValue(carbs, field: .carbs, title: "Углеводы", defaultValue: 0),
                 ),
             )
         }
@@ -333,11 +349,41 @@ final class ProductEditorViewModel {
             && carbs == EditableDecimal.string(from: version.nutrition.carbs)
     }
 
-    private func numericValue(_ text: String, field: String) throws -> Double {
+    private func numericValue(
+        _ text: String,
+        field: ProductEditorField,
+        title: String,
+        defaultValue: Double,
+    ) throws -> Double {
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return defaultValue
+        }
+
         guard let value = EditableDecimal.value(from: text) else {
-            throw ProductEditorError.invalidNumber(field: field)
+            throw ProductEditorError.invalidNumber(field: field, title: title)
         }
         return value
+    }
+
+    private func publishSaveError(_ error: Error) {
+        if let field = field(for: error) {
+            fieldErrors[field] = productErrorMessage(error, fallback: "Проверьте значение поля.")
+        } else {
+            errorMessage = productErrorMessage(error, fallback: "Не удалось сохранить продукт.")
+        }
+    }
+
+    private func field(for error: Error) -> ProductEditorField? {
+        switch error {
+        case ProductServiceError.nameRequired:
+            .name
+        case ProductServiceError.invalidBaseAmount:
+            .baseAmount
+        case let error as ProductEditorError:
+            error.field
+        default:
+            nil
+        }
     }
 }
 
@@ -376,12 +422,19 @@ final class ProductVersionHistoryViewModel {
 }
 
 private enum ProductEditorError: LocalizedError {
-    case invalidNumber(field: String)
+    case invalidNumber(field: ProductEditorField, title: String)
+
+    var field: ProductEditorField {
+        switch self {
+        case let .invalidNumber(field, _):
+            field
+        }
+    }
 
     var errorDescription: String? {
         switch self {
-        case let .invalidNumber(field):
-            "Введите корректное значение для поля «\(field)»."
+        case let .invalidNumber(_, title):
+            "Введите корректное значение для поля «\(title)»."
         }
     }
 }

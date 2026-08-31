@@ -79,34 +79,12 @@ struct ProductDetailView: View {
         if model.isLoading && model.details == nil {
             ProgressView()
         } else if let details = model.details {
-            List {
-                Section {
-                    LabeledContent("Название", value: details.product.name)
-                    if let barcode = details.product.barcode {
-                        LabeledContent("Штрихкод", value: barcode)
-                    }
-                }
-
-                Section("Текущая версия v\(details.currentVersion.versionNumber)") {
-                    LabeledContent(
-                        "Единица",
-                        value: details.currentVersion.baseUnit.russianLabel,
-                    )
-                    LabeledContent(
-                        "Количество",
-                        value: "\(formattedNumber(details.currentVersion.baseAmount)) \(details.currentVersion.baseUnit.russianLabel)",
-                    )
-                }
-
-                Section("Пищевая ценность") {
-                    LabeledContent(
-                        "Калории",
-                        value: "\(formattedNumber(details.currentVersion.nutrition.calories)) ккал",
-                    )
-                    LabeledContent("Белки", value: "\(formattedNumber(details.currentVersion.nutrition.protein)) г")
-                    LabeledContent("Жиры", value: "\(formattedNumber(details.currentVersion.nutrition.fat)) г")
-                    LabeledContent("Углеводы", value: "\(formattedNumber(details.currentVersion.nutrition.carbs)) г")
-                }
+            Form {
+                ProductFormLayout(
+                    mode: .readOnly,
+                    values: ProductFormValues(details: details),
+                    fieldErrors: [:],
+                )
 
                 if let errorMessage = model.errorMessage {
                     Section {
