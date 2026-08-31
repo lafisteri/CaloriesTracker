@@ -20,26 +20,38 @@ struct StatisticsView: View {
             } else if let statistics = model.statistics {
                 weekNavigation(for: statistics)
 
-                WeeklyCaloriesChart(days: statistics.days)
-                    .frame(height: 190)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 0,
-                            leading: DateNavigatorLayout.screenHorizontalMargin,
-                            bottom: 0,
-                            trailing: DateNavigatorLayout.screenHorizontalMargin,
-                        ),
-                    )
-                    .listRowSeparator(.hidden)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Калорийность за неделю")
+                        .font(.headline)
 
-                Section {
-                    LabeledContent("Баланс недели", value: calorieBalanceLabel(statistics.weeklyCalorieBalance))
+                    WeeklyCaloriesChart(days: statistics.days)
+                        .frame(height: 190)
                 }
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 0,
+                        leading: DateNavigatorLayout.screenHorizontalMargin,
+                        bottom: 0,
+                        trailing: DateNavigatorLayout.screenHorizontalMargin,
+                    ),
+                )
+                .listRowSeparator(.hidden)
 
-                Section("БЖУ за неделю") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("БЖУ за неделю")
+                        .font(.headline)
+
                     WeeklyMacrosChart(days: statistics.days)
                 }
-                .headerProminence(.increased)
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 0,
+                        leading: DateNavigatorLayout.screenHorizontalMargin,
+                        bottom: 0,
+                        trailing: DateNavigatorLayout.screenHorizontalMargin,
+                    ),
+                )
+                .listRowSeparator(.hidden)
             } else {
                 ContentUnavailableView(
                     "Статистика недоступна",
@@ -192,14 +204,6 @@ private extension MacroNutrient {
         case .carbs: nutrition.carbs
         }
     }
-}
-
-private func calorieBalanceLabel(_ balance: Double?) -> String {
-    guard let balance else {
-        return "—"
-    }
-    let prefix = balance > 0 ? "+" : ""
-    return "\(prefix)\(NutritionFormatting.calories(balance)) ккал"
 }
 
 private struct StatisticsInlineErrorView: View {
