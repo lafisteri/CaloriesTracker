@@ -296,6 +296,7 @@ final class RecipeEditorViewModel {
     private(set) var isLoading = false
     private(set) var isSaving = false
     var errorMessage: String?
+    private(set) var fieldErrors: [RecipeEditorField: String] = [:]
     private var composition: RecipeCalculation?
     private var compositionErrorMessage: String?
     private var compositionRevision = 0
@@ -316,6 +317,7 @@ final class RecipeEditorViewModel {
 
         isLoading = true
         errorMessage = nil
+        fieldErrors = [:]
 
         do {
             guard let editorData = try await recipeService.editorData(for: recipeID) else {
@@ -470,26 +472,30 @@ final class RecipeEditorViewModel {
     func refreshOutputPreview() {
         do {
             let draft = try makeDraft()
-            guard let composition else {
+            let totalNutrition: Nutrition
+            if let composition {
+                totalNutrition = composition.totalNutrition
+            } else if ingredients.isEmpty {
+                totalNutrition = .zero
+            } else {
                 if let compositionErrorMessage {
                     preview = nil
                     previewErrorMessage = compositionErrorMessage
                 } else if !isRefreshingComposition {
                     preview = nil
-                    previewErrorMessage = recipeErrorMessage(
-                        RecipeServiceError.noIngredients,
-                        fallback: "Не удалось рассчитать КБЖУ.",
-                    )
+                    previewErrorMessage = "Не удалось рассчитать КБЖУ."
                 }
                 return
             }
 
             preview = try recipeService.outputPreview(
-                totalNutrition: composition.totalNutrition,
+                totalNutrition: totalNutrition,
                 cookedWeight: draft.cookedWeight,
                 servingsCount: draft.servingsCount,
             )
-            applyIngredientNutrition(from: composition)
+            if let composition {
+                applyIngredientNutrition(from: composition)
+            }
             previewErrorMessage = nil
         } catch {
             preview = nil
@@ -503,6 +509,7 @@ final class RecipeEditorViewModel {
             return false
         }
         errorMessage = nil
+        fieldErrors = [:]
 
         do {
             let draft = try makeDraft()
@@ -516,9 +523,13 @@ final class RecipeEditorViewModel {
             return true
         } catch {
             isSaving = false
-            errorMessage = recipeErrorMessage(error, fallback: "Не удалось сохранить рецепт.")
+            publishSaveError(error)
             return false
         }
+    }
+
+    func clearFieldError(for field: RecipeEditorField) {
+        fieldErrors[field] = nil
     }
 
     private func invalidateComposition() {
@@ -549,8 +560,8 @@ final class RecipeEditorViewModel {
             outputValues = loadedOutputValues
         } else {
             outputValues = OutputValues(
-                cookedWeight: try recipeOptionalNumber(cookedWeightText, field: "Количество"),
-                servingsCount: try recipeOptionalNumber(servingsCountText, field: "Количество"),
+                cookedWeight: try recipeOptionalNumber(cookedWeightText, field: .outputAmount, title: "Количество"),
+                servingsCount: try recipeOptionalNumber(servingsCountText, field: .outputAmount, title: "Количество"),
             )
         }
 
@@ -565,6 +576,27 @@ final class RecipeEditorViewModel {
     private func outputInputsMatch(_ values: OutputValues) -> Bool {
         cookedWeightText == (values.cookedWeight.map { EditableDecimal.string(from: $0) } ?? "")
             && servingsCountText == (values.servingsCount.map { EditableDecimal.string(from: $0) } ?? "")
+    }
+
+    private func publishSaveError(_ error: Error) {
+        if let field = field(for: error) {
+            fieldErrors[field] = recipeErrorMessage(error, fallback: "Проверьте значение поля.")
+        } else {
+            errorMessage = recipeErrorMessage(error, fallback: "Не удалось сохранить рецепт.")
+        }
+    }
+
+    private func field(for error: Error) -> RecipeEditorField? {
+        switch error {
+        case RecipeServiceError.nameRequired:
+            .name
+        case RecipeServiceError.invalidCookedWeight, RecipeServiceError.invalidServingsCount:
+            .outputAmount
+        case let error as RecipeEditorError:
+            error.field
+        default:
+            nil
+        }
     }
 }
 
@@ -761,24 +793,35 @@ final class RecipeCompositionAmountViewModel {
     }
 }
 
-private func recipeOptionalNumber(_ text: String, field: String) throws -> Double? {
+private func recipeOptionalNumber(
+    _ text: String,
+    field: RecipeEditorField,
+    title: String,
+) throws -> Double? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
         return nil
     }
     guard let value = EditableDecimal.value(from: trimmed) else {
-        throw RecipeEditorError.invalidNumber(field: field)
+        throw RecipeEditorError.invalidNumber(field: field, title: title)
     }
     return value
 }
 
 private enum RecipeEditorError: LocalizedError {
-    case invalidNumber(field: String)
+    case invalidNumber(field: RecipeEditorField, title: String)
+
+    var field: RecipeEditorField {
+        switch self {
+        case let .invalidNumber(field, _):
+            field
+        }
+    }
 
     var errorDescription: String? {
         switch self {
-        case let .invalidNumber(field):
-            "Введите корректное значение для поля «\(field)»."
+        case let .invalidNumber(_, title):
+            "Введите корректное значение для поля «\(title)»."
         }
     }
 }

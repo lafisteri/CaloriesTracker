@@ -292,6 +292,7 @@ struct RecipeDetailView: View {
                 RecipeFormHeaderSection(
                     mode: .readOnly,
                     values: RecipeFormValues(details: details),
+                    fieldErrors: [:],
                 )
 
                 FoodCompositionSection(
@@ -442,6 +443,7 @@ struct RecipeEditorView: View {
                     RecipeFormHeaderSection(
                         mode: model.recipeID == nil ? .create(formEditing) : .edit(formEditing),
                         values: RecipeFormValues(name: model.name),
+                        fieldErrors: model.fieldErrors,
                     )
 
                     FoodCompositionSection(
@@ -474,7 +476,7 @@ struct RecipeEditorView: View {
                         if let preview = model.preview {
                             RecipeNutritionRows(nutrition: preview.totalNutrition)
                         } else {
-                            Text("Добавьте ингредиенты и укажите выход рецепта.")
+                            Text("Добавьте ингредиенты, чтобы рассчитать КБЖУ.")
                                 .foregroundStyle(.secondary)
                         }
                         if let previewErrorMessage = model.previewErrorMessage {
@@ -519,12 +521,20 @@ struct RecipeEditorView: View {
         .disabled(model.isLoading || model.isSaving)
         .task {
             await model.loadForEditing()
+            if model.recipeID == nil {
+                model.refreshOutputPreview()
+            }
         }
         .onChange(of: model.cookedWeightText) { _, _ in
+            model.clearFieldError(for: .outputAmount)
             model.refreshOutputPreview()
         }
         .onChange(of: model.servingsCountText) { _, _ in
+            model.clearFieldError(for: .outputAmount)
             model.refreshOutputPreview()
+        }
+        .onChange(of: model.name) { _, _ in
+            model.clearFieldError(for: .name)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
             isKeyboardVisible = true
@@ -905,21 +915,28 @@ private struct RecipeOutputValue: Identifiable {
 private struct RecipeFormHeaderSection: View {
     let mode: RecipeFormMode
     let values: RecipeFormValues
+    let fieldErrors: [RecipeEditorField: String]
 
     var body: some View {
         Section {
             if let editing = mode.editing {
-                TextField("Название", text: editing.name)
-                    .textInputAutocapitalization(.sentences)
-                    .focused(editing.focusedField, equals: .name)
-                    .standardRecipeFormSeparator()
+                editorRow(errorFor: .name) {
+                    TextField("Название", text: editing.name)
+                        .textInputAutocapitalization(.sentences)
+                        .focused(editing.focusedField, equals: .name)
+                }
 
-                RecipeOutputAmountUnitRow(
-                    editingAmount: editing.outputAmount,
-                    editingUnit: editing.outputUnit,
-                    focusedField: editing.focusedField,
-                    onUnitPickerRequested: editing.onUnitPickerRequested,
-                )
+                VStack(alignment: .leading, spacing: 4) {
+                    RecipeOutputAmountUnitRow(
+                        editingAmount: editing.outputAmount,
+                        editingUnit: editing.outputUnit,
+                        focusedField: editing.focusedField,
+                        onUnitPickerRequested: editing.onUnitPickerRequested,
+                    )
+
+                    fieldError(for: .outputAmount)
+                }
+                .listRowSeparator(.hidden)
             } else {
                 Text(values.name)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -932,6 +949,29 @@ private struct RecipeFormHeaderSection: View {
                     )
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func editorRow<Content: View>(
+        errorFor field: RecipeEditorField,
+        @ViewBuilder content: () -> Content,
+    ) -> some View {
+        if let message = fieldErrors[field] {
+            content()
+                .standardRecipeFormSeparator()
+            InlineErrorView(message: message)
+                .listRowSeparator(.hidden)
+        } else {
+            content()
+                .standardRecipeFormSeparator()
+        }
+    }
+
+    @ViewBuilder
+    private func fieldError(for field: RecipeEditorField) -> some View {
+        if let message = fieldErrors[field] {
+            InlineErrorView(message: message)
         }
     }
 }
@@ -967,7 +1007,7 @@ private struct RecipeIngredientListEntryRow: View {
     }
 }
 
-private enum RecipeEditorField: Hashable {
+enum RecipeEditorField: Hashable {
     case name
     case outputAmount
 }

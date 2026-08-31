@@ -54,10 +54,6 @@ enum RecipeCalculator {
     static func calculate(
         ingredients: [RecipeIngredientCalculationInput],
     ) throws -> RecipeCalculation {
-        guard !ingredients.isEmpty else {
-            throw RecipeCalculatorError.noIngredients
-        }
-
         var calculations: [RecipeIngredientCalculation] = []
         var total = Nutrition.zero
 

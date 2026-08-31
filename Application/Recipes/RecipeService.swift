@@ -708,9 +708,6 @@ final class RecipeService {
     }
 
     private func validate(_ draft: RecipeDraft) throws {
-        guard !draft.ingredients.isEmpty else {
-            throw RecipeServiceError.noIngredients
-        }
         try validateOutputs(cookedWeight: draft.cookedWeight, servingsCount: draft.servingsCount)
     }
 
@@ -724,9 +721,6 @@ final class RecipeService {
             guard servingsCount.isFinite, servingsCount > 0 else {
                 throw RecipeServiceError.invalidServingsCount
             }
-        }
-        guard cookedWeight != nil || servingsCount != nil else {
-            throw RecipeServiceError.outputRequired
         }
     }
 
