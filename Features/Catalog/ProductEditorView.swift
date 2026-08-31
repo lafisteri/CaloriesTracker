@@ -342,9 +342,9 @@ struct ProductFormLayout: View {
 
     @ViewBuilder
     private var amountAndUnitRow: some View {
-        if let fields = editingFields {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .bottom, spacing: AppStyle.controlSpacing) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .bottom, spacing: AppStyle.controlSpacing) {
+                if let fields = editingFields {
                     amountField(text: fields.baseAmount, focusedField: fields.focusedField)
                         .frame(maxWidth: .infinity)
 
@@ -353,18 +353,20 @@ struct ProductFormLayout: View {
                         Divider()
                     }
                     .frame(width: ProductEditorLayout.unitPickerWidth)
+                } else {
+                    readOnlyAmountField(values.baseAmount)
+                        .frame(maxWidth: .infinity)
+
+                    readOnlyUnit(values.baseUnit.russianLabel)
+                        .frame(width: ProductEditorLayout.unitPickerWidth)
                 }
+            }
+
+            if editingFields != nil {
                 fieldError(for: .baseAmount)
             }
-            .listRowSeparator(.hidden)
-        } else {
-            HStack(spacing: AppStyle.controlSpacing) {
-                Text(values.baseAmount)
-                Spacer(minLength: 0)
-                Text(values.baseUnit.russianLabel)
-            }
-            .standardProductFormSeparator()
         }
+        .listRowSeparator(.hidden)
     }
 
     private func amountField(
@@ -392,6 +394,23 @@ struct ProductFormLayout: View {
         }
     }
 
+    private func readOnlyAmountField(_ value: String) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: AppStyle.controlSpacing) {
+                Text("Количество")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(1)
+                Spacer(minLength: 0)
+                Text(value)
+                    .frame(minWidth: 44, maxWidth: 120, alignment: .trailing)
+                    .accessibilityLabel("Количество")
+            }
+            .frame(height: AppStyle.controlHeight)
+            Divider()
+        }
+    }
+
     private func unitPicker(fields: ProductFormEditing) -> some View {
         Button {
             fields.focusedField.wrappedValue = nil
@@ -415,6 +434,20 @@ struct ProductFormLayout: View {
         .anchorPreference(key: UnitPickerAnchorPreferenceKey.self, value: .bounds) { $0 }
         .accessibilityLabel("Единица")
         .accessibilityValue(fields.baseUnit.wrappedValue.russianLabel)
+    }
+
+    private func readOnlyUnit(_ label: String) -> some View {
+        VStack(spacing: 0) {
+            Text(label)
+                .frame(
+                    width: ProductEditorLayout.unitPickerWidth,
+                    height: AppStyle.controlHeight,
+                    alignment: .trailing,
+                )
+                .accessibilityLabel("Единица")
+                .accessibilityValue(label)
+            Divider()
+        }
     }
 
     private func nutritionRow(
