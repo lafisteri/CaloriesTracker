@@ -36,9 +36,10 @@ struct StatisticsView: View {
                     LabeledContent("Баланс недели", value: calorieBalanceLabel(statistics.weeklyCalorieBalance))
                 }
 
-                Section {
-                    WeeklyMacroDistribution(distribution: statistics.macroDistribution)
+                Section("БЖУ за неделю") {
+                    WeeklyMacrosChart(days: statistics.days)
                 }
+                .headerProminence(.increased)
             } else {
                 ContentUnavailableView(
                     "Статистика недоступна",
@@ -125,50 +126,70 @@ private struct WeeklyCaloriesChart: View {
     }
 }
 
-private struct WeeklyMacroDistribution: View {
-    let distribution: MacroDistribution
+private struct WeeklyMacrosChart: View {
+    let days: [DayStatistics]
 
     var body: some View {
-        if distribution.hasEnergy {
-            VStack(spacing: 10) {
-                Chart(distribution.components) { component in
-                    SectorMark(
-                        angle: .value("Энергия", component.energy),
-                        innerRadius: .ratio(0.62),
-                        angularInset: 1,
-                    )
-                    .foregroundStyle(color(for: component.nutrient))
-                }
-                .chartLegend(.hidden)
-                .frame(height: 130)
-
-                HStack(spacing: 12) {
-                    ForEach(distribution.components) { component in
-                        Text("\(macroLabel(component.nutrient)) \(NutritionFormatting.percentage(component.percentage))%")
-                            .font(.footnote)
-                            .foregroundStyle(color(for: component.nutrient))
+        VStack(spacing: 10) {
+            Chart {
+                ForEach(days) { day in
+                    ForEach(MacroNutrient.allCases, id: \.self) { nutrient in
+                        BarMark(
+                            x: .value("День", day.weekday.russianShortLabel),
+                            y: .value("Граммы", nutrient.amount(in: day.consumedNutrition)),
+                        )
+                        .position(by: .value("БЖУ", nutrient.shortLabel))
+                        .foregroundStyle(nutrient.color)
                     }
                 }
             }
-        } else {
-            Text("Нет данных за неделю.")
-                .foregroundStyle(.secondary)
+            .chartLegend(.hidden)
+            .chartYScale(domain: .automatic(includesZero: true))
+            .chartYAxis {
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                    AxisTick()
+
+                    if let grams = value.as(Double.self) {
+                        AxisValueLabel(NutritionFormatting.macro(grams))
+                    }
+                }
+            }
+            .frame(height: 190)
+
+            HStack(spacing: 12) {
+                ForEach(MacroNutrient.allCases, id: \.self) { nutrient in
+                    Label(nutrient.shortLabel, systemImage: "circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(nutrient.color)
+                }
+            }
+        }
+    }
+}
+
+private extension MacroNutrient {
+    var shortLabel: String {
+        switch self {
+        case .protein: "Б"
+        case .fat: "Ж"
+        case .carbs: "У"
         }
     }
 
-    private func color(for nutrient: MacroNutrient) -> Color {
-        switch nutrient {
+    var color: Color {
+        switch self {
         case .protein: .blue
         case .fat: .orange
         case .carbs: .green
         }
     }
 
-    private func macroLabel(_ nutrient: MacroNutrient) -> String {
-        switch nutrient {
-        case .protein: "Б"
-        case .fat: "Ж"
-        case .carbs: "У"
+    func amount(in nutrition: Nutrition) -> Double {
+        switch self {
+        case .protein: nutrition.protein
+        case .fat: nutrition.fat
+        case .carbs: nutrition.carbs
         }
     }
 }
