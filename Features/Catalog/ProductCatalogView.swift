@@ -532,12 +532,12 @@ private struct ProductListRow: View {
             Group {
                 if let selectionDisplay {
                     if let nutrition = selectionDisplay.nutrition {
-                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · \(formattedNumber(nutrition.calories)) ккал")
+                        Text("\(NutritionFormatting.amount(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · \(NutritionFormatting.calories(nutrition.calories)) ккал")
                     } else {
-                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · КБЖУ недоступно")
+                        Text("\(NutritionFormatting.amount(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · КБЖУ недоступно")
                     }
                 } else {
-                    Text("\(formattedNumber(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(formattedNumber(item.currentVersion.nutrition.calories)) ккал")
+                    Text("\(NutritionFormatting.amount(item.currentVersion.baseAmount)) \(item.currentVersion.baseUnit.russianLabel) · \(NutritionFormatting.calories(item.currentVersion.nutrition.calories)) ккал")
                 }
             }
             .font(.subheadline)
@@ -574,10 +574,6 @@ extension ProductBaseUnit {
         case .serving: "порция"
         }
     }
-}
-
-func formattedNumber(_ value: Double) -> String {
-    value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 2)))
 }
 
 struct InlineErrorView: View {

@@ -9,9 +9,7 @@ enum EditableDecimal {
             return ""
         }
 
-        return value.formatted(
-            .number.grouping(.never).precision(.fractionLength(0 ... maximumFractionDigits)),
-        )
+        return NutritionFormatting.editable(value)
     }
 
     static func value(from text: String) -> Double? {

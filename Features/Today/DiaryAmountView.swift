@@ -445,7 +445,7 @@ private struct AmountNutritionPreview: View {
                     .foregroundStyle(.secondary)
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(diaryNumber(nutrition.calories))
+                    Text(NutritionFormatting.preciseNutrition(nutrition.calories))
                         .font(.system(size: 38, weight: .bold, design: .rounded))
                         .monospacedDigit()
                     Text("ккал")
@@ -477,7 +477,7 @@ private struct AmountNutritionPreview: View {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("\(diaryNumber(value)) г")
+            Text("\(NutritionFormatting.preciseNutrition(value)) г")
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
         }

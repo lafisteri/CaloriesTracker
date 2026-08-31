@@ -388,6 +388,7 @@ private struct DiaryEntryDragPreview: View {
 struct FoodCompositionSection<Rows: View, AddRow: View>: View {
     let title: String
     let nutrition: Nutrition
+    let numberStyle: FoodCompositionNumberStyle
     let showsAddRow: Bool
     let onAdd: (@MainActor () -> Void)?
     private let rows: Rows
@@ -396,6 +397,7 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
     init(
         title: String,
         nutrition: Nutrition,
+        numberStyle: FoodCompositionNumberStyle = .compact,
         showsAddRow: Bool = true,
         onAdd: (@MainActor () -> Void)? = nil,
         @ViewBuilder rows: () -> Rows,
@@ -403,6 +405,7 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
     ) {
         self.title = title
         self.nutrition = nutrition
+        self.numberStyle = numberStyle
         self.showsAddRow = showsAddRow
         self.onAdd = onAdd
         self.rows = rows()
@@ -426,7 +429,7 @@ struct FoodCompositionSection<Rows: View, AddRow: View>: View {
                 .font(.headline.weight(.bold))
                 .foregroundStyle(Color.black)
 
-            Text("\(diaryNumber(nutrition.calories)) ккал")
+            Text("\(numberStyle.calories(nutrition.calories)) ккал")
                 .font(.body.weight(.regular))
                 .foregroundStyle(Color.black)
 
@@ -453,6 +456,7 @@ struct FoodCompositionEntryRow: View {
     let amount: Double
     let unitLabel: String
     let calories: Double
+    let numberStyle: FoodCompositionNumberStyle
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -461,9 +465,9 @@ struct FoodCompositionEntryRow: View {
                 .foregroundStyle(Color.black)
 
             HStack {
-                Text("\(diaryNumber(amount)) \(unitLabel)")
+                Text("\(numberStyle.amount(amount)) \(unitLabel)")
                 Spacer()
-                Text("\(diaryNumber(calories)) ккал")
+                Text("\(numberStyle.calories(calories)) ккал")
             }
             .font(.subheadline)
             .foregroundStyle(Color.black)
@@ -533,15 +537,15 @@ private struct DailyNutritionSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let calorieGoal {
-                Text("\(diaryNumber(nutrition.calories)) / \(diaryNumber(calorieGoal)) ккал")
+                Text("\(NutritionFormatting.calories(nutrition.calories)) / \(NutritionFormatting.calories(calorieGoal)) ккал")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Color.black)
             } else {
-                Text("\(diaryNumber(nutrition.calories)) ккал")
+                Text("\(NutritionFormatting.calories(nutrition.calories)) ккал")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Color.black)
             }
-            Text("Б \(diaryNumber(nutrition.protein)) · Ж \(diaryNumber(nutrition.fat)) · У \(diaryNumber(nutrition.carbs))")
+            Text("Б \(NutritionFormatting.macro(nutrition.protein)) · Ж \(NutritionFormatting.macro(nutrition.fat)) · У \(NutritionFormatting.macro(nutrition.carbs))")
                 .font(.subheadline)
                 .foregroundStyle(Color.black)
         }
@@ -557,12 +561,32 @@ private struct DiaryEntryRow: View {
             amount: entry.amount,
             unitLabel: diaryUnitLabel(for: entry.unitToken, sourceType: entry.sourceType),
             calories: entry.nutrition.calories,
+            numberStyle: .compact,
         )
     }
 }
 
-func diaryNumber(_ value: Double) -> String {
-    value.formatted(.number.grouping(.never).precision(.fractionLength(0 ... 2)))
+enum FoodCompositionNumberStyle {
+    case compact
+    case detailed
+
+    func calories(_ value: Double) -> String {
+        switch self {
+        case .compact:
+            NutritionFormatting.calories(value)
+        case .detailed:
+            NutritionFormatting.preciseNutrition(value)
+        }
+    }
+
+    func amount(_ value: Double) -> String {
+        switch self {
+        case .compact:
+            NutritionFormatting.amount(value)
+        case .detailed:
+            NutritionFormatting.preciseAmount(value)
+        }
+    }
 }
 
 func diaryUnitLabel(for token: String, sourceType: SourceType) -> String {

@@ -192,9 +192,9 @@ private struct RecipeListRow: View {
             Group {
                 if let selectionDisplay {
                     if let nutrition = selectionDisplay.nutrition {
-                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · \(formattedNumber(nutrition.calories)) ккал")
+                        Text("\(NutritionFormatting.amount(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · \(NutritionFormatting.calories(nutrition.calories)) ккал")
                     } else {
-                        Text("\(formattedNumber(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · КБЖУ недоступно")
+                        Text("\(NutritionFormatting.amount(selectionDisplay.defaultValue.amount)) \(selectionDisplay.defaultValue.unitLabel) · КБЖУ недоступно")
                     }
                 } else {
                     Text(recipeOutputSummary(for: item.currentVersion))
@@ -298,6 +298,7 @@ struct RecipeDetailView: View {
                 FoodCompositionSection(
                     title: "Ингредиенты",
                     nutrition: details.currentVersion.totalNutrition,
+                    numberStyle: .detailed,
                     showsAddRow: false,
                 ) {
                     ForEach(details.ingredients) { item in
@@ -306,6 +307,7 @@ struct RecipeDetailView: View {
                             amount: item.ingredient.amount,
                             unitLabel: recipeIngredientUnitLabel(item.ingredient.unitToken),
                             calories: recipeIngredientNutrition(item).calories,
+                            numberStyle: .detailed,
                         )
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                     }
@@ -316,10 +318,10 @@ struct RecipeDetailView: View {
                 Section("Пищевая ценность (v\(details.currentVersion.versionNumber))") {
                     RecipeNutritionRows(nutrition: details.currentVersion.totalNutrition)
                     if let per100 = details.nutritionPer100Grams {
-                        LabeledContent("На 100 г", value: "\(formattedNumber(per100.calories)) ккал")
+                        LabeledContent("На 100 г", value: "\(NutritionFormatting.preciseNutrition(per100.calories)) ккал")
                     }
                     if let perServing = details.nutritionPerServing {
-                        LabeledContent("На порцию", value: "\(formattedNumber(perServing.calories)) ккал")
+                        LabeledContent("На порцию", value: "\(NutritionFormatting.preciseNutrition(perServing.calories)) ккал")
                     }
                 }
 
@@ -355,10 +357,10 @@ private struct RecipeNutritionRows: View {
     let nutrition: Nutrition
 
     var body: some View {
-        LabeledContent("Калории", value: "\(formattedNumber(nutrition.calories)) ккал")
-        LabeledContent("Белки", value: "\(formattedNumber(nutrition.protein)) г")
-        LabeledContent("Жиры", value: "\(formattedNumber(nutrition.fat)) г")
-        LabeledContent("Углеводы", value: "\(formattedNumber(nutrition.carbs)) г")
+        LabeledContent("Калории", value: "\(NutritionFormatting.preciseNutrition(nutrition.calories)) ккал")
+        LabeledContent("Белки", value: "\(NutritionFormatting.preciseNutrition(nutrition.protein)) г")
+        LabeledContent("Жиры", value: "\(NutritionFormatting.preciseNutrition(nutrition.fat)) г")
+        LabeledContent("Углеводы", value: "\(NutritionFormatting.preciseNutrition(nutrition.carbs)) г")
     }
 }
 
@@ -449,6 +451,7 @@ struct RecipeEditorView: View {
                     FoodCompositionSection(
                         title: "Ингредиенты",
                         nutrition: model.preview?.totalNutrition ?? .zero,
+                        numberStyle: .detailed,
                     ) {
                         ForEach(model.ingredients) { item in
                             RecipeIngredientListEntryRow(
@@ -893,10 +896,10 @@ private struct RecipeFormValues {
         name = details.recipe.name
         outputs = [
             details.currentVersion.cookedWeight.map {
-                RecipeOutputValue(amount: formattedNumber($0), unit: .grams)
+                RecipeOutputValue(amount: NutritionFormatting.preciseAmount($0), unit: .grams)
             },
             details.currentVersion.servingsCount.map {
-                RecipeOutputValue(amount: formattedNumber($0), unit: .serving)
+                RecipeOutputValue(amount: NutritionFormatting.preciseAmount($0), unit: .serving)
             },
         ]
         .compactMap { $0 }
@@ -989,6 +992,7 @@ private struct RecipeIngredientListEntryRow: View {
                     amount: item.draft.amount,
                     unitLabel: recipeIngredientTokenLabel(item.draft.unitToken),
                     calories: item.nutrition?.calories ?? 0,
+                    numberStyle: .detailed,
                 )
                 Spacer(minLength: 0)
             }
@@ -1369,14 +1373,14 @@ private func recipeOutputUnitLabel(_ unit: RecipeDiaryUnit) -> String {
 
 private func recipeOutputSummary(for version: RecipeVersion) -> String {
     var components = [
-        "\(formattedNumber(version.totalNutrition.calories)) ккал",
-        "Б \(formattedNumber(version.totalNutrition.protein)) · Ж \(formattedNumber(version.totalNutrition.fat)) · У \(formattedNumber(version.totalNutrition.carbs))",
+        "\(NutritionFormatting.calories(version.totalNutrition.calories)) ккал",
+        "Б \(NutritionFormatting.macro(version.totalNutrition.protein)) · Ж \(NutritionFormatting.macro(version.totalNutrition.fat)) · У \(NutritionFormatting.macro(version.totalNutrition.carbs))",
     ]
     if let cookedWeight = version.cookedWeight {
-        components.append("\(formattedNumber(cookedWeight)) г")
+        components.append("\(NutritionFormatting.amount(cookedWeight)) г")
     }
     if let servings = version.servingsCount {
-        components.append("\(formattedNumber(servings)) порц.")
+        components.append("\(NutritionFormatting.amount(servings)) порц.")
     }
     return components.joined(separator: " · ")
 }

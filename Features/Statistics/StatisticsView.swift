@@ -144,7 +144,7 @@ private struct WeeklyMacroDistribution: View {
 
                 HStack(spacing: 12) {
                     ForEach(distribution.components) { component in
-                        Text("\(macroLabel(component.nutrient)) \(formattedNumber(component.percentage))%")
+                        Text("\(macroLabel(component.nutrient)) \(NutritionFormatting.percentage(component.percentage))%")
                             .font(.footnote)
                             .foregroundStyle(color(for: component.nutrient))
                     }
@@ -178,7 +178,7 @@ private func calorieBalanceLabel(_ balance: Double?) -> String {
         return "—"
     }
     let prefix = balance > 0 ? "+" : ""
-    return "\(prefix)\(formattedNumber(balance)) ккал"
+    return "\(prefix)\(NutritionFormatting.calories(balance)) ккал"
 }
 
 private struct StatisticsInlineErrorView: View {

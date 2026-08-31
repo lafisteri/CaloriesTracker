@@ -70,6 +70,7 @@
 		A10000000000000000000069 /* DateNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000069 /* DateNavigator.swift */; };
 		A10000000000000000000070 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000070 /* AppStyle.swift */; };
 		A10000000000000000000071 /* SchemaV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* SchemaV5.swift */; };
+		A10000000000000000000072 /* NutritionFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* NutritionFormatting.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -138,6 +139,7 @@
 		A20000000000000000000069 /* DateNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateNavigator.swift; sourceTree = "<group>"; };
 		A20000000000000000000070 /* AppStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyle.swift; sourceTree = "<group>"; };
 		A20000000000000000000071 /* SchemaV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV5.swift; sourceTree = "<group>"; };
+		A20000000000000000000072 /* NutritionFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormatting.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -436,6 +438,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000048 /* EditableDecimal.swift */,
+				A20000000000000000000072 /* NutritionFormatting.swift */,
 				A20000000000000000000069 /* DateNavigator.swift */,
 				A20000000000000000000070 /* AppStyle.swift */,
 			);
@@ -605,6 +608,7 @@
 				A10000000000000000000044 /* StatisticsViewModels.swift in Sources */,
 				A10000000000000000000045 /* StatisticsView.swift in Sources */,
 				A10000000000000000000046 /* EditableDecimal.swift in Sources */,
+				A10000000000000000000072 /* NutritionFormatting.swift in Sources */,
 				A10000000000000000000069 /* DateNavigator.swift in Sources */,
 				A10000000000000000000070 /* AppStyle.swift in Sources */,
 			);

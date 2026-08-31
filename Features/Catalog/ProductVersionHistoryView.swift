@@ -65,10 +65,10 @@ private struct VersionHistoryRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Text("\(formattedNumber(version.baseAmount)) \(version.baseUnit.russianLabel) · \(formattedNumber(version.nutrition.calories)) ккал")
+            Text("\(NutritionFormatting.amount(version.baseAmount)) \(version.baseUnit.russianLabel) · \(NutritionFormatting.calories(version.nutrition.calories)) ккал")
                 .font(.subheadline)
 
-            Text("Б \(formattedNumber(version.nutrition.protein)) · Ж \(formattedNumber(version.nutrition.fat)) · У \(formattedNumber(version.nutrition.carbs))")
+            Text("Б \(NutritionFormatting.macro(version.nutrition.protein)) · Ж \(NutritionFormatting.macro(version.nutrition.fat)) · У \(NutritionFormatting.macro(version.nutrition.carbs))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

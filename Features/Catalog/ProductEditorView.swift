@@ -257,12 +257,12 @@ struct ProductFormValues {
     init(details: ProductDetails) {
         name = details.product.name
         barcode = details.product.barcode
-        baseAmount = formattedNumber(details.currentVersion.baseAmount)
+        baseAmount = NutritionFormatting.preciseAmount(details.currentVersion.baseAmount)
         baseUnit = details.currentVersion.baseUnit
-        calories = formattedNumber(details.currentVersion.nutrition.calories)
-        protein = formattedNumber(details.currentVersion.nutrition.protein)
-        fat = formattedNumber(details.currentVersion.nutrition.fat)
-        carbs = formattedNumber(details.currentVersion.nutrition.carbs)
+        calories = NutritionFormatting.preciseNutrition(details.currentVersion.nutrition.calories)
+        protein = NutritionFormatting.preciseNutrition(details.currentVersion.nutrition.protein)
+        fat = NutritionFormatting.preciseNutrition(details.currentVersion.nutrition.fat)
+        carbs = NutritionFormatting.preciseNutrition(details.currentVersion.nutrition.carbs)
         versionNumber = details.currentVersion.versionNumber
     }
 
