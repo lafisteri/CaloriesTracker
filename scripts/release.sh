@@ -27,8 +27,6 @@ DERIVED_DATA="$WORK_DIR/DerivedData"
 ARCHIVE_PATH="$WORK_DIR/$APP_NAME.xcarchive"
 PACKAGE_DIR="$WORK_DIR/package"
 
-ASSUME_YES=0
-NO_OPEN=0
 VERSION_NOTES=""
 
 usage() {
@@ -36,8 +34,6 @@ usage() {
 Usage: ./scripts/release.sh [options]
 
 Options:
-  -y, --yes           Skip the final confirmation prompt
-      --no-open       Do not open Finder/GitHub after completion
       --notes TEXT    AltStore description for this version
   -h, --help          Show this help
 USAGE
@@ -45,12 +41,6 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -y|--yes)
-      ASSUME_YES=1
-      ;;
-    --no-open)
-      NO_OPEN=1
-      ;;
     --notes)
       [[ $# -ge 2 ]] || { echo "ERROR: --notes requires a value."; exit 1; }
       VERSION_NOTES="$2"
@@ -194,15 +184,6 @@ for item in apps[0].get("versions", []):
     if str(item.get("version")) == version and str(item.get("buildVersion")) == build:
         raise SystemExit(f"ERROR: AltStore source already contains {version} ({build}). Increase the Xcode build number.")
 PY
-
-if [[ "$ASSUME_YES" -ne 1 ]]; then
-  echo
-  read -r -p "Archive, publish GitHub Release, and update AltStore source? [y/N] " ANSWER
-  [[ "$ANSWER" =~ ^[Yy]$ ]] || {
-    echo "Cancelled."
-    exit 0
-  }
-fi
 
 step "Check remote branch state"
 
@@ -477,9 +458,4 @@ if [[ "$IS_PRIVATE" == "true" ]]; then
   echo
   echo "WARNING: This repository is private."
   echo "AltStore cannot fetch the raw source or IPA without GitHub authentication."
-fi
-
-if [[ "$NO_OPEN" -ne 1 ]]; then
-  open "$RELEASE_URL" >/dev/null 2>&1 || true
-  open -R "$IPA_PATH" >/dev/null 2>&1 || true
 fi
