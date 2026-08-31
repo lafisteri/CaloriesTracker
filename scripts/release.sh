@@ -1,304 +1,307 @@
-#!/bin/zsh
-
+#!/bin/bash
 set -euo pipefail
 
-# ------------------------------------------------------------
-# CaloriesTracker release configuration
-# ------------------------------------------------------------
+# CaloriesTracker: archive -> IPA -> GitHub Release
+# Assumes the Xcode project was flattened into the repository root.
 
 APP_NAME="CaloriesTracker"
 SCHEME="CaloriesTracker"
 CONFIGURATION="Release"
+EXPECTED_BUNDLE_ID="com.caloriestracker.ios"
 REMOTE="origin"
 
-ROOT="$(git rev-parse --show-toplevel)"
-OUTPUT_DIR="$HOME/Desktop/CaloriesTrackerIPA"
-ARCHIVES_ROOT="$HOME/Library/Developer/Xcode/Archives"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$ROOT" ]]; then
+  echo "ERROR: Run this script from inside the CaloriesTracker Git repository."
+  exit 1
+fi
 
-cd "$ROOT"
+PROJECT="$ROOT/CaloriesTracker.xcodeproj"
+ARTIFACTS_DIR="$ROOT/artifacts"
+IPA_DIR="$ARTIFACTS_DIR/ipa"
+LOG_DIR="$ARTIFACTS_DIR/logs"
+WORK_DIR="$ARTIFACTS_DIR/.release-work"
+DERIVED_DATA="$WORK_DIR/DerivedData"
+ARCHIVE_PATH="$WORK_DIR/$APP_NAME.xcarchive"
+PACKAGE_DIR="$WORK_DIR/package"
 
-# ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
+ASSUME_YES=0
+NO_OPEN=0
+
+usage() {
+  cat <<USAGE
+Usage: ./scripts/release.sh [options]
+
+Options:
+  -y, --yes       Skip the final confirmation prompt
+      --no-open   Do not open Finder/GitHub after completion
+  -h, --help      Show this help
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -y|--yes)
+      ASSUME_YES=1
+      ;;
+    --no-open)
+      NO_OPEN=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 fail() {
-    echo
-    echo "❌ $1"
-    exit 1
+  echo
+  echo "ERROR: $1"
+  exit 1
 }
 
 step() {
-    echo
-    echo "────────────────────────────────────────"
-    echo "$1"
-    echo "────────────────────────────────────────"
+  echo
+  echo "============================================================"
+  echo "$1"
+  echo "============================================================"
 }
 
-# ------------------------------------------------------------
-# Requirements
-# ------------------------------------------------------------
+cd "$ROOT"
 
-step "🔎 Проверяю окружение"
+step "Preflight"
 
-command -v git >/dev/null || fail "git не найден"
-command -v xcodebuild >/dev/null || fail "xcodebuild не найден"
-command -v gh >/dev/null || fail "GitHub CLI (gh) не найден"
-command -v zip >/dev/null || fail "zip не найден"
+for tool in git xcodebuild gh zip unzip shasum codesign ditto; do
+  command -v "$tool" >/dev/null 2>&1 || fail "Required command not found: $tool"
+done
 
-/usr/bin/gh auth status >/dev/null 2>&1 ||
-    fail "GitHub CLI не авторизован. Выполни: gh auth login"
+[[ -d "$PROJECT" ]] || fail "Xcode project not found: $PROJECT"
 
-git remote get-url "$REMOTE" >/dev/null 2>&1 ||
-    fail "Git remote '$REMOTE' не найден"
+gh auth status >/dev/null 2>&1 || fail "GitHub CLI is not authenticated. Run: gh auth login"
+git remote get-url "$REMOTE" >/dev/null 2>&1 || fail "Git remote '$REMOTE' was not found."
 
-# ------------------------------------------------------------
-# Git safety
-# ------------------------------------------------------------
-
-step "🌿 Проверяю Git"
-
-if [[ -n "$(git status --porcelain)" ]]; then
-    echo
-    git status --short
-    echo
-    fail "Есть незакоммиченные изменения. Перед релизом сделай commit."
+if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+  git status --short
+  fail "The Git working tree is not clean. Commit or stash changes before releasing."
 fi
 
 BRANCH="$(git symbolic-ref --quiet --short HEAD || true)"
-
-if [[ -z "$BRANCH" ]]; then
-    fail "Git находится в detached HEAD."
-fi
+[[ -n "$BRANCH" ]] || fail "Detached HEAD is not supported. Check out a branch first."
 
 COMMIT="$(git rev-parse HEAD)"
 
-echo "Branch: $BRANCH"
-echo "Commit: ${COMMIT:0:8}"
+mkdir -p "$IPA_DIR" "$LOG_DIR"
+PROBE="$ARTIFACTS_DIR/.gitignore-probe"
+touch "$PROBE"
+if ! git check-ignore -q "$PROBE"; then
+  rm -f "$PROBE"
+  fail "The artifacts directory is not ignored. Add '/artifacts/' to the root .gitignore."
+fi
+rm -f "$PROBE"
 
-# ------------------------------------------------------------
-# Find Xcode project
-# ------------------------------------------------------------
+REPO="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
+IS_PRIVATE="$(gh repo view --json isPrivate --jq '.isPrivate')"
 
-step "📱 Ищу Xcode project"
+step "Read Xcode build settings"
 
-PROJECT="$(
-    find "$ROOT" \
-        -maxdepth 4 \
-        -type d \
-        -name "CaloriesTrackerIOS.xcodeproj" \
-        -print \
-        -quit
+BUILD_SETTINGS="$(
+  xcodebuild \
+    -project "$PROJECT" \
+    -scheme "$SCHEME" \
+    -configuration "$CONFIGURATION" \
+    -destination 'generic/platform=iOS' \
+    -showBuildSettings
 )"
 
-if [[ -z "$PROJECT" ]]; then
-    PROJECT="$(
-        find "$ROOT" \
-            -maxdepth 4 \
-            -type d \
-            -name "*.xcodeproj" \
-            -print \
-            -quit
-    )"
+VERSION="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ { print $2; exit }')"
+BUILD="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '$1 ~ /^[[:space:]]*CURRENT_PROJECT_VERSION$/ { print $2; exit }')"
+BUNDLE_ID="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F ' = ' '$1 ~ /^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER$/ { print $2; exit }')"
+
+[[ -n "$VERSION" ]] || fail "MARKETING_VERSION could not be read from Xcode build settings."
+[[ -n "$BUILD" ]] || fail "CURRENT_PROJECT_VERSION could not be read from Xcode build settings."
+[[ "$BUNDLE_ID" == "$EXPECTED_BUNDLE_ID" ]] || fail "Unexpected bundle identifier: $BUNDLE_ID"
+
+# Keep the IPA filename compatible with the existing manual convention.
+RELEASE_ID="${VERSION}.${BUILD}"
+IPA_NAME="${APP_NAME}-${RELEASE_ID}.ipa"
+SHA_NAME="${IPA_NAME}.sha256"
+IPA_PATH="$IPA_DIR/$IPA_NAME"
+SHA_PATH="$IPA_DIR/$SHA_NAME"
+
+# Tag names keep marketing version and build number visibly separate.
+TAG="v${VERSION}-build.${BUILD}"
+TITLE="${APP_NAME} ${VERSION} (${BUILD})"
+LOG_PATH="$LOG_DIR/release-${RELEASE_ID}.log"
+
+printf 'Repository:  %s\n' "$REPO"
+printf 'Branch:      %s\n' "$BRANCH"
+printf 'Commit:      %.12s\n' "$COMMIT"
+printf 'Version:     %s\n' "$VERSION"
+printf 'Build:       %s\n' "$BUILD"
+printf 'Bundle ID:   %s\n' "$BUNDLE_ID"
+printf 'Tag:         %s\n' "$TAG"
+printf 'IPA:         %s\n' "$IPA_PATH"
+
+# Fetch tags before duplicate checks so a previous failed local run is handled safely.
+git fetch --quiet --tags "$REMOTE"
+
+if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+  fail "GitHub Release $TAG already exists. Increase the Xcode build number."
 fi
 
-[[ -n "$PROJECT" ]] ||
-    fail "Не найден .xcodeproj"
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+  TAG_COMMIT="$(git rev-list -n 1 "$TAG")"
+  [[ "$TAG_COMMIT" == "$COMMIT" ]] || fail "Tag $TAG already points to a different commit. Increase the build number."
+fi
 
-echo "Project: $PROJECT"
-echo "Scheme:  $SCHEME"
+if [[ "$ASSUME_YES" -ne 1 ]]; then
+  echo
+  read -r -p "Archive, package, push, and publish this release? [y/N] " ANSWER
+  [[ "$ANSWER" =~ ^[Yy]$ ]] || {
+    echo "Cancelled."
+    exit 0
+  }
+fi
 
-# ------------------------------------------------------------
-# Archive
-# ------------------------------------------------------------
+step "Check remote branch state"
 
-step "🏗 Собираю iOS Archive"
+git fetch --quiet "$REMOTE"
+if git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH"; then
+  read -r BEHIND AHEAD <<< "$(git rev-list --left-right --count "$REMOTE/$BRANCH...HEAD")"
+  if [[ "$BEHIND" -gt 0 ]]; then
+    fail "Local branch is behind $REMOTE/$BRANCH by $BEHIND commit(s). Pull/rebase before releasing."
+  fi
+fi
 
-TODAY="$(date '+%Y-%m-%d')"
-TIMESTAMP="$(date '+%Y-%m-%d %H.%M.%S')"
+step "Create signed Xcode archive"
 
-ARCHIVE_DIR="$ARCHIVES_ROOT/$TODAY"
-ARCHIVE_PATH="$ARCHIVE_DIR/$APP_NAME $TIMESTAMP.xcarchive"
+rm -rf "$WORK_DIR"
+mkdir -p "$PACKAGE_DIR/Payload"
 
-mkdir -p "$ARCHIVE_DIR"
+cleanup() {
+  STATUS=$?
+  if [[ "$STATUS" -eq 0 ]]; then
+    rm -rf "$WORK_DIR"
+  else
+    echo
+    echo "Release failed. Temporary work files were kept at:"
+    echo "$WORK_DIR"
+  fi
+  exit "$STATUS"
+}
+trap cleanup EXIT
 
 XCODE_ARGS=(
-    -project "$PROJECT"
-    -scheme "$SCHEME"
-    -configuration "$CONFIGURATION"
-    -destination "generic/platform=iOS"
-    -archivePath "$ARCHIVE_PATH"
-    -allowProvisioningUpdates
-    archive
+  -project "$PROJECT"
+  -scheme "$SCHEME"
+  -configuration "$CONFIGURATION"
+  -destination "generic/platform=iOS"
+  -archivePath "$ARCHIVE_PATH"
+  -derivedDataPath "$DERIVED_DATA"
+  -allowProvisioningUpdates
+  archive
 )
 
 if command -v xcbeautify >/dev/null 2>&1; then
-    set -o pipefail
-    xcodebuild "${XCODE_ARGS[@]}" | xcbeautify
+  xcodebuild "${XCODE_ARGS[@]}" 2>&1 | tee "$LOG_PATH" | xcbeautify
 else
-    xcodebuild "${XCODE_ARGS[@]}"
+  xcodebuild "${XCODE_ARGS[@]}" 2>&1 | tee "$LOG_PATH"
 fi
 
-[[ -d "$ARCHIVE_PATH" ]] ||
-    fail "Archive не был создан"
+[[ -d "$ARCHIVE_PATH" ]] || fail "Xcode archive was not created."
 
-echo
-echo "✅ Archive:"
-echo "$ARCHIVE_PATH"
+APPLICATIONS_DIR="$ARCHIVE_PATH/Products/Applications"
+APP_COUNT="$(find "$APPLICATIONS_DIR" -maxdepth 1 -type d -name '*.app' | wc -l | tr -d '[:space:]')"
+[[ "$APP_COUNT" == "1" ]] || fail "Expected exactly one .app in the archive; found $APP_COUNT."
 
-# ------------------------------------------------------------
-# Locate .app
-# ------------------------------------------------------------
+APP_PATH="$(find "$APPLICATIONS_DIR" -maxdepth 1 -type d -name '*.app' -print -quit)"
+APP_BUNDLE_NAME="$(basename "$APP_PATH")"
+INFO_PLIST="$APP_PATH/Info.plist"
+[[ -f "$INFO_PLIST" ]] || fail "Archived app Info.plist was not found."
 
-APP="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
+ARCHIVE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
+ARCHIVE_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
+ARCHIVE_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")"
 
-[[ -d "$APP" ]] ||
-    fail "Не найден $APP_NAME.app внутри xcarchive"
+[[ "$ARCHIVE_VERSION" == "$VERSION" ]] || fail "Archive version does not match preflight version."
+[[ "$ARCHIVE_BUILD" == "$BUILD" ]] || fail "Archive build does not match preflight build."
+[[ "$ARCHIVE_BUNDLE_ID" == "$EXPECTED_BUNDLE_ID" ]] || fail "Archive bundle identifier changed unexpectedly."
 
-INFO_PLIST="$APP/Info.plist"
+codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
-[[ -f "$INFO_PLIST" ]] ||
-    fail "Info.plist не найден"
+step "Create IPA"
 
-# ------------------------------------------------------------
-# Version
-# ------------------------------------------------------------
-
-step "🏷 Читаю версию"
-
-VERSION="$(
-    /usr/libexec/PlistBuddy \
-        -c "Print :CFBundleShortVersionString" \
-        "$INFO_PLIST"
-)"
-
-BUILD="$(
-    /usr/libexec/PlistBuddy \
-        -c "Print :CFBundleVersion" \
-        "$INFO_PLIST"
-)"
-
-RELEASE_VERSION="${VERSION}.${BUILD}"
-TAG="v${RELEASE_VERSION}"
-
-IPA_NAME="${APP_NAME}-${RELEASE_VERSION}.ipa"
-IPA_PATH="$OUTPUT_DIR/$IPA_NAME"
-
-echo "Version: $VERSION"
-echo "Build:   $BUILD"
-echo "Tag:     $TAG"
-echo "IPA:     $IPA_NAME"
-
-# ------------------------------------------------------------
-# Duplicate release protection
-# ------------------------------------------------------------
-
-if gh release view "$TAG" >/dev/null 2>&1; then
-    fail "GitHub Release $TAG уже существует. Увеличь Build в Xcode."
-fi
-
-# ------------------------------------------------------------
-# Create IPA
-# ------------------------------------------------------------
-
-step "📦 Создаю IPA"
-
-mkdir -p "$OUTPUT_DIR"
-
-TMP_DIR="$(mktemp -d)"
-
-cleanup() {
-    rm -rf "$TMP_DIR"
-}
-
-trap cleanup EXIT
-
-mkdir -p "$TMP_DIR/Payload"
-
-ditto \
-    "$APP" \
-    "$TMP_DIR/Payload/$APP_NAME.app"
-
-rm -f "$IPA_PATH"
+rm -f "$IPA_PATH" "$SHA_PATH"
+ditto "$APP_PATH" "$PACKAGE_DIR/Payload/$APP_BUNDLE_NAME"
 
 (
-    cd "$TMP_DIR"
-    zip -qry "$IPA_PATH" Payload
+  cd "$PACKAGE_DIR"
+  COPYFILE_DISABLE=1 zip -qry "$IPA_PATH" Payload
 )
 
-[[ -f "$IPA_PATH" ]] ||
-    fail "IPA не создан"
+[[ -f "$IPA_PATH" ]] || fail "IPA was not created."
+unzip -tq "$IPA_PATH" >/dev/null || fail "IPA ZIP integrity check failed."
+unzip -Z1 "$IPA_PATH" | grep -q "^Payload/$APP_BUNDLE_NAME/Info.plist$" || fail "IPA does not contain the expected app bundle."
 
-# Basic ZIP integrity check
-unzip -tq "$IPA_PATH" >/dev/null ||
-    fail "Созданный IPA повреждён"
+(
+  cd "$IPA_DIR"
+  shasum -a 256 "$IPA_NAME" > "$SHA_NAME"
+)
 
-IPA_SIZE="$(du -h "$IPA_PATH" | awk '{print $1}')"
+IPA_SIZE="$(du -h "$IPA_PATH" | awk '{ print $1 }')"
+IPA_SHA="$(awk '{ print $1 }' "$SHA_PATH")"
 
-echo
-echo "✅ IPA готов"
-echo "$IPA_PATH"
-echo "Size: $IPA_SIZE"
+echo "IPA created: $IPA_PATH"
+echo "Size:        $IPA_SIZE"
+echo "SHA-256:     $IPA_SHA"
 
-# ------------------------------------------------------------
-# Push current source
-# ------------------------------------------------------------
+step "Push source commit"
 
-step "☁️ Отправляю код в GitHub"
+git push "$REMOTE" "HEAD:refs/heads/$BRANCH"
 
-echo "git push $REMOTE $BRANCH"
+step "Create and push Git tag"
 
-git push "$REMOTE" "$BRANCH"
+if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+  git tag -a "$TAG" "$COMMIT" -m "$TITLE"
+fi
 
-# ------------------------------------------------------------
-# GitHub Release
-# ------------------------------------------------------------
+git push "$REMOTE" "refs/tags/$TAG"
 
-step "🚀 Создаю GitHub Release $TAG"
+step "Create GitHub Release"
 
 gh release create "$TAG" \
-    "$IPA_PATH" \
-    --target "$COMMIT" \
-    --title "$APP_NAME $VERSION ($BUILD)" \
-    --generate-notes \
-    --latest
+  "$IPA_PATH#${APP_NAME} IPA" \
+  "$SHA_PATH#SHA-256 checksum" \
+  -R "$REPO" \
+  --verify-tag \
+  --title "$TITLE" \
+  --generate-notes \
+  --latest
 
-# gh creates the tag remotely. Fetch it locally as well.
-git fetch --tags "$REMOTE"
-
-# ------------------------------------------------------------
-# Result
-# ------------------------------------------------------------
-
-RELEASE_URL="$(
-    gh release view "$TAG" \
-        --json url \
-        --jq '.url'
-)"
-
-REPO="$(
-    gh repo view \
-        --json nameWithOwner \
-        --jq '.nameWithOwner'
-)"
-
+RELEASE_URL="$(gh release view "$TAG" -R "$REPO" --json url --jq '.url')"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/$IPA_NAME"
 
-step "🎉 RELEASE ГОТОВ"
+step "Release complete"
 
-echo "App:       $APP_NAME"
-echo "Version:   $VERSION"
-echo "Build:     $BUILD"
-echo "Tag:       $TAG"
-echo
-echo "IPA:"
-echo "$IPA_PATH"
-echo
-echo "GitHub Release:"
-echo "$RELEASE_URL"
-echo
-echo "IPA URL:"
-echo "$DOWNLOAD_URL"
-echo
+echo "Release:     $RELEASE_URL"
+echo "IPA:         $IPA_PATH"
+echo "Download:    $DOWNLOAD_URL"
+echo "SHA-256:     $IPA_SHA"
+echo "Build log:   $LOG_PATH"
 
-open "$RELEASE_URL"
-open -R "$IPA_PATH"
+if [[ "$IS_PRIVATE" == "true" ]]; then
+  echo
+  echo "NOTE: This repository is private. The direct download URL requires GitHub authentication"
+  echo "and cannot be used as a public AltStore Source URL without a public release host."
+fi
+
+if [[ "$NO_OPEN" -ne 1 ]]; then
+  open "$RELEASE_URL" >/dev/null 2>&1 || true
+  open -R "$IPA_PATH" >/dev/null 2>&1 || true
+fi

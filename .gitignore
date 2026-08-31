@@ -17,3 +17,6 @@ xcuserdata/
 
 # Local Supabase publishable-key override
 Config/Supabase.private.xcconfig
+
+# Local release artifacts
+/artifacts/
