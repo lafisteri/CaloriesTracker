@@ -12,6 +12,7 @@ struct DayStatistics: Identifiable, Hashable, Sendable {
     let day: LocalDay
     let weekday: LocalDay.Weekday
     let consumedNutrition: Nutrition
+    let macroGoal: DailyMacroGoal?
     let calorieGoal: Double?
     let calorieBalance: Double?
     let isFuture: Bool

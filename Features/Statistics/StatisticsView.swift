@@ -22,8 +22,6 @@ struct StatisticsView: View {
 
                 StatisticsChartCard(title: "Калории по дням", unit: "ккал") {
                     WeeklyCaloriesChart(days: statistics.days)
-                } legend: {
-                    CaloriesLegend()
                 }
                 .statisticsChartCardRow(topInset: 0)
 
@@ -99,6 +97,7 @@ private enum StatisticsChartLayout {
     static let cardContentSpacing: CGFloat = 12
     static let chartHeight: CGFloat = 180
     static let axisLabelWidth: CGFloat = 48
+    static let caloriesBarWidth: CGFloat = 28
     static let weekdayLabels = LocalDay.Weekday.allCases.map(\.russianShortLabel)
 }
 
@@ -106,7 +105,18 @@ private struct StatisticsChartCard<ChartContent: View, Legend: View>: View {
     let title: String
     let unit: String
     private let chartContent: ChartContent
-    private let legend: Legend
+    private let legend: Legend?
+
+    init(
+        title: String,
+        unit: String,
+        @ViewBuilder chart: () -> ChartContent,
+    ) where Legend == EmptyView {
+        self.title = title
+        self.unit = unit
+        chartContent = chart()
+        legend = nil
+    }
 
     init(
         title: String,
@@ -135,7 +145,10 @@ private struct StatisticsChartCard<ChartContent: View, Legend: View>: View {
             }
 
             chartContent
-            legend
+
+            if let legend {
+                legend
+            }
         }
         .padding(StatisticsChartLayout.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -160,15 +173,40 @@ private struct WeeklyCaloriesChart: View {
     var body: some View {
         Chart {
             ForEach(days) { day in
-                if day.consumedNutrition.calories > 0 {
-                    BarMark(
-                        x: .value("День", day.weekday.russianShortLabel),
-                        y: .value("Ккал", day.consumedNutrition.calories),
-                    )
-                    .foregroundStyle(.tint)
-                    .cornerRadius(4)
-                    .accessibilityLabel("Фактические калории")
-                    .accessibilityValue(NutritionFormatting.calories(day.consumedNutrition.calories))
+                let consumedCalories = day.consumedNutrition.calories
+
+                if consumedCalories > 0 {
+                    if let calorieGoal = day.calorieGoal, consumedCalories > calorieGoal {
+                        BarMark(
+                            x: .value("День", day.weekday.russianShortLabel),
+                            y: .value("Ккал", consumedCalories),
+                            width: .fixed(StatisticsChartLayout.caloriesBarWidth),
+                        )
+                        .foregroundStyle(.red)
+                        .cornerRadius(4)
+                        .accessibilityLabel("Превышение цели калорий")
+                        .accessibilityValue(NutritionFormatting.calories(consumedCalories - calorieGoal))
+
+                        BarMark(
+                            x: .value("День", day.weekday.russianShortLabel),
+                            yStart: .value("Ккал", 0),
+                            yEnd: .value("Ккал", calorieGoal),
+                            width: .fixed(StatisticsChartLayout.caloriesBarWidth),
+                        )
+                        .foregroundStyle(.tint)
+                        .accessibilityLabel("Фактические калории")
+                        .accessibilityValue(NutritionFormatting.calories(calorieGoal))
+                    } else {
+                        BarMark(
+                            x: .value("День", day.weekday.russianShortLabel),
+                            y: .value("Ккал", consumedCalories),
+                            width: .fixed(StatisticsChartLayout.caloriesBarWidth),
+                        )
+                        .foregroundStyle(.tint)
+                        .cornerRadius(4)
+                        .accessibilityLabel("Фактические калории")
+                        .accessibilityValue(NutritionFormatting.calories(consumedCalories))
+                    }
                 }
 
                 if let calorieGoal = day.calorieGoal {
@@ -178,8 +216,8 @@ private struct WeeklyCaloriesChart: View {
                     )
                     .foregroundStyle(.secondary)
                     .symbol {
-                        Capsule()
-                            .frame(width: 18, height: 3)
+                        Rectangle()
+                            .frame(width: StatisticsChartLayout.caloriesBarWidth, height: 2)
                     }
                     .accessibilityLabel("Цель калорий")
                     .accessibilityValue(NutritionFormatting.calories(calorieGoal))
@@ -210,28 +248,25 @@ private struct WeeklyMacrosChart: View {
                         .accessibilityLabel(nutrient.fullLabel)
                         .accessibilityValue(NutritionFormatting.macro(amount))
                     }
+
+                    if let macroGoal = day.macroGoal {
+                        let goal = nutrient.goal(in: macroGoal)
+
+                        PointMark(
+                            x: .value("День", day.weekday.russianShortLabel),
+                            y: .value("Цель", goal),
+                        )
+                        .position(by: .value("БЖУ", nutrient.shortLabel))
+                        .foregroundStyle(nutrient.color)
+                        .symbol(Circle())
+                        .symbolSize(24)
+                        .accessibilityLabel("Цель: \(nutrient.fullLabel)")
+                        .accessibilityValue(NutritionFormatting.macro(goal))
+                    }
                 }
             }
         }
         .statisticsChartAxes { NutritionFormatting.macro($0) }
-    }
-}
-
-private struct CaloriesLegend: View {
-    var body: some View {
-        HStack(spacing: 16) {
-            StatisticsLegendItem("Факт") {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(.tint)
-                    .frame(width: 10, height: 8)
-            }
-
-            StatisticsLegendItem("Цель") {
-                Capsule()
-                    .fill(Color.secondary)
-                    .frame(width: 18, height: 3)
-            }
-        }
     }
 }
 
@@ -299,6 +334,14 @@ private extension MacroNutrient {
         case .protein: nutrition.protein
         case .fat: nutrition.fat
         case .carbs: nutrition.carbs
+        }
+    }
+
+    func goal(in goal: DailyMacroGoal) -> Double {
+        switch self {
+        case .protein: goal.protein
+        case .fat: goal.fat
+        case .carbs: goal.carbs
         }
     }
 }

@@ -23,7 +23,8 @@ final class StatisticsService {
 
         let dayStatistics = try days.map { day in
             let consumedNutrition = try nutritionTotal(for: entriesByDay[day] ?? [])
-            let calorieGoal = goals[day]?.dailyGoals[day.weekday()]?.calories
+            let macroGoal = goals[day]?.dailyGoals[day.weekday()]
+            let calorieGoal = macroGoal?.calories
             let isFuture = day > today
             let calorieBalance = isFuture ? nil : calorieGoal.map { consumedNutrition.calories - $0 }
 
@@ -31,6 +32,7 @@ final class StatisticsService {
                 day: day,
                 weekday: day.weekday(),
                 consumedNutrition: consumedNutrition,
+                macroGoal: macroGoal,
                 calorieGoal: calorieGoal,
                 calorieBalance: calorieBalance,
                 isFuture: isFuture,
