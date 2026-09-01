@@ -55,16 +55,35 @@ struct TodayRootView: View {
                     ProgressView()
                 }
             }
-            .padding(.bottom, 8)
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                AppStyle.controlBackground,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous),
+            )
+            .shadow(
+                color: AppStyle.controlShadowColor,
+                radius: AppStyle.controlShadowRadius,
+                y: AppStyle.controlShadowY,
+            )
+            .listRowInsets(
+                EdgeInsets(
+                    top: 0,
+                    leading: AppStyle.screenHorizontalMargin,
+                    bottom: 0,
+                    trailing: AppStyle.screenHorizontalMargin,
+                ),
+            )
+            .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
 
             if let day = model.day {
                 ForEach(day.meals) { meal in
-                    FoodCompositionSection(
+                    DiaryMealCardSection(
+                        mealID: meal.mealType.rawValue,
                         title: meal.mealType.russianLabel,
                         nutrition: meal.totalNutrition,
-                        showsAddRow: false,
+                        hasEntries: !meal.entries.isEmpty,
                         onAdd: {
                             router.todayPath.append(
                                 .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
@@ -81,13 +100,21 @@ struct TodayRootView: View {
                                 onDragEnded: {
                                     clearDraggedEntryID(entry.id)
                                 },
-                                onDelete: {
+                            )
+                            .diaryMealCardEntryRow(
+                                mealID: meal.mealType.rawValue,
+                                isLast: entry.id == meal.entries.last?.id,
+                            )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
                                     Task {
                                         await model.delete(entryID: entry.id)
                                     }
-                                },
-                            )
-                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .accessibilityLabel("Удалить")
+                            }
                         }
                         .dropDestination(for: String.self) { identifiers, displayedTargetIndex in
                             guard let identifier = identifiers.first,
@@ -103,9 +130,6 @@ struct TodayRootView: View {
                             )
                             clearDraggedEntryID(entryID)
                         }
-
-                    } addRow: {
-                        EmptyView()
                     }
                 }
             }
@@ -113,6 +137,34 @@ struct TodayRootView: View {
             if let errorMessage = model.errorMessage {
                 DiaryInlineErrorView(message: errorMessage)
                     .listRowSeparator(.hidden)
+            }
+        }
+        .backgroundPreferenceValue(DiaryMealCardBoundsPreferenceKey.self) { cardBounds in
+            GeometryReader { proxy in
+                ForEach(cardBounds.keys.sorted(), id: \.self) { mealID in
+                    if let anchors = cardBounds[mealID],
+                       let top = anchors.top,
+                       let bottom = anchors.bottom {
+                        let topFrame = proxy[top]
+                        let bottomFrame = proxy[bottom]
+
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(AppStyle.controlBackground)
+                            .frame(
+                                width: topFrame.width,
+                                height: bottomFrame.maxY - topFrame.minY,
+                            )
+                            .position(
+                                x: topFrame.midX,
+                                y: (topFrame.minY + bottomFrame.maxY) / 2,
+                            )
+                            .shadow(
+                                color: AppStyle.controlShadowColor,
+                                radius: AppStyle.controlShadowRadius,
+                                y: AppStyle.controlShadowY,
+                            )
+                    }
+                }
             }
         }
         .appPlainListStyle()
@@ -344,7 +396,6 @@ private struct DiaryListEntryRow: View {
     let isDragging: Bool
     let onDragStarted: @MainActor () -> Void
     let onDragEnded: @MainActor () -> Void
-    let onDelete: @MainActor () -> Void
 
     var body: some View {
         NavigationLink(value: TodayRoute.entryEditor(entry.id)) {
@@ -357,15 +408,153 @@ private struct DiaryListEntryRow: View {
                     )
                 }
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive, action: onDelete) {
-                Image(systemName: "trash")
-            }
-            .accessibilityLabel("Удалить")
-        }
         .opacity(isDragging ? 0 : 1)
         .accessibilityHidden(isDragging)
         .allowsHitTesting(!isDragging)
+    }
+}
+
+private struct DiaryMealCardAnchors {
+    var top: Anchor<CGRect>?
+    var bottom: Anchor<CGRect>?
+}
+
+private struct DiaryMealCardBoundsPreferenceKey: PreferenceKey {
+    static let defaultValue: [String: DiaryMealCardAnchors] = [:]
+
+    static func reduce(
+        value: inout [String: DiaryMealCardAnchors],
+        nextValue: () -> [String: DiaryMealCardAnchors],
+    ) {
+        for (mealID, nextAnchors) in nextValue() {
+            var anchors = value[mealID] ?? DiaryMealCardAnchors()
+            anchors.top = anchors.top ?? nextAnchors.top
+            anchors.bottom = nextAnchors.bottom ?? anchors.bottom
+            value[mealID] = anchors
+        }
+    }
+}
+
+private struct DiaryMealCardSection<Rows: View>: View {
+    let mealID: String
+    let title: String
+    let nutrition: Nutrition
+    let hasEntries: Bool
+    let onAdd: @MainActor () -> Void
+    private let rows: Rows
+
+    init(
+        mealID: String,
+        title: String,
+        nutrition: Nutrition,
+        hasEntries: Bool,
+        onAdd: @escaping @MainActor () -> Void,
+        @ViewBuilder rows: () -> Rows,
+    ) {
+        self.mealID = mealID
+        self.title = title
+        self.nutrition = nutrition
+        self.hasEntries = hasEntries
+        self.onAdd = onAdd
+        self.rows = rows()
+    }
+
+    var body: some View {
+        Section {
+            DiaryMealCardHeader(
+                mealID: mealID,
+                title: title,
+                nutrition: nutrition,
+                hasEntries: hasEntries,
+                onAdd: onAdd,
+            )
+            .listRowInsets(
+                EdgeInsets(
+                    top: 0,
+                    leading: AppStyle.screenHorizontalMargin,
+                    bottom: 0,
+                    trailing: AppStyle.screenHorizontalMargin,
+                ),
+            )
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
+            rows
+        }
+    }
+}
+
+private struct DiaryMealCardHeader: View {
+    let mealID: String
+    let title: String
+    let nutrition: Nutrition
+    let hasEntries: Bool
+    let onAdd: @MainActor () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Color.black)
+
+            Text("\(NutritionFormatting.calories(nutrition.calories)) ккал")
+                .font(.body.weight(.regular))
+                .foregroundStyle(Color.black)
+
+            Spacer()
+
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+                    .font(.title2.weight(.regular))
+                    .foregroundStyle(.tint)
+            }
+            .buttonStyle(.borderless)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+            .accessibilityLabel("Добавить в \(title)")
+        }
+        .padding(.horizontal, 16)
+        .anchorPreference(key: DiaryMealCardBoundsPreferenceKey.self, value: .bounds) { bounds in
+            [
+                mealID: DiaryMealCardAnchors(
+                    top: bounds,
+                    bottom: hasEntries ? nil : bounds,
+                ),
+            ]
+        }
+    }
+}
+
+private extension View {
+    func diaryMealCardEntryRow(mealID: String, isLast: Bool) -> some View {
+        padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                AppStyle.controlBackground,
+                in: UnevenRoundedRectangle(
+                    cornerRadii: .init(
+                        topLeading: 0,
+                        bottomLeading: isLast ? 20 : 0,
+                        bottomTrailing: isLast ? 20 : 0,
+                        topTrailing: 0,
+                    ),
+                    style: .continuous,
+                ),
+            )
+            .compositingGroup()
+            .listRowInsets(
+                EdgeInsets(
+                    top: 0,
+                    leading: AppStyle.screenHorizontalMargin,
+                    bottom: 0,
+                    trailing: AppStyle.screenHorizontalMargin,
+                ),
+            )
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .anchorPreference(key: DiaryMealCardBoundsPreferenceKey.self, value: .bounds) { bounds in
+                isLast ? [mealID: DiaryMealCardAnchors(bottom: bounds)] : [:]
+            }
     }
 }
 
