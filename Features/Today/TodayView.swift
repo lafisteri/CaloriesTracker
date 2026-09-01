@@ -39,7 +39,14 @@ struct TodayRootView: View {
     var body: some View {
         List {
             dateNavigation
-                .listRowInsets(DateNavigatorLayout.listRowInsets)
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 0,
+                        leading: 0,
+                        bottom: DateNavigatorLayout.rootHeaderContentSpacing,
+                        trailing: 0,
+                    ),
+                )
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -69,9 +76,9 @@ struct TodayRootView: View {
             .listRowInsets(
                 EdgeInsets(
                     top: 0,
-                    leading: AppStyle.screenHorizontalMargin,
+                    leading: 0,
                     bottom: 0,
-                    trailing: AppStyle.screenHorizontalMargin,
+                    trailing: 0,
                 ),
             )
             .listRowBackground(Color.clear)
@@ -170,6 +177,7 @@ struct TodayRootView: View {
         .appPlainListStyle()
         .listSectionSpacing(.compact)
         .contentMargins(.top, 0, for: .scrollContent)
+        .contentMargins(.horizontal, AppStyle.screenHorizontalMargin, for: .scrollContent)
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await model.load()
@@ -471,9 +479,9 @@ private struct DiaryMealCardSection<Rows: View>: View {
             .listRowInsets(
                 EdgeInsets(
                     top: 0,
-                    leading: AppStyle.screenHorizontalMargin,
+                    leading: 0,
                     bottom: 0,
-                    trailing: AppStyle.screenHorizontalMargin,
+                    trailing: 0,
                 ),
             )
             .listRowBackground(Color.clear)
@@ -545,9 +553,9 @@ private extension View {
             .listRowInsets(
                 EdgeInsets(
                     top: 0,
-                    leading: AppStyle.screenHorizontalMargin,
+                    leading: 0,
                     bottom: 0,
-                    trailing: AppStyle.screenHorizontalMargin,
+                    trailing: 0,
                 ),
             )
             .listRowBackground(Color.clear)
