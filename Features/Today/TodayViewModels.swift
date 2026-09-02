@@ -10,7 +10,7 @@ final class TodayViewModel {
 
     private(set) var selectedDay: LocalDay
     private(set) var day: DiaryDayReadModel?
-    private(set) var calorieGoal: Double?
+    private(set) var dailyGoal: DailyMacroGoal?
     private(set) var isLoading = false
     var errorMessage: String?
     private var currentLoadID: UUID?
@@ -32,7 +32,7 @@ final class TodayViewModel {
         isLoading = true
         errorMessage = nil
         day = nil
-        calorieGoal = nil
+        dailyGoal = nil
 
         do {
             let loadedDay = try await diaryService.day(for: requestedDay)
@@ -43,14 +43,14 @@ final class TodayViewModel {
             }
 
             day = loadedDay
-            calorieGoal = loadedGoal?.dailyGoals[requestedDay.weekday()]?.calories
+            dailyGoal = loadedGoal?.dailyGoals[requestedDay.weekday()]
         } catch {
             guard currentLoadID == loadID else {
                 return
             }
 
             day = nil
-            calorieGoal = nil
+            dailyGoal = nil
             errorMessage = diaryErrorMessage(error, fallback: "Не удалось загрузить дневник.")
         }
 

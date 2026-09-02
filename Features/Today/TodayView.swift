@@ -51,13 +51,8 @@ struct TodayRootView: View {
                 .listRowSeparator(.hidden)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("За день")
-                    .font(.headline)
-                    .foregroundStyle(Color.black)
-                    .accessibilityAddTraits(.isHeader)
-
                 if let day = model.day {
-                    DailyNutritionSummary(nutrition: day.totalNutrition, calorieGoal: model.calorieGoal)
+                    DailyNutritionSummary(nutrition: day.totalNutrition, goal: model.dailyGoal)
                 } else {
                     ProgressView()
                 }
@@ -729,23 +724,237 @@ struct FoodCompositionAddRow: View {
 
 private struct DailyNutritionSummary: View {
     let nutrition: Nutrition
-    let calorieGoal: Double?
+    let goal: DailyMacroGoal?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let calorieGoal {
-                Text("\(NutritionFormatting.calories(nutrition.calories)) / \(NutritionFormatting.calories(calorieGoal)) ккал")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(Color.black)
-            } else {
-                Text("\(NutritionFormatting.calories(nutrition.calories)) ккал")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(Color.black)
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
+                calorieValue
+
+                Spacer(minLength: 0)
+
+                if let calorieGoal, calorieGoal > 0 {
+                    DailyCalorieProgressRing(
+                        progress: DailyGoalProgress(
+                            value: nutrition.calories,
+                            goal: calorieGoal,
+                        ),
+                    )
+                }
             }
-            Text("Б \(NutritionFormatting.macro(nutrition.protein)) · Ж \(NutritionFormatting.macro(nutrition.fat)) · У \(NutritionFormatting.macro(nutrition.carbs))")
-                .font(.subheadline)
-                .foregroundStyle(Color.black)
+
+            Divider()
+                .overlay(Color(uiColor: .systemGray4).opacity(0.55))
+
+            HStack(spacing: 8) {
+                DailyMacroSummaryColumn(
+                    label: "Б",
+                    value: nutrition.protein,
+                    goal: goal?.protein,
+                    color: .blue,
+                )
+
+                macroDivider
+
+                DailyMacroSummaryColumn(
+                    label: "Ж",
+                    value: nutrition.fat,
+                    goal: goal?.fat,
+                    color: .orange,
+                )
+
+                macroDivider
+
+                DailyMacroSummaryColumn(
+                    label: "У",
+                    value: nutrition.carbs,
+                    goal: goal?.carbs,
+                    color: .green,
+                )
+            }
         }
+    }
+
+    private var calorieGoal: Double? {
+        goal?.calories
+    }
+
+    private var calorieValue: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text(NutritionFormatting.calories(nutrition.calories))
+                .font(.title2.weight(.regular))
+                .foregroundStyle(Color.black)
+
+            if let calorieGoal {
+                Text(" / \(NutritionFormatting.calories(calorieGoal)) ккал")
+                    .font(.title3.weight(.regular))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(" ккал")
+                    .font(.title3.weight(.regular))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .layoutPriority(1)
+    }
+
+    private var macroDivider: some View {
+        Rectangle()
+            .fill(Color(uiColor: .systemGray4).opacity(0.7))
+            .frame(width: 1, height: 44)
+    }
+
+}
+
+private struct DailyCalorieProgressRing: View {
+    let progress: DailyGoalProgress
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color(uiColor: .systemGray5), lineWidth: 6)
+
+            Circle()
+                .trim(from: 0, to: progress.goalSegment)
+                .stroke(
+                    Color.purple,
+                    style: StrokeStyle(
+                        lineWidth: 6,
+                        lineCap: progress.overflowSegment > 0 ? .butt : .round,
+                    ),
+                )
+                .rotationEffect(.degrees(-90))
+
+            if progress.overflowSegment > 0 {
+                Circle()
+                    .trim(from: 0, to: progress.overflowSegment)
+                    .stroke(
+                        Color.red,
+                        style: StrokeStyle(lineWidth: 6, lineCap: .butt),
+                    )
+                    .rotationEffect(.degrees(-90 + 360 * progress.goalSegment))
+            }
+
+            Text("\(progress.percentage)%")
+                .font(.subheadline.weight(.regular))
+                .foregroundStyle(Color.black)
+                .monospacedDigit()
+        }
+        .frame(width: 56, height: 56)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Выполнение цели по калориям")
+        .accessibilityValue("\(progress.percentage)%")
+    }
+}
+
+private struct DailyMacroSummaryColumn: View {
+    let label: String
+    let value: Double
+    let goal: Double?
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(label)
+                    .font(.headline.weight(.regular))
+                    .foregroundStyle(color)
+
+                Text(NutritionFormatting.macro(value))
+                    .font(.subheadline.weight(.regular))
+                    .foregroundStyle(Color.black)
+
+                if let goal {
+                    Text(" / \(NutritionFormatting.macro(goal)) г")
+                        .font(.caption.weight(.regular))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(" г")
+                        .font(.caption.weight(.regular))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+
+            DailySummaryProgressBar(
+                progress: progress,
+                color: color,
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var progress: DailyGoalProgress {
+        DailyGoalProgress(value: value, goal: goal ?? 0)
+    }
+}
+
+private struct DailySummaryProgressBar: View {
+    let progress: DailyGoalProgress
+    let color: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(uiColor: .systemGray5))
+
+                if progress.overflowSegment > 0 {
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(color)
+                            .frame(width: proxy.size.width * progress.goalSegment)
+
+                        Rectangle()
+                            .fill(Color.red)
+                            .frame(width: proxy.size.width * progress.overflowSegment)
+                    }
+                    .clipShape(Capsule())
+                } else {
+                    Capsule()
+                        .fill(color)
+                        .frame(width: proxy.size.width * progress.goalSegment)
+                }
+            }
+        }
+        .frame(height: 6)
+    }
+}
+
+private struct DailyGoalProgress {
+    let value: Double
+    let goal: Double
+
+    var percentage: Int {
+        guard goal > 0 else {
+            return 0
+        }
+
+        return Int((value / goal * 100).rounded())
+    }
+
+    var goalSegment: Double {
+        guard goal > 0 else {
+            return 0
+        }
+
+        guard value > goal, value > 0 else {
+            return min(max(value / goal, 0), 1)
+        }
+
+        return goal / value
+    }
+
+    var overflowSegment: Double {
+        guard value > goal, value > 0 else {
+            return 0
+        }
+
+        return (value - goal) / value
     }
 }
 
