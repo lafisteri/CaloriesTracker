@@ -23,7 +23,7 @@ struct StatisticsView: View {
                 StatisticsChartCard(title: "Калории по дням", unit: "ккал") {
                     WeeklyCaloriesChart(days: statistics.days)
                 }
-                .statisticsChartCardRow(topInset: 0)
+                .statisticsChartCardRow()
 
                 StatisticsChartCard(title: "БЖУ по дням", unit: "г") {
                     WeeklyMacrosChart(days: statistics.days)
@@ -347,12 +347,12 @@ private extension MacroNutrient {
 }
 
 private extension View {
-    func statisticsChartCardRow(topInset: CGFloat = 8) -> some View {
+    func statisticsChartCardRow() -> some View {
         listRowInsets(
             EdgeInsets(
-                top: topInset,
+                top: 0,
                 leading: AppStyle.screenHorizontalMargin,
-                bottom: 8,
+                bottom: AppStyle.sectionSpacing,
                 trailing: AppStyle.screenHorizontalMargin,
             ),
         )

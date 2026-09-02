@@ -4,8 +4,8 @@ enum DateNavigatorLayout {
     static let height: CGFloat = 44
     static let screenHorizontalMargin = AppStyle.screenHorizontalMargin
     static let pairedControlSpacing = AppStyle.controlSpacing
-    static let rootHeaderContentSpacing: CGFloat = 6
-    static let headerBottomSpacing: CGFloat = 10
+    static let rootHeaderContentSpacing = AppStyle.sectionSpacing
+    static let headerBottomSpacing = AppStyle.sectionSpacing
     static let listRowInsets = EdgeInsets(
         top: 0,
         leading: screenHorizontalMargin,

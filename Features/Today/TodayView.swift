@@ -170,7 +170,7 @@ struct TodayRootView: View {
             }
         }
         .appPlainListStyle()
-        .listSectionSpacing(.compact)
+        .listSectionSpacing(AppStyle.sectionSpacing)
         .contentMargins(.top, 0, for: .scrollContent)
         .contentMargins(.horizontal, AppStyle.screenHorizontalMargin, for: .scrollContent)
         .toolbar(.hidden, for: .navigationBar)
