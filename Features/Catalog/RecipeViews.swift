@@ -8,6 +8,7 @@ struct RecipeListView: View {
     @State private var model: RecipeListViewModel
     @Binding private var searchText: String
     @State private var quickAddingRecipeID: UUID?
+    private let onSearchFocusDismissed: () -> Void
 
     init(
         recipeService: RecipeService,
@@ -15,16 +16,25 @@ struct RecipeListView: View {
         mode: RecipeListMode,
         onSelect: @escaping (UUID, FoodSelectionAmountDefault?) -> Void,
         searchText: Binding<String>,
+        onSearchFocusDismissed: @escaping () -> Void,
     ) {
         self.onSelect = onSelect
         self.mode = mode
         _model = State(initialValue: RecipeListViewModel(recipeService: recipeService, diaryService: diaryService))
         _searchText = searchText
+        self.onSearchFocusDismissed = onSearchFocusDismissed
     }
 
     var body: some View {
         recipeList
             .appPlainListStyle()
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { _ in
+                        onSearchFocusDismissed()
+                    },
+            )
         .task(id: searchText) {
             await model.load(matching: searchText)
         }
@@ -72,6 +82,7 @@ struct RecipeListView: View {
                             let source = FoodSourceReference(sourceType: .recipe, sourceID: item.recipe.id)
                             HStack(spacing: 12) {
                                 Button {
+                                    onSearchFocusDismissed()
                                     onSelect(item.recipe.id, defaultValue)
                                 } label: {
                                     HStack(spacing: 0) {
@@ -90,6 +101,7 @@ struct RecipeListView: View {
                                         .frame(minWidth: 44, minHeight: 44)
                                 } else {
                                     Button {
+                                        onSearchFocusDismissed()
                                         Task { @MainActor in
                                             await quickAdd(
                                                 source: source,
@@ -112,6 +124,7 @@ struct RecipeListView: View {
                             .catalogListRow()
                         } else {
                             Button {
+                                onSearchFocusDismissed()
                                 onSelect(item.recipe.id, nil)
                             } label: {
                                 HStack(spacing: 0) {

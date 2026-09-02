@@ -154,6 +154,7 @@ struct CatalogView: View {
     @State private var selectedSection: CatalogSection = .products
     @State private var productSearchText = ""
     @State private var recipeSearchText = ""
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         ZStack {
@@ -172,6 +173,9 @@ struct CatalogView: View {
                 .clipShape(Capsule())
                 .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
                 .padding(.bottom, DateNavigatorLayout.headerBottomSpacing)
+                .onChange(of: selectedSection) {
+                    dismissSearchFocus()
+                }
 
                 switch selectedSection {
                 case .products:
@@ -181,6 +185,7 @@ struct CatalogView: View {
                         mode: mode.productListMode,
                         onSelect: selectProduct,
                         searchText: $productSearchText,
+                        onSearchFocusDismissed: dismissSearchFocus,
                     )
                 case .recipes:
                     RecipeListView(
@@ -189,11 +194,24 @@ struct CatalogView: View {
                         mode: mode.recipeListMode,
                         onSelect: selectRecipe,
                         searchText: $recipeSearchText,
+                        onSearchFocusDismissed: dismissSearchFocus,
                     )
                 }
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            dismissSearchFocus()
+        }
+        .onDisappear {
+            dismissSearchFocus()
+        }
+        .onChange(of: router.selectedTab) { _, selectedTab in
+            guard selectedTab != .catalog else {
+                return
+            }
+            dismissSearchFocus()
+        }
     }
 
     private var isManagementMode: Bool {
@@ -210,16 +228,19 @@ struct CatalogView: View {
                 AppCircularButton(
                     systemName: "chevron.left",
                     accessibilityLabel: "Назад",
-                    action: { dismiss() }
+                    action: {
+                        dismissSearchFocus()
+                        dismiss()
+                    }
                 )
             }
 
             Group {
                 switch selectedSection {
                 case .products:
-                    CatalogInlineSearchField(text: $productSearchText)
+                    CatalogInlineSearchField(text: $productSearchText, isFocused: $isSearchFocused)
                 case .recipes:
-                    CatalogInlineSearchField(text: $recipeSearchText)
+                    CatalogInlineSearchField(text: $recipeSearchText, isFocused: $isSearchFocused)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -227,7 +248,10 @@ struct CatalogView: View {
             AppCircularButton(
                 systemName: "plus",
                 accessibilityLabel: "Добавить",
-                action: addSelectedSection
+                action: {
+                    dismissSearchFocus()
+                    addSelectedSection()
+                }
             )
         }
         .padding(.horizontal, DateNavigatorLayout.screenHorizontalMargin)
@@ -237,6 +261,8 @@ struct CatalogView: View {
     }
 
     private func selectProduct(_ productID: UUID, selectionDefault: FoodSelectionAmountDefault?) {
+        dismissSearchFocus()
+
         switch mode {
         case .management:
             router.catalogPath.append(.product(productID))
@@ -246,6 +272,8 @@ struct CatalogView: View {
     }
 
     private func selectRecipe(_ recipeID: UUID, selectionDefault: FoodSelectionAmountDefault?) {
+        dismissSearchFocus()
+
         switch mode {
         case .management:
             router.catalogPath.append(.recipe(recipeID))
@@ -280,6 +308,10 @@ struct CatalogView: View {
             createRecipe()
         }
     }
+
+    private func dismissSearchFocus() {
+        isSearchFocused = false
+    }
 }
 
 private struct ProductListView: View {
@@ -289,6 +321,7 @@ private struct ProductListView: View {
     @State private var model: ProductListViewModel
     @Binding private var searchText: String
     @State private var quickAddingProductID: UUID?
+    private let onSearchFocusDismissed: () -> Void
 
     init(
         productService: ProductService,
@@ -296,16 +329,25 @@ private struct ProductListView: View {
         mode: ProductListMode,
         onSelect: @escaping (UUID, FoodSelectionAmountDefault?) -> Void,
         searchText: Binding<String>,
+        onSearchFocusDismissed: @escaping () -> Void,
     ) {
         self.onSelect = onSelect
         self.mode = mode
         _model = State(initialValue: ProductListViewModel(productService: productService, diaryService: diaryService))
         _searchText = searchText
+        self.onSearchFocusDismissed = onSearchFocusDismissed
     }
 
     var body: some View {
         productList
             .appPlainListStyle()
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { _ in
+                        onSearchFocusDismissed()
+                    },
+            )
         .task(id: searchText) {
             await model.load(matching: searchText)
         }
@@ -353,6 +395,7 @@ private struct ProductListView: View {
                         let source = FoodSourceReference(sourceType: .product, sourceID: item.product.id)
                         HStack(spacing: 12) {
                             Button {
+                                onSearchFocusDismissed()
                                 onSelect(item.product.id, defaultValue)
                             } label: {
                                 HStack(spacing: 0) {
@@ -372,6 +415,7 @@ private struct ProductListView: View {
                                     .frame(minWidth: 44, minHeight: 44)
                             } else {
                                 Button {
+                                    onSearchFocusDismissed()
                                     Task { @MainActor in
                                         await quickAdd(
                                             source: source,
@@ -444,6 +488,7 @@ private struct ProductListView: View {
 
 struct CatalogInlineSearchField: View {
     @Binding var text: String
+    let isFocused: FocusState<Bool>.Binding
 
     var body: some View {
         HStack(spacing: 8) {
@@ -451,6 +496,7 @@ struct CatalogInlineSearchField: View {
                 .foregroundStyle(.secondary)
 
             TextField("Поиск", text: $text)
+                .focused(isFocused)
 
             if !text.isEmpty {
                 Button {
