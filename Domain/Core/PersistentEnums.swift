@@ -19,6 +19,7 @@ enum MealType: String, CaseIterable, Codable, Sendable {
 enum SourceType: String, Codable, Sendable {
     case product
     case recipe
+    case manual
 }
 
 enum ProductBaseUnit: String, CaseIterable, Codable, Sendable {

@@ -214,6 +214,18 @@ struct TodayRootView: View {
                     router: router,
                     diaryService: diaryService,
                 )
+            case let .manualEntry(context, initialName):
+                ProductEditorView(
+                    manualMode: .create(context: context, initialName: initialName),
+                    router: router,
+                    diaryService: diaryService,
+                )
+            case let .manualEntryEditor(entryID):
+                ProductEditorView(
+                    manualMode: .edit(entryID: entryID),
+                    router: router,
+                    diaryService: diaryService,
+                )
             case let .productEditor(context, _):
                 ProductEditorView(
                     productID: nil,
@@ -331,6 +343,9 @@ struct TodayRootView: View {
             onCreateRecipe: {
                 router.todayPath.append(.recipeEditor(context: context, recipeID: nil))
             },
+            onCreateManualEntry: { initialName in
+                router.todayPath.append(.manualEntry(context: context, initialName: initialName))
+            },
         )
     }
 
@@ -401,7 +416,11 @@ private struct DiaryListEntryRow: View {
     let onDragEnded: @MainActor () -> Void
 
     var body: some View {
-        NavigationLink(value: TodayRoute.entryEditor(entry.id)) {
+        NavigationLink(
+            value: entry.sourceType == .manual
+                ? TodayRoute.manualEntryEditor(entry.id)
+                : TodayRoute.entryEditor(entry.id),
+        ) {
             DiaryEntryRow(entry: entry)
                 .draggable(entry.id.uuidString) {
                     DiaryEntryDragPreview(

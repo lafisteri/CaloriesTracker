@@ -35,6 +35,7 @@ struct FoodSelectionContext {
     let onQuickAddRecipe: @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void
     let onCreateProduct: @MainActor () -> Void
     let onCreateRecipe: @MainActor () -> Void
+    let onCreateManualEntry: (@MainActor (String) -> Void)?
 
     init(
         quickAddState: CatalogQuickAddState? = nil,
@@ -44,6 +45,7 @@ struct FoodSelectionContext {
         onQuickAddRecipe: @escaping @MainActor (UUID, FoodSelectionAmountDefault) async throws -> Void,
         onCreateProduct: @escaping @MainActor () -> Void,
         onCreateRecipe: @escaping @MainActor () -> Void,
+        onCreateManualEntry: (@MainActor (String) -> Void)? = nil,
     ) {
         self.quickAddState = quickAddState
         self.onSelectProduct = onSelectProduct
@@ -52,6 +54,7 @@ struct FoodSelectionContext {
         self.onQuickAddRecipe = onQuickAddRecipe
         self.onCreateProduct = onCreateProduct
         self.onCreateRecipe = onCreateRecipe
+        self.onCreateManualEntry = onCreateManualEntry
     }
 }
 
@@ -445,6 +448,21 @@ private struct ProductListView: View {
                     InlineErrorView(message: errorMessage)
                 }
             }
+
+            if case let .selection(context) = mode,
+               let onCreateManualEntry = context.onCreateManualEntry
+            {
+                Button {
+                    onSearchFocusDismissed()
+                    onCreateManualEntry(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+                } label: {
+                    ManualDiaryEntryCatalogRow()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .catalogListRow()
+                .accessibilityLabel("Добавить калории")
+            }
         }
     }
 
@@ -596,6 +614,34 @@ private struct ProductListRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+private struct ManualDiaryEntryCatalogRow: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "plus.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Добавить калории")
+                    .font(.headline)
+
+                Text("Одноразовая запись")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 

@@ -150,6 +150,71 @@ final class DiaryService {
         )
     }
 
+    func createManualEntry(_ command: CreateManualDiaryEntryCommand) async throws {
+        let sourceName = try validatedManualName(command.sourceName)
+        try validatePositiveAmount(command.amount)
+        try validateManualUnit(command.unitToken)
+        try validateManualNutrition(command.nutrition)
+
+        let existingEntries = try await diaryRepository.entries(on: command.context.day)
+        let now = Date()
+        let entryID = UUID()
+        let entry = DiaryEntry(
+            id: entryID,
+            day: command.context.day,
+            mealType: command.context.meal,
+            sortOrder: nextSortOrder(for: existingEntries.filter { $0.mealType == command.context.meal }),
+            sourceType: .manual,
+            sourceID: entryID,
+            sourceVersionID: entryID,
+            sourceName: sourceName,
+            amount: command.amount,
+            unitToken: command.unitToken,
+            nutrition: command.nutrition,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: nil,
+        )
+
+        try await diaryRepository.create(entry)
+    }
+
+    func manualEntry(for entryID: UUID) async throws -> DiaryEntry {
+        guard let entry = try await diaryRepository.entry(id: entryID, includingDeleted: false) else {
+            throw DiaryServiceError.entryNotFound
+        }
+        guard entry.sourceType == .manual else {
+            throw DiaryServiceError.unsupportedSource
+        }
+        return entry
+    }
+
+    func updateManualEntry(_ command: UpdateManualDiaryEntryCommand) async throws {
+        let sourceName = try validatedManualName(command.sourceName)
+        try validatePositiveAmount(command.amount)
+        try validateManualUnit(command.unitToken)
+        try validateManualNutrition(command.nutrition)
+        let entry = try await manualEntry(for: command.entryID)
+        let updatedEntry = DiaryEntry(
+            id: entry.id,
+            day: entry.day,
+            mealType: entry.mealType,
+            sortOrder: entry.sortOrder,
+            sourceType: entry.sourceType,
+            sourceID: entry.sourceID,
+            sourceVersionID: entry.sourceVersionID,
+            sourceName: sourceName,
+            amount: command.amount,
+            unitToken: command.unitToken,
+            nutrition: command.nutrition,
+            createdAt: entry.createdAt,
+            updatedAt: Date(),
+            deletedAt: entry.deletedAt,
+        )
+
+        try await diaryRepository.saveManualSnapshot(updatedEntry)
+    }
+
     func quickAdd(
         context: DiaryContext,
         source sourceReference: FoodSourceReference,
@@ -368,6 +433,8 @@ final class DiaryService {
                 sourceName: recipe.name,
                 calculationSource: .recipe(version),
             )
+        case .manual:
+            throw DiaryServiceError.unsupportedSource
         }
     }
 
@@ -399,6 +466,8 @@ final class DiaryService {
                 sourceName: entry.sourceName,
                 calculationSource: .recipe(version),
             )
+        case .manual:
+            throw DiaryServiceError.unsupportedSource
         }
     }
 
@@ -498,6 +567,28 @@ final class DiaryService {
         }
     }
 
+    private func validatedManualName(_ name: String) throws -> String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw DiaryServiceError.invalidManualName
+        }
+        return trimmedName
+    }
+
+    private func validateManualNutrition(_ nutrition: Nutrition) throws {
+        guard nutrition.isFinite,
+              [nutrition.calories, nutrition.protein, nutrition.fat, nutrition.carbs].allSatisfy({ $0 >= 0 })
+        else {
+            throw DiaryServiceError.invalidManualNutrition
+        }
+    }
+
+    private func validateManualUnit(_ unitToken: String) throws {
+        guard ProductBaseUnit(rawValue: unitToken) != nil else {
+            throw DiaryServiceError.invalidUnit
+        }
+    }
+
     private func nutritionTotal(for entries: [DiaryEntry]) throws -> Nutrition {
         try entries.reduce(.zero) { partial, entry in
             try partial.adding(entry.nutrition)
@@ -550,6 +641,8 @@ enum DiaryServiceError: LocalizedError {
     case unsupportedSource
     case invalidAmount
     case invalidUnit
+    case invalidManualName
+    case invalidManualNutrition
     case invalidReorder
     case invalidMove
 
@@ -571,6 +664,10 @@ enum DiaryServiceError: LocalizedError {
             "Количество должно быть больше нуля."
         case .invalidUnit:
             "Выберите доступную единицу продукта."
+        case .invalidManualName:
+            "Введите название записи."
+        case .invalidManualNutrition:
+            "Введите корректные значения КБЖУ."
         case .invalidReorder:
             "Не удалось изменить порядок записей."
         case .invalidMove:

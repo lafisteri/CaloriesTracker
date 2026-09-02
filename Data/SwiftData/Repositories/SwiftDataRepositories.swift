@@ -774,6 +774,42 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         }
     }
 
+    func saveManualSnapshot(_ entry: DiaryEntry) async throws {
+        guard let record = try entryRecord(id: entry.id) else {
+            throw DiaryRepositoryError.entryNotFound
+        }
+        guard matchesManualSnapshotIdentityFields(record, entry),
+              record.deletedAt == nil,
+              entry.deletedAt == nil,
+              !entry.sourceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              entry.amount.isFinite,
+              entry.amount > 0,
+              ProductBaseUnit(rawValue: entry.unitToken) != nil,
+              entry.nutrition.isFinite,
+              [entry.nutrition.calories, entry.nutrition.protein, entry.nutrition.fat, entry.nutrition.carbs]
+                .allSatisfy({ $0 >= 0 })
+        else {
+            throw DiaryRepositoryError.invalidManualSnapshotUpdate
+        }
+
+        record.sourceName = entry.sourceName
+        record.amount = entry.amount
+        record.unitToken = entry.unitToken
+        record.calories = entry.nutrition.calories
+        record.protein = entry.nutrition.protein
+        record.fat = entry.nutrition.fat
+        record.carbs = entry.nutrition.carbs
+        record.updatedAt = entry.updatedAt
+
+        do {
+            try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
+            try commitSyncableMutation()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
     func rebaseSourceSnapshot(_ entry: DiaryEntry) async throws {
         guard let record = try entryRecord(id: entry.id) else {
             throw DiaryRepositoryError.entryNotFound
@@ -894,6 +930,19 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             && record.createdAt == entry.createdAt
     }
 
+    private func matchesManualSnapshotIdentityFields(_ record: DiaryEntryRecord, _ entry: DiaryEntry) -> Bool {
+        record.dayKey == entry.day.rawValue
+            && record.mealTypeRaw == entry.mealType.rawValue
+            && record.sortOrder == entry.sortOrder
+            && record.sourceTypeRaw == SourceType.manual.rawValue
+            && entry.sourceType == .manual
+            && record.sourceID == record.id
+            && entry.sourceID == entry.id
+            && record.sourceVersionID == record.id
+            && entry.sourceVersionID == entry.id
+            && record.createdAt == entry.createdAt
+    }
+
     private func makeRecord(_ entry: DiaryEntry) -> DiaryEntryRecord {
         DiaryEntryRecord(
             id: entry.id,
@@ -921,6 +970,7 @@ private enum DiaryRepositoryError: LocalizedError {
     case entryNotFound
     case invalidCreate
     case invalidAmountUpdate
+    case invalidManualSnapshotUpdate
     case invalidSourceRebase
     case invalidOrderUpdate
     case duplicateEntry
@@ -933,6 +983,8 @@ private enum DiaryRepositoryError: LocalizedError {
             "Не удалось создать запись дневника."
         case .invalidAmountUpdate:
             "Можно изменить только количество и единицу записи."
+        case .invalidManualSnapshotUpdate:
+            "Можно изменить только название, количество, единицу и КБЖУ ручной записи."
         case .invalidSourceRebase:
             "Не удалось обновить источник записи."
         case .invalidOrderUpdate:

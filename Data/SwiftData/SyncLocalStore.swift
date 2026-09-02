@@ -589,6 +589,8 @@ final class SyncLocalStore {
                     reason: "recipe source version is incompatible with the diary snapshot",
                 )
             }
+        case .manual:
+            return []
         }
         return []
     }
@@ -903,6 +905,19 @@ final class SyncLocalStore {
         }
         try validateNutrition(payload.nutrition, key: key)
         try validateDates(payload.createdAt, payload.updatedAt, payload.deletedAt, key: key)
+
+        if payload.sourceType == .manual {
+            guard payload.sourceID == payload.id,
+                  payload.sourceVersionID == payload.id,
+                  ProductBaseUnit(rawValue: payload.unitToken) != nil,
+                  payload.sourceName == payload.sourceName.trimmingCharacters(in: .whitespacesAndNewlines)
+            else {
+                throw SyncLocalStoreError.invalidPayload(
+                    key,
+                    reason: "manual diary entry snapshot is invalid",
+                )
+            }
+        }
     }
 
     private func validate(_ payload: WeeklyGoalPayload) throws {

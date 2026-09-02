@@ -13,6 +13,22 @@ struct UpdateDiaryEntryAmountCommand: Hashable, Sendable {
     let unitToken: String
 }
 
+struct CreateManualDiaryEntryCommand: Hashable, Sendable {
+    let context: DiaryContext
+    let sourceName: String
+    let amount: Double
+    let unitToken: String
+    let nutrition: Nutrition
+}
+
+struct UpdateManualDiaryEntryCommand: Hashable, Sendable {
+    let entryID: UUID
+    let sourceName: String
+    let amount: Double
+    let unitToken: String
+    let nutrition: Nutrition
+}
+
 struct MoveDiaryEntryCommand: Hashable, Sendable {
     let entryID: UUID
     let targetMeal: MealType

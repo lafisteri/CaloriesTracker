@@ -1,11 +1,18 @@
 import SwiftUI
 
+private enum ProductEditorViewMode {
+    case product
+    case manual
+}
+
 struct ProductEditorView: View {
     let router: AppRouter
     let onSaved: (@MainActor () -> Void)?
     let onDismissed: (@MainActor (Bool) -> Void)?
 
-    @State private var model: ProductEditorViewModel
+    private let mode: ProductEditorViewMode
+    @State private var productModel: ProductEditorViewModel?
+    @State private var manualModel: ManualDiaryEntryViewModel?
     @FocusState private var focusedField: ProductEditorField?
     @State private var didSave = false
     @State private var isUnitPickerPresented = false
@@ -20,101 +27,78 @@ struct ProductEditorView: View {
         self.router = router
         self.onSaved = onSaved
         self.onDismissed = onDismissed
-        _model = State(initialValue: ProductEditorViewModel(productID: productID, productService: productService))
+        mode = .product
+        _productModel = State(
+            initialValue: ProductEditorViewModel(productID: productID, productService: productService),
+        )
+        _manualModel = State(initialValue: nil)
     }
 
+    init(
+        manualMode: ManualDiaryEntryEditorMode,
+        router: AppRouter,
+        diaryService: DiaryService,
+    ) {
+        self.router = router
+        onSaved = nil
+        onDismissed = nil
+        mode = .manual
+        _productModel = State(initialValue: nil)
+        _manualModel = State(initialValue: ManualDiaryEntryViewModel(mode: manualMode, diaryService: diaryService))
+    }
+
+    @ViewBuilder
     var body: some View {
-        @Bindable var model = model
+        switch mode {
+        case .product:
+            if let productModel {
+                productEditor(productModel)
+            }
+        case .manual:
+            if let manualModel {
+                manualEditor(manualModel)
+            }
+        }
+    }
 
-        VStack(spacing: 0) {
-            AppTopNavigationHeader(
-                title: model.productID == nil ? "Новый продукт" : "Редактировать продукт",
-            ) {
-                Button {
-                    focusedField = nil
-                    Task {
-                        let didSave = await model.save()
-                        if didSave {
-                            self.didSave = true
-                            if let onSaved {
-                                onSaved()
-                            } else {
-                                router.catalogPath = []
-                            }
-                        }
-                    }
-                } label: {
-                    AppCircularControl {
-                        if model.isSaving {
-                            ProgressView()
+    private func productEditor(_ productModel: ProductEditorViewModel) -> some View {
+        @Bindable var model = productModel
+
+        return ProductEditorScreen(
+            title: model.productID == nil ? "Новый продукт" : "Редактировать продукт",
+            isLoading: model.isLoading,
+            isSaving: model.isSaving,
+            formMode: model.productID == nil ? .create(productEditingFields(for: model)) : .edit(productEditingFields(for: model)),
+            values: ProductFormValues(
+                name: model.name,
+                barcode: model.barcode.isEmpty ? nil : model.barcode,
+                baseAmount: model.baseAmount,
+                baseUnit: model.baseUnit,
+                calories: model.calories,
+                protein: model.protein,
+                fat: model.fat,
+                carbs: model.carbs,
+                versionNumber: model.currentVersionNumber,
+            ),
+            fieldErrors: model.fieldErrors,
+            errorMessage: model.errorMessage,
+            onSave: {
+                focusedField = nil
+                Task {
+                    if await model.save() {
+                        didSave = true
+                        if let onSaved {
+                            onSaved()
                         } else {
-                            Image(systemName: "checkmark")
-                                .font(.body.weight(.semibold))
+                            router.catalogPath = []
                         }
                     }
                 }
-                .accessibilityLabel(model.isSaving ? "Сохранение" : "Сохранить")
-                .disabled(model.isLoading || model.isSaving)
-            }
-
-            Form {
-                if model.isLoading {
-                    Section {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
-                    }
-                } else {
-                    ProductFormLayout(
-                        mode: model.productID == nil ? .create(editingFields) : .edit(editingFields),
-                        values: ProductFormValues(
-                            name: model.name,
-                            barcode: model.barcode.isEmpty ? nil : model.barcode,
-                            baseAmount: model.baseAmount,
-                            baseUnit: model.baseUnit,
-                            calories: model.calories,
-                            protein: model.protein,
-                            fat: model.fat,
-                            carbs: model.carbs,
-                            versionNumber: model.currentVersionNumber,
-                        ),
-                        fieldErrors: model.fieldErrors,
-                    )
-                }
-
-                if let errorMessage = model.errorMessage {
-                    Section {
-                        InlineErrorView(message: errorMessage)
-                    }
-                }
-            }
-        }
+            },
+        )
         .overlayPreferenceValue(UnitPickerAnchorPreferenceKey.self) { anchor in
-            GeometryReader { proxy in
-                if isUnitPickerPresented, let anchor {
-                    let frame = proxy[anchor]
-
-                    ZStack(alignment: .topLeading) {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                isUnitPickerPresented = false
-                            }
-
-                        unitPickerMenu(selection: $model.baseUnit)
-                            .offset(
-                                x: frame.maxX - ProductEditorLayout.unitMenuWidth,
-                                y: frame.maxY + AppStyle.controlSpacing,
-                            )
-                    }
-                    .zIndex(1)
-                }
-            }
+            unitPickerOverlay(anchor: anchor, selection: $model.baseUnit)
         }
-        .appScreenBackground()
-        .toolbar(.hidden, for: .navigationBar)
         .disabled(model.isLoading || model.isSaving)
         .task {
             await model.loadForEditing()
@@ -146,6 +130,66 @@ struct ProductEditorView: View {
                 await Task.yield()
                 onDismissed(didSave)
             }
+        }
+    }
+
+    private func manualEditor(_ manualModel: ManualDiaryEntryViewModel) -> some View {
+        @Bindable var model = manualModel
+
+        return ProductEditorScreen(
+            title: manualTitle(for: model.mode),
+            isLoading: model.isLoading,
+            isSaving: model.isSaving,
+            formMode: .manual(manualEditingFields(for: model)),
+            values: ProductFormValues(
+                name: model.name,
+                barcode: nil,
+                baseAmount: model.amountText,
+                baseUnit: model.selectedUnit,
+                calories: model.caloriesText,
+                protein: model.proteinText,
+                fat: model.fatText,
+                carbs: model.carbsText,
+                versionNumber: nil,
+            ),
+            fieldErrors: model.fieldErrors,
+            errorMessage: model.errorMessage,
+            onSave: {
+                focusedField = nil
+                Task {
+                    if await model.save() {
+                        router.todayPath = []
+                    }
+                }
+            },
+        )
+        .overlayPreferenceValue(UnitPickerAnchorPreferenceKey.self) { anchor in
+            unitPickerOverlay(anchor: anchor, selection: $model.selectedUnit)
+        }
+        .disabled(model.isLoading || model.isSaving)
+        .task {
+            await model.load()
+        }
+        .onChange(of: model.name) { _, _ in
+            model.clearFieldError(for: .name)
+        }
+        .onChange(of: model.amountText) { _, _ in
+            model.clearFieldError(for: .baseAmount)
+        }
+        .onChange(of: model.caloriesText) { _, _ in
+            model.clearFieldError(for: .calories)
+        }
+        .onChange(of: model.proteinText) { _, _ in
+            model.clearFieldError(for: .protein)
+        }
+        .onChange(of: model.fatText) { _, _ in
+            model.clearFieldError(for: .fat)
+        }
+        .onChange(of: model.carbsText) { _, _ in
+            model.clearFieldError(for: .carbs)
+        }
+        .onDisappear {
+            focusedField = nil
         }
     }
 
@@ -184,8 +228,36 @@ struct ProductEditorView: View {
         )
     }
 
-    private var editingFields: ProductFormEditing {
-        ProductFormEditing(
+    private func unitPickerOverlay(
+        anchor: Anchor<CGRect>?,
+        selection: Binding<ProductBaseUnit>,
+    ) -> some View {
+        GeometryReader { proxy in
+            if isUnitPickerPresented, let anchor {
+                let frame = proxy[anchor]
+
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isUnitPickerPresented = false
+                        }
+
+                    unitPickerMenu(selection: selection)
+                        .offset(
+                            x: frame.maxX - ProductEditorLayout.unitMenuWidth,
+                            y: frame.maxY + AppStyle.controlSpacing,
+                        )
+                }
+                .zIndex(1)
+            }
+        }
+    }
+
+    private func productEditingFields(for model: ProductEditorViewModel) -> ProductFormEditing {
+        @Bindable var model = model
+
+        return ProductFormEditing(
             name: $model.name,
             baseAmount: $model.baseAmount,
             baseUnit: $model.baseUnit,
@@ -199,6 +271,88 @@ struct ProductEditorView: View {
                 isUnitPickerPresented = true
             },
         )
+    }
+
+    private func manualEditingFields(for model: ManualDiaryEntryViewModel) -> ProductFormEditing {
+        @Bindable var model = model
+
+        return ProductFormEditing(
+            name: $model.name,
+            baseAmount: $model.amountText,
+            baseUnit: $model.selectedUnit,
+            calories: $model.caloriesText,
+            protein: $model.proteinText,
+            fat: $model.fatText,
+            carbs: $model.carbsText,
+            focusedField: $focusedField,
+            onUnitPickerRequested: {
+                focusedField = nil
+                isUnitPickerPresented = true
+            },
+        )
+    }
+
+    private func manualTitle(for mode: ManualDiaryEntryEditorMode) -> String {
+        switch mode {
+        case .create: "Добавить калории"
+        case .edit: "Редактировать запись"
+        }
+    }
+}
+
+private struct ProductEditorScreen: View {
+    let title: String
+    let isLoading: Bool
+    let isSaving: Bool
+    let formMode: ProductFormMode
+    let values: ProductFormValues
+    let fieldErrors: [ProductEditorField: String]
+    let errorMessage: String?
+    let onSave: @MainActor () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            AppTopNavigationHeader(title: title) {
+                Button(action: onSave) {
+                    AppCircularControl {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                        }
+                    }
+                }
+                .accessibilityLabel(isSaving ? "Сохранение" : "Сохранить")
+                .disabled(isLoading || isSaving)
+            }
+
+            Form {
+                if isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
+                } else {
+                    ProductFormLayout(
+                        mode: formMode,
+                        values: values,
+                        fieldErrors: fieldErrors,
+                    )
+                }
+
+                if let errorMessage {
+                    Section {
+                        InlineErrorView(message: errorMessage)
+                    }
+                }
+            }
+        }
+        .appScreenBackground()
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -219,16 +373,27 @@ private enum ProductEditorLayout {
 enum ProductFormMode {
     case create(ProductFormEditing)
     case edit(ProductFormEditing)
+    case manual(ProductFormEditing)
     case readOnly
 
     var editingFields: ProductFormEditing? {
         switch self {
-        case let .create(fields), let .edit(fields):
+        case let .create(fields), let .edit(fields), let .manual(fields):
             fields
         case .readOnly:
             nil
         }
     }
+
+    var showsBarcode: Bool {
+        switch self {
+        case .manual:
+            false
+        case .create, .edit, .readOnly:
+            true
+        }
+    }
+
 }
 
 struct ProductFormEditing {
@@ -297,7 +462,9 @@ struct ProductFormLayout: View {
     var body: some View {
         Section {
             nameRow
-            barcodeRow
+            if mode.showsBarcode {
+                barcodeRow
+            }
             amountAndUnitRow
         }
 

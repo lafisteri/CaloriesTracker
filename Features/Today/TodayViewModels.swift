@@ -156,6 +156,161 @@ enum DiaryAmountEditorMode: Hashable, Sendable {
     case edit(entryID: UUID)
 }
 
+enum ManualDiaryEntryEditorMode: Hashable, Sendable {
+    case create(context: DiaryContext, initialName: String)
+    case edit(entryID: UUID)
+}
+
+@MainActor
+@Observable
+final class ManualDiaryEntryViewModel {
+    private let diaryService: DiaryService
+    let mode: ManualDiaryEntryEditorMode
+
+    var name: String
+    var amountText = ""
+    var selectedUnit: ProductBaseUnit = .g
+    var caloriesText = ""
+    var proteinText = ""
+    var fatText = ""
+    var carbsText = ""
+    private(set) var isLoading = false
+    private(set) var isSaving = false
+    var errorMessage: String?
+    private(set) var fieldErrors: [ProductEditorField: String] = [:]
+
+    init(mode: ManualDiaryEntryEditorMode, diaryService: DiaryService) {
+        self.mode = mode
+        self.diaryService = diaryService
+
+        switch mode {
+        case let .create(_, initialName):
+            name = initialName.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .edit:
+            name = ""
+        }
+    }
+
+    func load() async {
+        guard case let .edit(entryID) = mode else {
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+        errorMessage = nil
+        fieldErrors = [:]
+
+        do {
+            let entry = try await diaryService.manualEntry(for: entryID)
+            name = entry.sourceName
+            amountText = EditableDecimal.string(from: entry.amount)
+            selectedUnit = ProductBaseUnit(rawValue: entry.unitToken) ?? .g
+            caloriesText = EditableDecimal.string(from: entry.nutrition.calories)
+            proteinText = EditableDecimal.string(from: entry.nutrition.protein)
+            fatText = EditableDecimal.string(from: entry.nutrition.fat)
+            carbsText = EditableDecimal.string(from: entry.nutrition.carbs)
+        } catch {
+            errorMessage = diaryErrorMessage(error, fallback: "Не удалось загрузить запись.")
+        }
+    }
+
+    @discardableResult
+    func save() async -> Bool {
+        guard !isSaving else {
+            return false
+        }
+        errorMessage = nil
+        fieldErrors = [:]
+
+        guard let amount = parsedAmount(),
+              let nutrition = parsedNutrition()
+        else {
+            return false
+        }
+
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            switch mode {
+            case let .create(context, _):
+                try await diaryService.createManualEntry(
+                    CreateManualDiaryEntryCommand(
+                        context: context,
+                        sourceName: name,
+                        amount: amount,
+                        unitToken: selectedUnit.rawValue,
+                        nutrition: nutrition,
+                    ),
+                )
+            case let .edit(entryID):
+                try await diaryService.updateManualEntry(
+                    UpdateManualDiaryEntryCommand(
+                        entryID: entryID,
+                        sourceName: name,
+                        amount: amount,
+                        unitToken: selectedUnit.rawValue,
+                        nutrition: nutrition,
+                    ),
+                )
+            }
+            return true
+        } catch {
+            errorMessage = diaryErrorMessage(error, fallback: "Не удалось сохранить запись.")
+            return false
+        }
+    }
+
+    func clearFieldError(for field: ProductEditorField) {
+        fieldErrors[field] = nil
+    }
+
+    private func parsedAmount() -> Double? {
+        let trimmedText = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let amount = EditableDecimal.value(from: trimmedText), amount > 0 else {
+            fieldErrors[.baseAmount] = "Количество должно быть больше нуля."
+            return nil
+        }
+        return amount
+    }
+
+    private func parsedNutrition() -> Nutrition? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            fieldErrors[.name] = "Введите название записи."
+            return nil
+        }
+
+        guard let calories = numericValue(from: caloriesText, field: .calories, title: "Калории"),
+              let protein = numericValue(from: proteinText, field: .protein, title: "Белки"),
+              let fat = numericValue(from: fatText, field: .fat, title: "Жиры"),
+              let carbs = numericValue(from: carbsText, field: .carbs, title: "Углеводы")
+        else {
+            return nil
+        }
+
+        return Nutrition(calories: calories, protein: protein, fat: fat, carbs: carbs)
+    }
+
+    private func numericValue(
+        from text: String,
+        field: ProductEditorField,
+        title: String,
+    ) -> Double? {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedText.isEmpty {
+            return 0
+        }
+
+        guard let value = EditableDecimal.value(from: trimmedText), value >= 0 else {
+            fieldErrors[field] = "Введите корректное значение: \(title)."
+            return nil
+        }
+        return value
+    }
+}
+
 @MainActor
 @Observable
 final class AmountViewModel {
