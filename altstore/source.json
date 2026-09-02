@@ -15,6 +15,16 @@
       "category": "lifestyle",
       "versions": [
         {
+          "version": "2.0",
+          "buildVersion": "1",
+          "date": "2026-09-02",
+          "localizedDescription": "CaloriesTracker 2.0 (1) update.",
+          "downloadURL": "https://github.com/lafisteri/CaloriesTracker/releases/download/v2.0-build.1/CaloriesTracker-2.0.1.ipa",
+          "size": 4101050,
+          "minOSVersion": "17.0",
+          "sha256": "00d20e2a8b144588b742775d6622ff83562cf89cc1e3a17ca0d5413bb3187bb1"
+        },
+        {
           "version": "1.9",
           "buildVersion": "1",
           "date": "2026-09-02",
