@@ -55,3 +55,9 @@ protocol MealConfigurationRepository: Sendable {
     func configuration(for day: LocalDay) async throws -> MealConfiguration
     func saveToday(meals: [MealConfigurationItem], today: LocalDay, at: Date) async throws -> MealConfiguration
 }
+
+@MainActor
+protocol ChartSettingsRepository: Sendable {
+    func settings() async throws -> ChartSettings
+    func save(_ settings: ChartSettings) async throws
+}

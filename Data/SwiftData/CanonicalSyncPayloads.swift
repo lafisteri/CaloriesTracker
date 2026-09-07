@@ -161,6 +161,7 @@ enum SyncPayload: Codable, Equatable, Sendable {
     case recipeVersion(RecipeVersionPayload)
     case diaryEntry(DiaryEntryPayload)
     case mealConfiguration(MealConfiguration)
+    case chartSettings(ChartSettings)
     case weeklyGoal(WeeklyGoalPayload)
 
     var key: SyncEntityKey {
@@ -177,6 +178,8 @@ enum SyncPayload: Codable, Equatable, Sendable {
             SyncEntityKey(entityType: .diaryEntry, entityID: payload.id)
         case let .mealConfiguration(payload):
             SyncEntityKey(entityType: .mealConfiguration, entityID: payload.id)
+        case let .chartSettings(payload):
+            SyncEntityKey(entityType: .chartSettings, entityID: payload.id)
         case let .weeklyGoal(payload):
             SyncEntityKey(entityType: .weeklyGoal, entityID: payload.id)
         }
@@ -202,6 +205,8 @@ enum SyncPayload: Codable, Equatable, Sendable {
             self = .diaryEntry(try container.decode(DiaryEntryPayload.self, forKey: .payload))
         case .mealConfiguration:
             self = .mealConfiguration(try container.decode(MealConfiguration.self, forKey: .payload))
+        case .chartSettings:
+            self = .chartSettings(try container.decode(ChartSettings.self, forKey: .payload))
         case .weeklyGoal:
             self = .weeklyGoal(try container.decode(WeeklyGoalPayload.self, forKey: .payload))
         }
@@ -222,6 +227,8 @@ enum SyncPayload: Codable, Equatable, Sendable {
         case let .diaryEntry(payload):
             try container.encode(payload, forKey: .payload)
         case let .mealConfiguration(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .chartSettings(payload):
             try container.encode(payload, forKey: .payload)
         case let .weeklyGoal(payload):
             try container.encode(payload, forKey: .payload)
@@ -305,6 +312,10 @@ enum SyncPayload: Codable, Equatable, Sendable {
             .mealConfiguration(MealConfiguration(id: payload.id, effectiveFrom: payload.effectiveFrom,
                 meals: payload.meals, createdAt: SyncTimestamp.canonical(payload.createdAt),
                 updatedAt: SyncTimestamp.canonical(payload.updatedAt)))
+        case let .chartSettings(payload):
+            .chartSettings(ChartSettings(id: payload.id, items: payload.items,
+                createdAt: SyncTimestamp.canonical(payload.createdAt),
+                updatedAt: SyncTimestamp.canonical(payload.updatedAt)))
         case let .weeklyGoal(payload):
             .weeklyGoal(
                 WeeklyGoalPayload(
@@ -325,7 +336,7 @@ enum SyncPayload: Codable, Equatable, Sendable {
         switch self {
         case let .weeklyGoal(payload):
             .weeklyGoal(payload.canonicalizedIdentity())
-        case .product, .productVersion, .recipe, .recipeVersion, .diaryEntry, .mealConfiguration:
+        case .product, .productVersion, .recipe, .recipeVersion, .diaryEntry, .mealConfiguration, .chartSettings:
             self
         }
     }
@@ -671,6 +682,28 @@ extension MealConfiguration {
         try container.encode(id, forKey: .id)
         try container.encode(effectiveFrom, forKey: .effectiveFrom)
         try container.encode(meals, forKey: .meals)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+        try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
+    }
+}
+
+// ChartSettings is also its canonical payload; timestamps use the same
+// explicit millisecond codec as every other sync aggregate.
+extension ChartSettings {
+    private enum CodingKeys: String, CodingKey { case id, items, createdAt, updatedAt }
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            items: try container.decode([ChartSettingsItem].self, forKey: .items),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+            updatedAt: try SyncTimestamp.decode(from: container, forKey: .updatedAt),
+        )
+    }
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(items, forKey: .items)
         try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
         try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
     }

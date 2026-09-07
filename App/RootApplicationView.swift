@@ -12,6 +12,8 @@ struct RootApplicationView: View {
             NavigationStack {
                 StatisticsView(
                     statisticsService: dependencies.statisticsService,
+                    chartSettingsService: dependencies.chartSettingsService,
+                    syncStatus: dependencies.syncStatus,
                 )
             }
             .tabItem {
@@ -26,6 +28,7 @@ struct RootApplicationView: View {
                     goalService: dependencies.goalService,
                     productService: dependencies.productService,
                     recipeService: dependencies.recipeService,
+                    chartSettingsService: dependencies.chartSettingsService,
                     supabaseAuth: dependencies.supabaseAuth,
                     syncStatus: dependencies.syncStatus,
                     syncOrchestrator: dependencies.syncOrchestrator,

@@ -76,6 +76,11 @@
 		F10000000000000000000002 /* MealConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* MealConfigurationStore.swift */; };
 		F10000000000000000000003 /* SchemaV6.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* SchemaV6.swift */; };
 		F10000000000000000000004 /* MealSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* MealSettingsView.swift */; };
+		F10000000000000000000005 /* ChartSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* ChartSettings.swift */; };
+		F10000000000000000000006 /* ChartSettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000006 /* ChartSettingsService.swift */; };
+		F10000000000000000000007 /* ChartSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000007 /* ChartSettingsStore.swift */; };
+		F10000000000000000000008 /* SchemaV7.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000008 /* SchemaV7.swift */; };
+		F10000000000000000000009 /* ChartSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000009 /* ChartSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -150,6 +155,11 @@
 		F20000000000000000000002 /* MealConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealConfigurationStore.swift; sourceTree = "<group>"; };
 		F20000000000000000000003 /* SchemaV6.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV6.swift; sourceTree = "<group>"; };
 		F20000000000000000000004 /* MealSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealSettingsView.swift; sourceTree = "<group>"; };
+		F20000000000000000000005 /* ChartSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSettings.swift; sourceTree = "<group>"; };
+		F20000000000000000000006 /* ChartSettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSettingsService.swift; sourceTree = "<group>"; };
+		F20000000000000000000007 /* ChartSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSettingsStore.swift; sourceTree = "<group>"; };
+		F20000000000000000000008 /* SchemaV7.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV7.swift; sourceTree = "<group>"; };
+		F20000000000000000000009 /* ChartSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -310,6 +320,7 @@
 				A20000000000000000000065 /* SchemaV4.swift */,
 				A20000000000000000000071 /* SchemaV5.swift */,
 				F20000000000000000000003 /* SchemaV6.swift */,
+				F20000000000000000000008 /* SchemaV7.swift */,
 				A20000000000000000000020 /* MigrationPlan.swift */,
 				A20000000000000000000050 /* SyncOutbox.swift */,
 				A20000000000000000000061 /* SyncMetadata.swift */,
@@ -317,6 +328,7 @@
 				A20000000000000000000052 /* CanonicalSyncPayloads.swift */,
 				A20000000000000000000053 /* SyncLocalStore.swift */,
 				F20000000000000000000002 /* MealConfigurationStore.swift */,
+				F20000000000000000000007 /* ChartSettingsStore.swift */,
 			);
 			path = SwiftData;
 			sourceTree = "<group>";
@@ -418,6 +430,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000041 /* StatisticsService.swift */,
+				F20000000000000000000006 /* ChartSettingsService.swift */,
 			);
 			path = Statistics;
 			sourceTree = "<group>";
@@ -444,6 +457,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000042 /* StatisticsModels.swift */,
+				F20000000000000000000005 /* ChartSettings.swift */,
 			);
 			path = Statistics;
 			sourceTree = "<group>";
@@ -485,6 +499,7 @@
 			children = (
 				A20000000000000000000068 /* SettingsView.swift */,
 				F20000000000000000000004 /* MealSettingsView.swift */,
+				F20000000000000000000009 /* ChartSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -580,6 +595,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F10000000000000000000009 /* ChartSettingsView.swift in Sources */,
+				F10000000000000000000008 /* SchemaV7.swift in Sources */,
+				F10000000000000000000007 /* ChartSettingsStore.swift in Sources */,
+				F10000000000000000000006 /* ChartSettingsService.swift in Sources */,
+				F10000000000000000000005 /* ChartSettings.swift in Sources */,
 				F10000000000000000000004 /* MealSettingsView.swift in Sources */,
 				F10000000000000000000003 /* SchemaV6.swift in Sources */,
 				F10000000000000000000002 /* MealConfigurationStore.swift in Sources */,
@@ -764,7 +784,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.caloriestracker.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -792,7 +812,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.caloriestracker.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

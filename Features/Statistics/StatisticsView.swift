@@ -2,9 +2,19 @@ import Charts
 import SwiftUI
 
 struct StatisticsView: View {
-    @State private var model: StatisticsViewModel
+    let chartSettingsService: ChartSettingsService
+    let syncStatus: SyncStatusStore?
 
-    init(statisticsService: StatisticsService) {
+    @State private var model: StatisticsViewModel
+    @State private var chartSettings = ChartSettings.default
+
+    init(
+        statisticsService: StatisticsService,
+        chartSettingsService: ChartSettingsService,
+        syncStatus: SyncStatusStore?,
+    ) {
+        self.chartSettingsService = chartSettingsService
+        self.syncStatus = syncStatus
         _model = State(initialValue: StatisticsViewModel(statisticsService: statisticsService))
     }
 
@@ -20,17 +30,24 @@ struct StatisticsView: View {
             } else if let statistics = model.statistics {
                 weekNavigation(for: statistics)
 
-                StatisticsChartCard(title: "Калории по дням", unit: "ккал") {
-                    WeeklyCaloriesChart(days: statistics.days)
+                let visibleCharts = chartSettings.orderedKnownItems.filter(\.isEnabled)
+                if visibleCharts.isEmpty {
+                    ContentUnavailableView(
+                        "Нет выбранных графиков",
+                        systemImage: "chart.bar",
+                        description: Text("Настройте отображение в разделе «Графики»."),
+                    )
+                    .statisticsChartCardRow()
+                } else {
+                    ForEach(visibleCharts) { item in
+                        if let chartType = item.chartType {
+                            StatisticsChartCard(title: chartType.chartTitle, unit: chartType.unit) {
+                                WeeklyMetricChart(chartType: chartType, days: statistics.days)
+                            }
+                            .statisticsChartCardRow()
+                        }
+                    }
                 }
-                .statisticsChartCardRow()
-
-                StatisticsChartCard(title: "БЖУ по дням", unit: "г") {
-                    WeeklyMacrosChart(days: statistics.days)
-                } legend: {
-                    MacrosLegend()
-                }
-                .statisticsChartCardRow()
             } else {
                 ContentUnavailableView(
                     "Статистика недоступна",
@@ -52,7 +69,14 @@ struct StatisticsView: View {
         .onAppear {
             Task {
                 await model.load()
+                await loadChartSettings()
             }
+        }
+        .onChange(of: syncStatus?.lastSuccessfulSyncAt) { _, _ in
+            Task { await loadChartSettings() }
+        }
+        .onChange(of: chartSettingsService.revision) { _, _ in
+            Task { await loadChartSettings() }
         }
     }
 
@@ -89,6 +113,14 @@ struct StatisticsView: View {
         let end = statistics.weekStart.adding(days: 6).presentationDate()
         return "\(start.formatted(.dateTime.day().month(.abbreviated))) – \(end.formatted(.dateTime.day().month(.abbreviated)))"
     }
+
+    private func loadChartSettings() async {
+        do {
+            chartSettings = try await chartSettingsService.settings()
+        } catch {
+            chartSettings = .default
+        }
+    }
 }
 
 private enum StatisticsChartLayout {
@@ -97,37 +129,23 @@ private enum StatisticsChartLayout {
     static let cardContentSpacing: CGFloat = 12
     static let chartHeight: CGFloat = 180
     static let axisLabelWidth: CGFloat = 48
-    static let caloriesBarWidth: CGFloat = 28
+    static let barWidth: CGFloat = 28
     static let weekdayLabels = LocalDay.Weekday.allCases.map(\.russianShortLabel)
 }
 
-private struct StatisticsChartCard<ChartContent: View, Legend: View>: View {
+private struct StatisticsChartCard<ChartContent: View>: View {
     let title: String
     let unit: String
     private let chartContent: ChartContent
-    private let legend: Legend?
 
     init(
         title: String,
         unit: String,
         @ViewBuilder chart: () -> ChartContent,
-    ) where Legend == EmptyView {
-        self.title = title
-        self.unit = unit
-        chartContent = chart()
-        legend = nil
-    }
-
-    init(
-        title: String,
-        unit: String,
-        @ViewBuilder chart: () -> ChartContent,
-        @ViewBuilder legend: () -> Legend,
     ) {
         self.title = title
         self.unit = unit
         chartContent = chart()
-        self.legend = legend()
     }
 
     var body: some View {
@@ -145,10 +163,6 @@ private struct StatisticsChartCard<ChartContent: View, Legend: View>: View {
             }
 
             chartContent
-
-            if let legend {
-                legend
-            }
         }
         .padding(StatisticsChartLayout.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,181 +181,214 @@ private struct StatisticsChartCard<ChartContent: View, Legend: View>: View {
     }
 }
 
-private struct WeeklyCaloriesChart: View {
+private struct WeeklyMetricChart: View {
+    let chartType: StatisticsChartType
     let days: [DayStatistics]
 
     var body: some View {
         Chart {
             ForEach(days) { day in
-                let consumedCalories = day.consumedNutrition.calories
+                let actual = chartType.actual(in: day)
+                let goal = chartType.goal(in: day)
 
-                if consumedCalories > 0 {
-                    if let calorieGoal = day.calorieGoal, consumedCalories > calorieGoal {
+                if actual > 0 {
+                    if chartType.showsOverGoal, let goal, actual > goal {
                         BarMark(
                             x: .value("День", day.weekday.russianShortLabel),
-                            y: .value("Ккал", consumedCalories),
-                            width: .fixed(StatisticsChartLayout.caloriesBarWidth),
+                            y: .value(chartType.valueAxisTitle, actual),
+                            width: .fixed(StatisticsChartLayout.barWidth),
                         )
                         .foregroundStyle(.red)
                         .cornerRadius(4)
-                        .accessibilityLabel("Превышение цели калорий")
-                        .accessibilityValue(NutritionFormatting.calories(consumedCalories - calorieGoal))
+                        .accessibilityLabel(chartType.overGoalAccessibilityLabel)
+                        .accessibilityValue(chartType.formatted(actual - goal))
 
                         BarMark(
                             x: .value("День", day.weekday.russianShortLabel),
-                            yStart: .value("Ккал", 0),
-                            yEnd: .value("Ккал", calorieGoal),
-                            width: .fixed(StatisticsChartLayout.caloriesBarWidth),
+                            yStart: .value(chartType.valueAxisTitle, 0),
+                            yEnd: .value(chartType.valueAxisTitle, goal),
+                            width: .fixed(StatisticsChartLayout.barWidth),
                         )
-                        .foregroundStyle(.tint)
-                        .accessibilityLabel("Фактические калории")
-                        .accessibilityValue(NutritionFormatting.calories(calorieGoal))
+                        .foregroundStyle(chartType.color)
+                        .accessibilityLabel(chartType.actualAccessibilityLabel)
+                        .accessibilityValue(chartType.formatted(goal))
                     } else {
                         BarMark(
                             x: .value("День", day.weekday.russianShortLabel),
-                            y: .value("Ккал", consumedCalories),
-                            width: .fixed(StatisticsChartLayout.caloriesBarWidth),
+                            y: .value(chartType.valueAxisTitle, actual),
+                            width: .fixed(StatisticsChartLayout.barWidth),
                         )
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(chartType.color)
                         .cornerRadius(4)
-                        .accessibilityLabel("Фактические калории")
-                        .accessibilityValue(NutritionFormatting.calories(consumedCalories))
+                        .accessibilityLabel(chartType.actualAccessibilityLabel)
+                        .accessibilityValue(chartType.formatted(actual))
                     }
                 }
 
-                if let calorieGoal = day.calorieGoal {
-                    PointMark(
+                if let goal {
+                    LineMark(
                         x: .value("День", day.weekday.russianShortLabel),
-                        y: .value("Цель", calorieGoal),
+                        y: .value("Цель", goal),
                     )
-                    .foregroundStyle(.secondary)
-                    .symbol {
-                        Rectangle()
-                            .frame(width: StatisticsChartLayout.caloriesBarWidth, height: 2)
-                    }
-                    .accessibilityLabel("Цель калорий")
-                    .accessibilityValue(NutritionFormatting.calories(calorieGoal))
+                    // Keeps goal values in the Chart scale and accessibility
+                    // tree. The visible line is drawn in chartOverlay so it
+                    // can start and end at the plot-area boundaries.
+                    .opacity(0)
+                    .accessibilityLabel(chartType.goalAccessibilityLabel)
+                    .accessibilityValue(chartType.formatted(goal))
                 }
             }
         }
-        .statisticsChartAxes { NutritionFormatting.calories($0) }
-    }
-}
-
-private struct WeeklyMacrosChart: View {
-    let days: [DayStatistics]
-
-    var body: some View {
-        Chart {
-            ForEach(days) { day in
-                ForEach(MacroNutrient.allCases, id: \.self) { nutrient in
-                    let amount = nutrient.amount(in: day.consumedNutrition)
-
-                    if amount > 0 {
-                        BarMark(
-                            x: .value("День", day.weekday.russianShortLabel),
-                            y: .value("Граммы", amount),
-                        )
-                        .position(by: .value("БЖУ", nutrient.shortLabel))
-                        .foregroundStyle(nutrient.color)
-                        .cornerRadius(3)
-                        .accessibilityLabel(nutrient.fullLabel)
-                        .accessibilityValue(NutritionFormatting.macro(amount))
-                    }
-
-                    if let macroGoal = day.macroGoal {
-                        let goal = nutrient.goal(in: macroGoal)
-
-                        PointMark(
-                            x: .value("День", day.weekday.russianShortLabel),
-                            y: .value("Цель", goal),
-                        )
-                        .position(by: .value("БЖУ", nutrient.shortLabel))
-                        .foregroundStyle(nutrient.color)
-                        .symbol(Circle())
-                        .symbolSize(24)
-                        .accessibilityLabel("Цель: \(nutrient.fullLabel)")
-                        .accessibilityValue(NutritionFormatting.macro(goal))
-                    }
+        .statisticsChartAxes { chartType.formatted($0) }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                if let plotFrame = proxy.plotFrame {
+                    StatisticsGoalDashedLine(
+                        points: goalPoints,
+                        proxy: proxy,
+                        plotFrame: geometry[plotFrame],
+                    )
                 }
             }
         }
-        .statisticsChartAxes { NutritionFormatting.macro($0) }
     }
-}
 
-private struct MacrosLegend: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            ForEach(MacroNutrient.allCases, id: \.self) { nutrient in
-                StatisticsLegendItem(nutrient.fullLabel) {
-                    Circle()
-                        .fill(nutrient.color)
-                        .frame(width: 8, height: 8)
-                }
+    private var goalPoints: [StatisticsGoalPoint] {
+        days.enumerated().compactMap { index, day in
+            chartType.goal(in: day).map {
+                StatisticsGoalPoint(
+                    weekday: day.weekday.russianShortLabel,
+                    value: $0,
+                    dayIndex: index,
+                )
             }
         }
     }
 }
 
-private struct StatisticsLegendItem<Marker: View>: View {
-    let title: String
-    private let marker: Marker
+private struct StatisticsGoalPoint {
+    let weekday: String
+    let value: Double
+    let dayIndex: Int
+}
 
-    init(_ title: String, @ViewBuilder marker: () -> Marker) {
-        self.title = title
-        self.marker = marker()
-    }
+private struct StatisticsGoalDashedLine: View {
+    let points: [StatisticsGoalPoint]
+    let proxy: ChartProxy
+    let plotFrame: CGRect
 
     var body: some View {
-        HStack(spacing: 6) {
-            marker
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        Canvas { context, _ in
+            guard var runStart = points.first else { return }
+            var previous = runStart
+
+            for point in points.dropFirst() {
+                if point.dayIndex == previous.dayIndex + 1, point.value == previous.value {
+                    previous = point
+                    continue
+                }
+                strokeRun(from: runStart, through: previous, in: &context)
+                runStart = point
+                previous = point
+            }
+            strokeRun(from: runStart, through: previous, in: &context)
         }
-        .fixedSize(horizontal: true, vertical: false)
+        .allowsHitTesting(false)
+    }
+
+    private func strokeRun(
+        from first: StatisticsGoalPoint,
+        through last: StatisticsGoalPoint,
+        in context: inout GraphicsContext,
+    ) {
+        guard let firstPosition = position(for: first),
+              let lastPosition = position(for: last)
+        else {
+            return
+        }
+
+        let halfBarWidth = StatisticsChartLayout.barWidth / 2
+        var path = Path()
+        path.move(to: CGPoint(x: firstPosition.x - halfBarWidth, y: firstPosition.y))
+        path.addLine(to: CGPoint(x: lastPosition.x + halfBarWidth, y: lastPosition.y))
+        context.stroke(
+            path,
+            with: .color(.gray),
+            style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 5]),
+        )
+    }
+
+    private func position(for point: StatisticsGoalPoint) -> CGPoint? {
+        guard let x = proxy.position(forX: point.weekday),
+              let y = proxy.position(forY: point.value)
+        else {
+            return nil
+        }
+        return CGPoint(x: plotFrame.minX + x, y: plotFrame.minY + y)
     }
 }
 
-private extension MacroNutrient {
-    var shortLabel: String {
+private extension StatisticsChartType {
+    var chartTitle: String { "\(russianTitle) по дням" }
+
+    var unit: String {
         switch self {
-        case .protein: "Б"
-        case .fat: "Ж"
-        case .carbs: "У"
+        case .calories: "ккал"
+        case .protein, .fat, .carbs: "г"
         }
     }
 
-    var fullLabel: String {
+    var valueAxisTitle: String {
         switch self {
-        case .protein: "Белки"
-        case .fat: "Жиры"
-        case .carbs: "Углеводы"
+        case .calories: "Ккал"
+        case .protein, .fat, .carbs: "Граммы"
         }
     }
 
+    // The Today calorie progress ring uses Color.purple.
     var color: Color {
         switch self {
+        case .calories: .purple
         case .protein: .blue
         case .fat: .orange
         case .carbs: .green
         }
     }
 
-    func amount(in nutrition: Nutrition) -> Double {
+    var showsOverGoal: Bool { true }
+
+    var actualAccessibilityLabel: String { "Фактические \(russianTitle.lowercased())" }
+
+    var goalAccessibilityLabel: String {
+        self == .calories ? "Цель калорий" : "Цель: \(russianTitle)"
+    }
+
+    var overGoalAccessibilityLabel: String {
+        self == .calories ? "Превышение цели калорий" : "Превышение цели: \(russianTitle)"
+    }
+
+    func actual(in day: DayStatistics) -> Double {
         switch self {
-        case .protein: nutrition.protein
-        case .fat: nutrition.fat
-        case .carbs: nutrition.carbs
+        case .calories: day.consumedNutrition.calories
+        case .protein: day.consumedNutrition.protein
+        case .fat: day.consumedNutrition.fat
+        case .carbs: day.consumedNutrition.carbs
         }
     }
 
-    func goal(in goal: DailyMacroGoal) -> Double {
+    func goal(in day: DayStatistics) -> Double? {
         switch self {
-        case .protein: goal.protein
-        case .fat: goal.fat
-        case .carbs: goal.carbs
+        case .calories: day.calorieGoal
+        case .protein: day.macroGoal?.protein
+        case .fat: day.macroGoal?.fat
+        case .carbs: day.macroGoal?.carbs
+        }
+    }
+
+    func formatted(_ value: Double) -> String {
+        switch self {
+        case .calories: NutritionFormatting.calories(value)
+        case .protein, .fat, .carbs: NutritionFormatting.macro(value)
         }
     }
 }

@@ -65,6 +65,7 @@ final class SyncLocalStore {
         let recipes = try modelContext.fetch(FetchDescriptor<RecipeRecord>())
         let weeklyGoals = try modelContext.fetch(FetchDescriptor<WeeklyGoalRecord>())
         let mealConfigurations = try modelContext.fetch(FetchDescriptor<MealConfigurationRecord>())
+        let chartSettings = try modelContext.fetch(FetchDescriptor<ChartSettingsRecord>())
         let diaryEntries = try modelContext.fetch(FetchDescriptor<DiaryEntryRecord>())
 
         func keys<T>(_ records: [T], type: SyncEntityType, id: (T) -> UUID) -> [SyncEntityKey] {
@@ -80,6 +81,7 @@ final class SyncLocalStore {
             + keys(recipeVersions, type: .recipeVersion, id: { $0.id })
             + keys(recipes, type: .recipe, id: { $0.id })
             + keys(mealConfigurations, type: .mealConfiguration, id: { $0.id })
+            + keys(chartSettings, type: .chartSettings, id: { $0.id })
             + canonicalWeeklyGoalKeys
             + keys(diaryEntries, type: .diaryEntry, id: { $0.id })
     }
@@ -162,6 +164,11 @@ final class SyncLocalStore {
                 throw SyncLocalStoreError.missingEntity(key)
             }
             return .mealConfiguration(try record.configuration())
+        case .chartSettings:
+            guard let record = try chartSettingsRecord(id: key.entityID, in: modelContext) else {
+                throw SyncLocalStoreError.missingEntity(key)
+            }
+            return .chartSettings(try record.settings())
         case .weeklyGoal:
             guard let record = try weeklyGoalRecord(id: key.entityID, in: modelContext) else {
                 throw SyncLocalStoreError.missingEntity(key)
@@ -189,6 +196,8 @@ final class SyncLocalStore {
             return try applyDiaryEntry(payload, in: modelContext)
         case let .mealConfiguration(payload):
             return try applyMealConfiguration(payload, in: modelContext)
+        case let .chartSettings(payload):
+            return try applyChartSettings(payload, in: modelContext)
         case let .weeklyGoal(payload):
             return try applyWeeklyGoal(payload, in: modelContext)
         }
@@ -420,6 +429,36 @@ final class SyncLocalStore {
             return .remoteApplied(key, needsRepublish: [])
         }
         context.insert(try MealConfigurationRecord(remote))
+        return .inserted(key, needsRepublish: [])
+    }
+
+    private func chartSettingsKey(_ settings: ChartSettings) -> SyncEntityKey {
+        SyncEntityKey(entityType: .chartSettings, entityID: settings.id)
+    }
+
+    private func chartSettingsRecord(id: UUID, in context: ModelContext) throws -> ChartSettingsRecord? {
+        var descriptor = FetchDescriptor<ChartSettingsRecord>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func applyChartSettings(_ remote: ChartSettings, in context: ModelContext) throws -> SyncMergeResult {
+        let key = chartSettingsKey(remote)
+        if let record = try chartSettingsRecord(id: remote.id, in: context) {
+            let local = try record.settings()
+            if local == remote { return .identical(key) }
+            if try timestampWinner(
+                local: .chartSettings(local),
+                remote: .chartSettings(remote),
+                localTimestamp: local.updatedAt,
+                remoteTimestamp: remote.updatedAt,
+            ) == .local {
+                return .localKept(key, needsRepublish: [key])
+            }
+            try record.apply(remote)
+            return .remoteApplied(key, needsRepublish: [])
+        }
+        context.insert(try ChartSettingsRecord(remote))
         return .inserted(key, needsRepublish: [])
     }
 
@@ -857,6 +896,9 @@ final class SyncLocalStore {
         case let .mealConfiguration(payload):
             do { try payload.validate() }
             catch { throw SyncLocalStoreError.invalidPayload(payloadKey(payload), reason: error.localizedDescription) }
+        case let .chartSettings(payload):
+            do { try payload.validate() }
+            catch { throw SyncLocalStoreError.invalidPayload(chartSettingsKey(payload), reason: error.localizedDescription) }
         case let .weeklyGoal(payload):
             try validate(payload)
         }

@@ -9,6 +9,7 @@ enum CaloriesTrackerMigrationPlan: SchemaMigrationPlan {
             CaloriesTrackerSchemaV4.self,
             CaloriesTrackerSchemaV5.self,
             CaloriesTrackerSchemaV6.self,
+            CaloriesTrackerSchemaV7.self,
         ]
     }
 
@@ -38,6 +39,10 @@ enum CaloriesTrackerMigrationPlan: SchemaMigrationPlan {
                     try MealMigration.normalizeEntries(in: context)
                     try context.save()
                 },
+            ),
+            .lightweight(
+                fromVersion: CaloriesTrackerSchemaV6.self,
+                toVersion: CaloriesTrackerSchemaV7.self,
             ),
         ]
     }

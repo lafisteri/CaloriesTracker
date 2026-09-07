@@ -10,6 +10,7 @@ final class AppDependencies {
     let productService: ProductService
     let recipeService: RecipeService
     let mealConfigurationService: MealConfigurationService
+    let chartSettingsService: ChartSettingsService
     let diaryService: DiaryService
     let goalService: GoalService
     let statisticsService: StatisticsService
@@ -25,7 +26,7 @@ final class AppDependencies {
     let syncOrchestrator: SyncOrchestrator?
 
     init(isStoredInMemoryOnly: Bool = false) throws {
-        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV6.self)
+        let schema = Schema(versionedSchema: CaloriesTrackerSchemaV7.self)
         let configuration = ModelConfiguration(
             "CaloriesTracker",
             schema: schema,
@@ -39,6 +40,7 @@ final class AppDependencies {
         )
 
         try MealMigration.prepare(in: ModelContext(modelContainer))
+        try ChartSettingsStore.prepare(in: ModelContext(modelContainer))
         self.modelContainer = modelContainer
         let syncLocalStore = SyncLocalStore(modelContainer: modelContainer)
         // This data-only, idempotent boundary runs before repositories or sync
@@ -72,6 +74,8 @@ final class AppDependencies {
         let mealConfigurationService = MealConfigurationService(repository: SwiftDataMealConfigurationRepository(
             modelContainer: modelContainer, syncChangeNotifier: syncChangeNotifier))
         self.mealConfigurationService = mealConfigurationService
+        chartSettingsService = ChartSettingsService(repository: SwiftDataChartSettingsRepository(
+            modelContainer: modelContainer, syncChangeNotifier: syncChangeNotifier))
         diaryService = DiaryService(
             mealConfigurationService: mealConfigurationService,
             diaryRepository: diaryRepository,

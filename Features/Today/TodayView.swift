@@ -7,6 +7,7 @@ struct TodayRootView: View {
     let goalService: GoalService
     let productService: ProductService
     let recipeService: RecipeService
+    let chartSettingsService: ChartSettingsService
     let supabaseAuth: SupabaseAuthService?
     let syncStatus: SyncStatusStore?
     let syncOrchestrator: SyncOrchestrator?
@@ -21,6 +22,7 @@ struct TodayRootView: View {
         goalService: GoalService,
         productService: ProductService,
         recipeService: RecipeService,
+        chartSettingsService: ChartSettingsService,
         supabaseAuth: SupabaseAuthService?,
         syncStatus: SyncStatusStore?,
         syncOrchestrator: SyncOrchestrator?,
@@ -30,6 +32,7 @@ struct TodayRootView: View {
         self.goalService = goalService
         self.productService = productService
         self.recipeService = recipeService
+        self.chartSettingsService = chartSettingsService
         self.supabaseAuth = supabaseAuth
         self.syncStatus = syncStatus
         self.syncOrchestrator = syncOrchestrator
@@ -197,6 +200,7 @@ struct TodayRootView: View {
                 SettingsView(
                     goalService: goalService,
                     mealConfigurationService: diaryService.mealConfigurationService,
+                    chartSettingsService: chartSettingsService,
                     supabaseAuth: supabaseAuth,
                     syncStatus: syncStatus,
                     syncOrchestrator: syncOrchestrator,
@@ -1056,6 +1060,7 @@ private struct TodayViewPreview: View {
                 goalService: dependencies.goalService,
                 productService: dependencies.productService,
                 recipeService: dependencies.recipeService,
+                chartSettingsService: dependencies.chartSettingsService,
                 supabaseAuth: nil,
                 syncStatus: nil,
                 syncOrchestrator: nil,

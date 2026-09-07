@@ -8,6 +8,7 @@ enum SyncEntityType: String, CaseIterable, Codable, Sendable {
     case recipeVersion
     case diaryEntry
     case mealConfiguration
+    case chartSettings
     case weeklyGoal
 }
 
@@ -74,4 +75,9 @@ enum MealConfigurationIdentity {
             bytes[12], bytes[13], bytes[14], bytes[15],
         ))
     }
+}
+
+/// Stable singleton identity for the user's chart display preference.
+enum ChartSettingsIdentity {
+    static let id = UUID(uuidString: "A4036B4D-EA32-48A7-83E5-987754226AE1")!
 }
