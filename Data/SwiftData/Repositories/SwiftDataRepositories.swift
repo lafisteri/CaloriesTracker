@@ -368,7 +368,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
               initialVersion.id == recipe.currentVersionID,
               initialVersion.versionNumber == 1,
               initialVersion.basedOnVersionID == nil,
-              initialVersion.ingredients.allSatisfy({ $0.recipeVersionID == initialVersion.id })
+              hasCanonicalIngredients(initialVersion)
         else {
             throw RecipeRepositoryError.invalidInitialVersion
         }
@@ -422,7 +422,7 @@ final class SwiftDataRecipeRepository: RecipeRepository {
               recipe.currentVersionID == version.id,
               version.basedOnVersionID != nil,
               version.versionNumber > 1,
-              version.ingredients.allSatisfy({ $0.recipeVersionID == version.id })
+              hasCanonicalIngredients(version)
         else {
             throw RecipeRepositoryError.invalidVersionAppend
         }
@@ -501,6 +501,14 @@ final class SwiftDataRecipeRepository: RecipeRepository {
         var descriptor = FetchDescriptor<RecipeVersionRecord>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first
+    }
+
+    private func hasCanonicalIngredients(_ version: RecipeVersion) -> Bool {
+        let ingredients = version.ingredients
+        let positions = ingredients.map(\.position)
+        return Set(ingredients.map(\.id)).count == ingredients.count
+            && ingredients.allSatisfy({ $0.recipeVersionID == version.id })
+            && positions.sorted() == Array(ingredients.indices)
     }
 
     private func makeRecord(_ recipe: Recipe) -> RecipeRecord {

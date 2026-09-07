@@ -567,11 +567,11 @@ final class SyncPullCoordinator {
                 category: .syncLocalStoreMissingEntity,
                 safeErrorDescription: "local entity is missing",
             )
-        case .invalidPayload:
+        case let .invalidPayload(_, reason):
             return SyncRemoteApplyFailureDiagnostic(
                 reason: .invalidPayload,
                 category: .syncLocalStoreInvalidPayload,
-                safeErrorDescription: "payload validation rejected the remote record",
+                safeErrorDescription: "payload validation rejected the remote record: \(reason)",
             )
         case .inconsistentIdentity:
             return SyncRemoteApplyFailureDiagnostic(

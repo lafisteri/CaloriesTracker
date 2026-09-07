@@ -857,15 +857,23 @@ final class SyncLocalStore {
 
     private func validate(_ payload: RecipeVersionPayload) throws {
         let key = SyncEntityKey(entityType: .recipeVersion, entityID: payload.id)
-        guard payload.versionNumber > 0,
-              !payload.ingredients.isEmpty,
-              Set(payload.ingredients.map(\.id)).count == payload.ingredients.count,
-              payload.ingredients.map(\.position) == Array(payload.ingredients.indices)
-        else {
-            throw SyncLocalStoreError.invalidPayload(key, reason: "ingredient identities or ordering are invalid")
+        guard payload.versionNumber > 0 else {
+            throw SyncLocalStoreError.invalidPayload(key, reason: "recipe version number is invalid")
         }
-        guard payload.cookedWeight != nil || payload.servingsCount != nil else {
-            throw SyncLocalStoreError.invalidPayload(key, reason: "recipe output is required")
+        guard Set(payload.ingredients.map(\.id)).count == payload.ingredients.count else {
+            throw SyncLocalStoreError.invalidPayload(key, reason: "recipe ingredient IDs are not unique")
+        }
+
+        let expectedPositions = Array(payload.ingredients.indices)
+        let positions = payload.ingredients.map(\.position)
+        guard positions.sorted() == expectedPositions else {
+            throw SyncLocalStoreError.invalidPayload(key, reason: "recipe ingredient positions are not canonical")
+        }
+        guard positions == expectedPositions else {
+            throw SyncLocalStoreError.invalidPayload(
+                key,
+                reason: "recipe ingredient positions do not match payload array order",
+            )
         }
         if let cookedWeight = payload.cookedWeight,
            !(cookedWeight.isFinite && cookedWeight > 0)
