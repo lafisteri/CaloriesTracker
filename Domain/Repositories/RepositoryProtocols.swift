@@ -49,3 +49,9 @@ protocol GoalRepository: Sendable {
     func goals(effectiveOn days: [LocalDay]) async throws -> [LocalDay: WeeklyGoal]
     func save(draft: WeeklyGoalDraft, at timestamp: Date) async throws -> WeeklyGoal
 }
+
+@MainActor
+protocol MealConfigurationRepository: Sendable {
+    func configuration(for day: LocalDay) async throws -> MealConfiguration
+    func saveToday(meals: [MealConfigurationItem], today: LocalDay, at: Date) async throws -> MealConfiguration
+}

@@ -106,8 +106,8 @@ extension DiaryEntryRecord {
         guard let day = LocalDay(rawValue: dayKey) else {
             throw RecordMappingError.invalidLocalDay(dayKey)
         }
-        guard let mealType = MealType(rawValue: mealTypeRaw) else {
-            throw RecordMappingError.invalidEnum(type: "MealType", value: mealTypeRaw)
+        guard let mealID = mealID else {
+            throw RecordMappingError.invalidEnum(type: "UUID", value: "missing mealID")
         }
         guard let sourceType = SourceType(rawValue: sourceTypeRaw) else {
             throw RecordMappingError.invalidEnum(type: "SourceType", value: sourceTypeRaw)
@@ -116,7 +116,7 @@ extension DiaryEntryRecord {
         return DiaryEntry(
             id: id,
             day: day,
-            mealType: mealType,
+            mealID: mealID,
             sortOrder: sortOrder,
             sourceType: sourceType,
             sourceID: sourceID,

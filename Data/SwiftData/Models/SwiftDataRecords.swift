@@ -189,7 +189,9 @@ final class RecipeIngredientRecord {
 final class DiaryEntryRecord {
     @Attribute(.unique) var id: UUID
     var dayKey: String
-    var mealTypeRaw: String
+    // Retained only to migrate V1–V5 stores. Runtime identity is mealID.
+    var mealTypeRaw: String = ""
+    var mealID: UUID?
     var sortOrder: Int
     var sourceTypeRaw: String
     var sourceID: UUID
@@ -208,7 +210,7 @@ final class DiaryEntryRecord {
     init(
         id: UUID,
         dayKey: String,
-        mealTypeRaw: String,
+        mealID: UUID,
         sortOrder: Int,
         sourceTypeRaw: String,
         sourceID: UUID,
@@ -226,7 +228,7 @@ final class DiaryEntryRecord {
     ) {
         self.id = id
         self.dayKey = dayKey
-        self.mealTypeRaw = mealTypeRaw
+        self.mealID = mealID
         self.sortOrder = sortOrder
         self.sourceTypeRaw = sourceTypeRaw
         self.sourceID = sourceID

@@ -2,7 +2,7 @@ import Foundation
 
 struct DiaryContext: Hashable, Codable, Sendable {
     let day: LocalDay
-    let meal: MealType
+    let mealID: UUID
 }
 
 struct FoodSourceReference: Hashable, Codable, Sendable {
@@ -20,7 +20,7 @@ struct LatestDiaryUsage: Hashable, Sendable {
 struct DiaryEntry: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let day: LocalDay
-    let mealType: MealType
+    let mealID: UUID
     let sortOrder: Int
     let sourceType: SourceType
     let sourceID: UUID

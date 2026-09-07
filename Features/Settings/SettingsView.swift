@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 struct SettingsView: View {
     let goalService: GoalService
+    let mealConfigurationService: MealConfigurationService
     let supabaseAuth: SupabaseAuthService?
     let syncStatus: SyncStatusStore?
     let syncOrchestrator: SyncOrchestrator?
@@ -18,6 +19,9 @@ struct SettingsView: View {
 
             List {
                 Section {
+                    NavigationLink("Приёмы пищи") {
+                        MealSettingsView(service: mealConfigurationService)
+                    }
                     NavigationLink {
                         GoalEditorView(goalService: goalService)
                     } label: {

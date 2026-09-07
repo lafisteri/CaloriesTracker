@@ -82,13 +82,13 @@ struct TodayRootView: View {
             if let day = model.day {
                 ForEach(day.meals) { meal in
                     DiaryMealCardSection(
-                        mealID: meal.mealType.rawValue,
-                        title: meal.mealType.russianLabel,
+                        mealID: meal.mealID,
+                        title: meal.name,
                         nutrition: meal.totalNutrition,
                         hasEntries: !meal.entries.isEmpty,
                         onAdd: {
                             router.todayPath.append(
-                                .catalogSelection(DiaryContext(day: model.selectedDay, meal: meal.mealType)),
+                                .catalogSelection(DiaryContext(day: model.selectedDay, mealID: meal.mealID)),
                             )
                         },
                     ) {
@@ -104,7 +104,7 @@ struct TodayRootView: View {
                                 },
                             )
                             .diaryMealCardEntryRow(
-                                mealID: meal.mealType.rawValue,
+                                mealID: meal.mealID,
                                 isLast: entry.id == meal.entries.last?.id,
                             )
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -127,7 +127,7 @@ struct TodayRootView: View {
 
                             move(
                                 entryID: entryID,
-                                to: meal.mealType,
+                                to: meal.mealID,
                                 displayedTargetIndex: displayedTargetIndex,
                             )
                             clearDraggedEntryID(entryID)
@@ -177,6 +177,12 @@ struct TodayRootView: View {
         .task {
             await model.load()
         }
+        .onChange(of: syncStatus?.lastSuccessfulSyncAt) { _, _ in
+            Task { await model.load() }
+        }
+        .onChange(of: diaryService.mealConfigurationService.revision) { _, _ in
+            Task { await model.load() }
+        }
         .onChange(of: router.todayPath) { _, path in
             guard path.isEmpty else {
                 return
@@ -190,6 +196,7 @@ struct TodayRootView: View {
             case .settings:
                 SettingsView(
                     goalService: goalService,
+                    mealConfigurationService: diaryService.mealConfigurationService,
                     supabaseAuth: supabaseAuth,
                     syncStatus: syncStatus,
                     syncOrchestrator: syncOrchestrator,
@@ -392,7 +399,7 @@ struct TodayRootView: View {
         .buttonStyle(.borderless)
     }
 
-    private func move(entryID: UUID, to meal: MealType, displayedTargetIndex: Int) {
+    private func move(entryID: UUID, to meal: UUID, displayedTargetIndex: Int) {
         Task {
             await model.move(
                 entryID: entryID,
@@ -442,11 +449,11 @@ private struct DiaryMealCardAnchors {
 }
 
 private struct DiaryMealCardBoundsPreferenceKey: PreferenceKey {
-    static let defaultValue: [String: DiaryMealCardAnchors] = [:]
+    static let defaultValue: [UUID: DiaryMealCardAnchors] = [:]
 
     static func reduce(
-        value: inout [String: DiaryMealCardAnchors],
-        nextValue: () -> [String: DiaryMealCardAnchors],
+        value: inout [UUID: DiaryMealCardAnchors],
+        nextValue: () -> [UUID: DiaryMealCardAnchors],
     ) {
         for (mealID, nextAnchors) in nextValue() {
             var anchors = value[mealID] ?? DiaryMealCardAnchors()
@@ -458,7 +465,7 @@ private struct DiaryMealCardBoundsPreferenceKey: PreferenceKey {
 }
 
 private struct DiaryMealCardSection<Rows: View>: View {
-    let mealID: String
+    let mealID: UUID
     let title: String
     let nutrition: Nutrition
     let hasEntries: Bool
@@ -466,7 +473,7 @@ private struct DiaryMealCardSection<Rows: View>: View {
     private let rows: Rows
 
     init(
-        mealID: String,
+        mealID: UUID,
         title: String,
         nutrition: Nutrition,
         hasEntries: Bool,
@@ -507,7 +514,7 @@ private struct DiaryMealCardSection<Rows: View>: View {
 }
 
 private struct DiaryMealCardHeader: View {
-    let mealID: String
+    let mealID: UUID
     let title: String
     let nutrition: Nutrition
     let hasEntries: Bool
@@ -548,7 +555,7 @@ private struct DiaryMealCardHeader: View {
 }
 
 private extension View {
-    func diaryMealCardEntryRow(mealID: String, isLast: Bool) -> some View {
+    func diaryMealCardEntryRow(mealID: UUID, isLast: Bool) -> some View {
         padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(

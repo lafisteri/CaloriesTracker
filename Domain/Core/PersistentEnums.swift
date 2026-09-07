@@ -1,6 +1,7 @@
 import Foundation
 
-enum MealType: String, CaseIterable, Codable, Sendable {
+/// Migration and legacy payload compatibility only.
+enum LegacyMealType: String, CaseIterable, Codable, Sendable {
     case breakfast
     case lunch
     case dinner

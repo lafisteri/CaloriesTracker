@@ -64,6 +64,7 @@ final class SyncLocalStore {
         let recipeVersions = try modelContext.fetch(FetchDescriptor<RecipeVersionRecord>())
         let recipes = try modelContext.fetch(FetchDescriptor<RecipeRecord>())
         let weeklyGoals = try modelContext.fetch(FetchDescriptor<WeeklyGoalRecord>())
+        let mealConfigurations = try modelContext.fetch(FetchDescriptor<MealConfigurationRecord>())
         let diaryEntries = try modelContext.fetch(FetchDescriptor<DiaryEntryRecord>())
 
         func keys<T>(_ records: [T], type: SyncEntityType, id: (T) -> UUID) -> [SyncEntityKey] {
@@ -78,6 +79,7 @@ final class SyncLocalStore {
             + keys(products, type: .product, id: { $0.id })
             + keys(recipeVersions, type: .recipeVersion, id: { $0.id })
             + keys(recipes, type: .recipe, id: { $0.id })
+            + keys(mealConfigurations, type: .mealConfiguration, id: { $0.id })
             + canonicalWeeklyGoalKeys
             + keys(diaryEntries, type: .diaryEntry, id: { $0.id })
     }
@@ -155,6 +157,11 @@ final class SyncLocalStore {
                 throw SyncLocalStoreError.missingEntity(key)
             }
             return .diaryEntry(try diaryEntryPayload(from: record))
+        case .mealConfiguration:
+            guard let record = try mealConfigurationRecord(id: key.entityID, in: modelContext) else {
+                throw SyncLocalStoreError.missingEntity(key)
+            }
+            return .mealConfiguration(try record.configuration())
         case .weeklyGoal:
             guard let record = try weeklyGoalRecord(id: key.entityID, in: modelContext) else {
                 throw SyncLocalStoreError.missingEntity(key)
@@ -180,6 +187,8 @@ final class SyncLocalStore {
             return try applyRecipeVersion(payload, in: modelContext)
         case let .diaryEntry(payload):
             return try applyDiaryEntry(payload, in: modelContext)
+        case let .mealConfiguration(payload):
+            return try applyMealConfiguration(payload, in: modelContext)
         case let .weeklyGoal(payload):
             return try applyWeeklyGoal(payload, in: modelContext)
         }
@@ -387,6 +396,30 @@ final class SyncLocalStore {
         }
 
         modelContext.insert(makeDiaryEntryRecord(from: remote))
+        return .inserted(key, needsRepublish: [])
+    }
+
+    private func payloadKey(_ configuration: MealConfiguration) -> SyncEntityKey {
+        SyncEntityKey(entityType: .mealConfiguration, entityID: configuration.id)
+    }
+
+    private func mealConfigurationRecord(id: UUID, in context: ModelContext) throws -> MealConfigurationRecord? {
+        try context.fetch(FetchDescriptor<MealConfigurationRecord>(predicate: #Predicate { $0.id == id })).first
+    }
+
+    private func applyMealConfiguration(_ remote: MealConfiguration, in context: ModelContext) throws -> SyncMergeResult {
+        let key = payloadKey(remote)
+        if let record = try mealConfigurationRecord(id: remote.id, in: context) {
+            let local = try record.configuration()
+            if local == remote { return .identical(key) }
+            if try timestampWinner(local: .mealConfiguration(local), remote: .mealConfiguration(remote),
+                localTimestamp: local.updatedAt, remoteTimestamp: remote.updatedAt) == .local {
+                return .localKept(key, needsRepublish: [key])
+            }
+            try record.apply(remote)
+            return .remoteApplied(key, needsRepublish: [])
+        }
+        context.insert(try MealConfigurationRecord(remote))
         return .inserted(key, needsRepublish: [])
     }
 
@@ -821,6 +854,9 @@ final class SyncLocalStore {
             try validate(payload)
         case let .diaryEntry(payload):
             try validate(payload)
+        case let .mealConfiguration(payload):
+            do { try payload.validate() }
+            catch { throw SyncLocalStoreError.invalidPayload(payloadKey(payload), reason: error.localizedDescription) }
         case let .weeklyGoal(payload):
             try validate(payload)
         }
@@ -1212,7 +1248,7 @@ final class SyncLocalStore {
 
     private func diaryEntryPayload(from record: DiaryEntryRecord) throws -> DiaryEntryPayload {
         guard let day = LocalDay(rawValue: record.dayKey),
-              let mealType = MealType(rawValue: record.mealTypeRaw),
+              let mealID = record.mealID,
               let sourceType = SourceType(rawValue: record.sourceTypeRaw)
         else {
             throw SyncLocalStoreError.invalidPayload(
@@ -1223,7 +1259,7 @@ final class SyncLocalStore {
         return DiaryEntryPayload(
             id: record.id,
             day: day,
-            mealType: mealType,
+            mealID: mealID,
             sortOrder: record.sortOrder,
             sourceType: sourceType,
             sourceID: record.sourceID,
@@ -1374,7 +1410,7 @@ final class SyncLocalStore {
         DiaryEntryRecord(
             id: payload.id,
             dayKey: payload.day.rawValue,
-            mealTypeRaw: payload.mealType.rawValue,
+            mealID: payload.mealID,
             sortOrder: payload.sortOrder,
             sourceTypeRaw: payload.sourceType.rawValue,
             sourceID: payload.sourceID,
@@ -1393,7 +1429,7 @@ final class SyncLocalStore {
     }
 
     private func apply(_ payload: DiaryEntryPayload, to record: DiaryEntryRecord) {
-        record.mealTypeRaw = payload.mealType.rawValue
+        record.mealID = payload.mealID
         record.sortOrder = payload.sortOrder
         record.sourceVersionID = payload.sourceVersionID
         record.sourceName = payload.sourceName

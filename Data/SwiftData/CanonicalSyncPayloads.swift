@@ -160,6 +160,7 @@ enum SyncPayload: Codable, Equatable, Sendable {
     case recipe(RecipePayload)
     case recipeVersion(RecipeVersionPayload)
     case diaryEntry(DiaryEntryPayload)
+    case mealConfiguration(MealConfiguration)
     case weeklyGoal(WeeklyGoalPayload)
 
     var key: SyncEntityKey {
@@ -174,6 +175,8 @@ enum SyncPayload: Codable, Equatable, Sendable {
             SyncEntityKey(entityType: .recipeVersion, entityID: payload.id)
         case let .diaryEntry(payload):
             SyncEntityKey(entityType: .diaryEntry, entityID: payload.id)
+        case let .mealConfiguration(payload):
+            SyncEntityKey(entityType: .mealConfiguration, entityID: payload.id)
         case let .weeklyGoal(payload):
             SyncEntityKey(entityType: .weeklyGoal, entityID: payload.id)
         }
@@ -197,6 +200,8 @@ enum SyncPayload: Codable, Equatable, Sendable {
             self = .recipeVersion(try container.decode(RecipeVersionPayload.self, forKey: .payload))
         case .diaryEntry:
             self = .diaryEntry(try container.decode(DiaryEntryPayload.self, forKey: .payload))
+        case .mealConfiguration:
+            self = .mealConfiguration(try container.decode(MealConfiguration.self, forKey: .payload))
         case .weeklyGoal:
             self = .weeklyGoal(try container.decode(WeeklyGoalPayload.self, forKey: .payload))
         }
@@ -215,6 +220,8 @@ enum SyncPayload: Codable, Equatable, Sendable {
         case let .recipeVersion(payload):
             try container.encode(payload, forKey: .payload)
         case let .diaryEntry(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .mealConfiguration(payload):
             try container.encode(payload, forKey: .payload)
         case let .weeklyGoal(payload):
             try container.encode(payload, forKey: .payload)
@@ -280,7 +287,7 @@ enum SyncPayload: Codable, Equatable, Sendable {
                 DiaryEntryPayload(
                     id: payload.id,
                     day: payload.day,
-                    mealType: payload.mealType,
+                    mealID: payload.mealID,
                     sortOrder: payload.sortOrder,
                     sourceType: payload.sourceType,
                     sourceID: payload.sourceID,
@@ -294,6 +301,10 @@ enum SyncPayload: Codable, Equatable, Sendable {
                     deletedAt: SyncTimestamp.canonical(payload.deletedAt),
                 ),
             )
+        case let .mealConfiguration(payload):
+            .mealConfiguration(MealConfiguration(id: payload.id, effectiveFrom: payload.effectiveFrom,
+                meals: payload.meals, createdAt: SyncTimestamp.canonical(payload.createdAt),
+                updatedAt: SyncTimestamp.canonical(payload.updatedAt)))
         case let .weeklyGoal(payload):
             .weeklyGoal(
                 WeeklyGoalPayload(
@@ -314,7 +325,7 @@ enum SyncPayload: Codable, Equatable, Sendable {
         switch self {
         case let .weeklyGoal(payload):
             .weeklyGoal(payload.canonicalizedIdentity())
-        case .product, .productVersion, .recipe, .recipeVersion, .diaryEntry:
+        case .product, .productVersion, .recipe, .recipeVersion, .diaryEntry, .mealConfiguration:
             self
         }
     }
@@ -376,7 +387,7 @@ struct RecipeVersionPayload: Codable, Equatable, Sendable {
 struct DiaryEntryPayload: Codable, Equatable, Sendable {
     let id: UUID
     let day: LocalDay
-    let mealType: MealType
+    let mealID: UUID
     let sortOrder: Int
     let sourceType: SourceType
     let sourceID: UUID
@@ -556,7 +567,7 @@ extension RecipeVersionPayload {
 
 extension DiaryEntryPayload {
     private enum CodingKeys: String, CodingKey {
-        case id, day, mealType, sortOrder, sourceType, sourceID, sourceVersionID, sourceName, amount, unitToken, nutrition, createdAt, updatedAt, deletedAt
+        case id, day, mealID, mealType, sortOrder, sourceType, sourceID, sourceVersionID, sourceName, amount, unitToken, nutrition, createdAt, updatedAt, deletedAt
     }
 
     init(from decoder: any Decoder) throws {
@@ -564,7 +575,8 @@ extension DiaryEntryPayload {
         self.init(
             id: try container.decode(UUID.self, forKey: .id),
             day: try container.decode(LocalDay.self, forKey: .day),
-            mealType: try container.decode(MealType.self, forKey: .mealType),
+            mealID: try container.decodeIfPresent(UUID.self, forKey: .mealID)
+                ?? container.decode(LegacyMealType.self, forKey: .mealType).mealID,
             sortOrder: try container.decode(Int.self, forKey: .sortOrder),
             sourceType: try container.decode(SourceType.self, forKey: .sourceType),
             sourceID: try container.decode(UUID.self, forKey: .sourceID),
@@ -583,7 +595,7 @@ extension DiaryEntryPayload {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(day, forKey: .day)
-        try container.encode(mealType, forKey: .mealType)
+        try container.encode(mealID, forKey: .mealID)
         try container.encode(sortOrder, forKey: .sortOrder)
         try container.encode(sourceType, forKey: .sourceType)
         try container.encode(sourceID, forKey: .sourceID)
@@ -639,5 +651,27 @@ enum SyncPayloadCanonicalizer {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return try encoder.encode(SyncPayloadEnvelope(payload: payload))
+    }
+}
+
+// MealConfiguration is also its canonical payload; timestamps use the same
+// explicit millisecond codec as every other sync aggregate.
+extension MealConfiguration {
+    private enum CodingKeys: String, CodingKey { case id, effectiveFrom, meals, createdAt, updatedAt }
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try container.decode(UUID.self, forKey: .id),
+            effectiveFrom: try container.decode(LocalDay.self, forKey: .effectiveFrom),
+            meals: try container.decode([MealConfigurationItem].self, forKey: .meals),
+            createdAt: try SyncTimestamp.decode(from: container, forKey: .createdAt),
+            updatedAt: try SyncTimestamp.decode(from: container, forKey: .updatedAt))
+    }
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(effectiveFrom, forKey: .effectiveFrom)
+        try container.encode(meals, forKey: .meals)
+        try SyncTimestamp.encode(createdAt, to: &container, forKey: .createdAt)
+        try SyncTimestamp.encode(updatedAt, to: &container, forKey: .updatedAt)
     }
 }

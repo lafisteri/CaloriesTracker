@@ -31,6 +31,6 @@ struct UpdateManualDiaryEntryCommand: Hashable, Sendable {
 
 struct MoveDiaryEntryCommand: Hashable, Sendable {
     let entryID: UUID
-    let targetMeal: MealType
+    let targetMealID: UUID
     let targetIndex: Int
 }

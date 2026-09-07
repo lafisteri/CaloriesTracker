@@ -1,12 +1,13 @@
 import Foundation
 
 struct DiaryMealReadModel: Identifiable, Hashable, Sendable {
-    let mealType: MealType
+    let mealID: UUID
+    let name: String
     let entries: [DiaryEntry]
     let totalNutrition: Nutrition
 
-    var id: MealType {
-        mealType
+    var id: UUID {
+        mealID
     }
 }
 
@@ -59,15 +60,18 @@ private struct ResolvedDiarySource: Hashable, Sendable {
 
 @MainActor
 final class DiaryService {
+    let mealConfigurationService: MealConfigurationService
     private let diaryRepository: any DiaryRepository
     private let productRepository: any ProductRepository
     private let recipeRepository: any RecipeRepository
 
     init(
+        mealConfigurationService: MealConfigurationService,
         diaryRepository: any DiaryRepository,
         productRepository: any ProductRepository,
         recipeRepository: any RecipeRepository,
     ) {
+        self.mealConfigurationService = mealConfigurationService
         self.diaryRepository = diaryRepository
         self.productRepository = productRepository
         self.recipeRepository = recipeRepository
@@ -75,12 +79,15 @@ final class DiaryService {
 
     func day(for day: LocalDay) async throws -> DiaryDayReadModel {
         let entries = try await diaryRepository.entries(on: day)
-        let meals = try MealType.allCases.map { mealType in
+        let configuration = try await mealConfigurationService.configuration(for: day)
+        let meals = try configuration.meals.sorted { $0.position < $1.position }.map { item in
+            let mealID = item.mealID
             let mealEntries = entries
-                .filter { $0.mealType == mealType }
+                .filter { $0.mealID == mealID }
                 .sorted(by: diaryEntryOrder)
             return DiaryMealReadModel(
-                mealType: mealType,
+                mealID: mealID,
+                name: item.name,
                 entries: mealEntries,
                 totalNutrition: try nutritionTotal(for: mealEntries),
             )
@@ -151,6 +158,7 @@ final class DiaryService {
     }
 
     func createManualEntry(_ command: CreateManualDiaryEntryCommand) async throws {
+        try await validateMeal(command.context.mealID, on: command.context.day)
         let sourceName = try validatedManualName(command.sourceName)
         try validatePositiveAmount(command.amount)
         try validateManualUnit(command.unitToken)
@@ -162,8 +170,8 @@ final class DiaryService {
         let entry = DiaryEntry(
             id: entryID,
             day: command.context.day,
-            mealType: command.context.meal,
-            sortOrder: nextSortOrder(for: existingEntries.filter { $0.mealType == command.context.meal }),
+            mealID: command.context.mealID,
+            sortOrder: nextSortOrder(for: existingEntries.filter { $0.mealID == command.context.mealID }),
             sourceType: .manual,
             sourceID: entryID,
             sourceVersionID: entryID,
@@ -198,7 +206,7 @@ final class DiaryService {
         let updatedEntry = DiaryEntry(
             id: entry.id,
             day: entry.day,
-            mealType: entry.mealType,
+            mealID: entry.mealID,
             sortOrder: entry.sortOrder,
             sourceType: entry.sourceType,
             sourceID: entry.sourceID,
@@ -255,13 +263,14 @@ final class DiaryService {
             amount: amount,
             unitToken: unitToken,
         )
+        try await validateMeal(context.mealID, on: context.day)
         let existingEntries = try await diaryRepository.entries(on: context.day)
         let now = Date()
         let entry = DiaryEntry(
             id: UUID(),
             day: context.day,
-            mealType: context.meal,
-            sortOrder: nextSortOrder(for: existingEntries.filter { $0.mealType == context.meal }),
+            mealID: context.mealID,
+            sortOrder: nextSortOrder(for: existingEntries.filter { $0.mealID == context.mealID }),
             sourceType: source.sourceType,
             sourceID: source.sourceID,
             sourceVersionID: source.sourceVersionID,
@@ -287,7 +296,7 @@ final class DiaryService {
         let updatedEntry = DiaryEntry(
             id: entry.id,
             day: entry.day,
-            mealType: entry.mealType,
+            mealID: entry.mealID,
             sortOrder: entry.sortOrder,
             sourceType: entry.sourceType,
             sourceID: entry.sourceID,
@@ -326,7 +335,7 @@ final class DiaryService {
         let rebasedEntry = DiaryEntry(
             id: entry.id,
             day: entry.day,
-            mealType: entry.mealType,
+            mealID: entry.mealID,
             sortOrder: entry.sortOrder,
             sourceType: entry.sourceType,
             sourceID: entry.sourceID,
@@ -351,9 +360,9 @@ final class DiaryService {
         try await diaryRepository.softDeleteEntry(id: entryID, at: Date())
     }
 
-    func reorder(day: LocalDay, meal: MealType, orderedEntryIDs: [UUID]) async throws {
+    func reorder(day: LocalDay, meal: UUID, orderedEntryIDs: [UUID]) async throws {
         let entries = try await diaryRepository.entries(on: day)
-        let currentMealEntries = entries.filter { $0.mealType == meal }.sorted(by: diaryEntryOrder)
+        let currentMealEntries = entries.filter { $0.mealID == meal }.sorted(by: diaryEntryOrder)
         guard currentMealEntries.map(\.id).count == orderedEntryIDs.count,
               Set(currentMealEntries.map(\.id)) == Set(orderedEntryIDs),
               Set(orderedEntryIDs).count == orderedEntryIDs.count
@@ -374,29 +383,37 @@ final class DiaryService {
             throw DiaryServiceError.entryNotFound
         }
 
+        try await validateMeal(command.targetMealID, on: entry.day)
         let allEntries = try await diaryRepository.entries(on: entry.day)
         let now = Date()
         var sourceEntries = allEntries
-            .filter { $0.mealType == entry.mealType }
+            .filter { $0.mealID == entry.mealID }
             .sorted(by: diaryEntryOrder)
         sourceEntries.removeAll { $0.id == entry.id }
 
-        if command.targetMeal == entry.mealType {
+        if command.targetMealID == entry.mealID {
             let insertionIndex = min(command.targetIndex, sourceEntries.count)
             sourceEntries.insert(entry, at: insertionIndex)
-            try await diaryRepository.save(normalized(entries: sourceEntries, meal: entry.mealType, at: now))
+            try await diaryRepository.save(normalized(entries: sourceEntries, meal: entry.mealID, at: now))
             return
         }
 
         var targetEntries = allEntries
-            .filter { $0.mealType == command.targetMeal }
+            .filter { $0.mealID == command.targetMealID }
             .sorted(by: diaryEntryOrder)
         let insertionIndex = min(command.targetIndex, targetEntries.count)
         targetEntries.insert(entry, at: insertionIndex)
 
-        let sourceUpdates = normalized(entries: sourceEntries, meal: entry.mealType, at: now)
-        let targetUpdates = normalized(entries: targetEntries, meal: command.targetMeal, at: now)
+        let sourceUpdates = normalized(entries: sourceEntries, meal: entry.mealID, at: now)
+        let targetUpdates = normalized(entries: targetEntries, meal: command.targetMealID, at: now)
         try await diaryRepository.save(sourceUpdates + targetUpdates)
+    }
+
+    private func validateMeal(_ mealID: UUID, on day: LocalDay) async throws {
+        let configuration = try await mealConfigurationService.configuration(for: day)
+        guard configuration.meals.contains(where: { $0.mealID == mealID }) else {
+            throw MealConfigurationError.invalidConfiguration
+        }
     }
 
     private func currentSource(for source: FoodSourceReference) async throws -> ResolvedDiarySource {
@@ -603,12 +620,12 @@ final class DiaryService {
         return overflow ? entries.count * 100 : nextOrder
     }
 
-    private func normalized(entries: [DiaryEntry], meal: MealType, at date: Date) -> [DiaryEntry] {
+    private func normalized(entries: [DiaryEntry], meal: UUID, at date: Date) -> [DiaryEntry] {
         entries.enumerated().map { index, entry in
             DiaryEntry(
                 id: entry.id,
                 day: entry.day,
-                mealType: meal,
+                mealID: meal,
                 sortOrder: index * 100,
                 sourceType: entry.sourceType,
                 sourceID: entry.sourceID,

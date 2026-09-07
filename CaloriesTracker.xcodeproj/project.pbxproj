@@ -71,6 +71,11 @@
 		A10000000000000000000070 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000070 /* AppStyle.swift */; };
 		A10000000000000000000071 /* SchemaV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* SchemaV5.swift */; };
 		A10000000000000000000072 /* NutritionFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* NutritionFormatting.swift */; };
+		F10000000000000000000000 /* MealModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000000 /* MealModels.swift */; };
+		F10000000000000000000001 /* MealConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* MealConfigurationService.swift */; };
+		F10000000000000000000002 /* MealConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* MealConfigurationStore.swift */; };
+		F10000000000000000000003 /* SchemaV6.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* SchemaV6.swift */; };
+		F10000000000000000000004 /* MealSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* MealSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -140,6 +145,11 @@
 		A20000000000000000000070 /* AppStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyle.swift; sourceTree = "<group>"; };
 		A20000000000000000000071 /* SchemaV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV5.swift; sourceTree = "<group>"; };
 		A20000000000000000000072 /* NutritionFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormatting.swift; sourceTree = "<group>"; };
+		F20000000000000000000000 /* MealModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealModels.swift; sourceTree = "<group>"; };
+		F20000000000000000000001 /* MealConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealConfigurationService.swift; sourceTree = "<group>"; };
+		F20000000000000000000002 /* MealConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealConfigurationStore.swift; sourceTree = "<group>"; };
+		F20000000000000000000003 /* SchemaV6.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV6.swift; sourceTree = "<group>"; };
+		F20000000000000000000004 /* MealSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -214,6 +224,7 @@
 				A4000000000000000000000C /* Goals */,
 				A4000000000000000000001D /* Statistics */,
 				A4000000000000000000000D /* Repositories */,
+				F40000000000000000000000 /* Meals */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -298,12 +309,14 @@
 				A20000000000000000000062 /* SchemaV3.swift */,
 				A20000000000000000000065 /* SchemaV4.swift */,
 				A20000000000000000000071 /* SchemaV5.swift */,
+				F20000000000000000000003 /* SchemaV6.swift */,
 				A20000000000000000000020 /* MigrationPlan.swift */,
 				A20000000000000000000050 /* SyncOutbox.swift */,
 				A20000000000000000000061 /* SyncMetadata.swift */,
 				A20000000000000000000051 /* SyncEntityIdentity.swift */,
 				A20000000000000000000052 /* CanonicalSyncPayloads.swift */,
 				A20000000000000000000053 /* SyncLocalStore.swift */,
+				F20000000000000000000002 /* MealConfigurationStore.swift */,
 			);
 			path = SwiftData;
 			sourceTree = "<group>";
@@ -340,6 +353,7 @@
 				A40000000000000000000018 /* Recipes */,
 				A40000000000000000000019 /* Goals */,
 				A4000000000000000000001A /* Statistics */,
+				F40000000000000000000001 /* Meals */,
 			);
 			path = Application;
 			sourceTree = "<group>";
@@ -470,8 +484,25 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000068 /* SettingsView.swift */,
+				F20000000000000000000004 /* MealSettingsView.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		F40000000000000000000000 /* Meals */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000000 /* MealModels.swift */,
+			);
+			path = Meals;
+			sourceTree = "<group>";
+		};
+		F40000000000000000000001 /* Meals */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000001 /* MealConfigurationService.swift */,
+			);
+			path = Meals;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -549,6 +580,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F10000000000000000000004 /* MealSettingsView.swift in Sources */,
+				F10000000000000000000003 /* SchemaV6.swift in Sources */,
+				F10000000000000000000002 /* MealConfigurationStore.swift in Sources */,
+				F10000000000000000000001 /* MealConfigurationService.swift in Sources */,
+				F10000000000000000000000 /* MealModels.swift in Sources */,
 				A10000000000000000000001 /* AppTab.swift in Sources */,
 				A10000000000000000000002 /* AppRouter.swift in Sources */,
 				A10000000000000000000003 /* AppDependencies.swift in Sources */,

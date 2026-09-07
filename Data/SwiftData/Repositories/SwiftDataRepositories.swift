@@ -607,7 +607,6 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         let descriptor = FetchDescriptor<DiaryEntryRecord>(
             predicate: #Predicate { $0.dayKey == dayKey && $0.deletedAt == nil },
             sortBy: [
-                SortDescriptor(\DiaryEntryRecord.mealTypeRaw),
                 SortDescriptor(\DiaryEntryRecord.sortOrder),
             ],
         )
@@ -616,8 +615,8 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             .fetch(descriptor)
             .map { try $0.toDomain() }
             .sorted { lhs, rhs in
-                if lhs.mealType.rawValue != rhs.mealType.rawValue {
-                    return lhs.mealType.rawValue < rhs.mealType.rawValue
+                if lhs.mealID.uuidString != rhs.mealID.uuidString {
+                    return lhs.mealID.uuidString < rhs.mealID.uuidString
                 }
                 if lhs.sortOrder != rhs.sortOrder {
                     return lhs.sortOrder < rhs.sortOrder
@@ -636,7 +635,6 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             predicate: #Predicate { $0.deletedAt == nil && dayKeys.contains($0.dayKey) },
             sortBy: [
                 SortDescriptor(\DiaryEntryRecord.dayKey),
-                SortDescriptor(\DiaryEntryRecord.mealTypeRaw),
                 SortDescriptor(\DiaryEntryRecord.sortOrder),
             ],
         )
@@ -648,8 +646,8 @@ final class SwiftDataDiaryRepository: DiaryRepository {
                 if lhs.day != rhs.day {
                     return lhs.day < rhs.day
                 }
-                if lhs.mealType.rawValue != rhs.mealType.rawValue {
-                    return lhs.mealType.rawValue < rhs.mealType.rawValue
+                if lhs.mealID.uuidString != rhs.mealID.uuidString {
+                    return lhs.mealID.uuidString < rhs.mealID.uuidString
                 }
                 if lhs.sortOrder != rhs.sortOrder {
                     return lhs.sortOrder < rhs.sortOrder
@@ -757,7 +755,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             throw DiaryRepositoryError.entryNotFound
         }
         guard matchesImmutableFields(record, entry),
-              record.mealTypeRaw == entry.mealType.rawValue,
+              record.mealID == entry.mealID,
               record.sortOrder == entry.sortOrder,
               record.deletedAt == nil,
               entry.deletedAt == nil
@@ -865,7 +863,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             else {
                 throw DiaryRepositoryError.invalidOrderUpdate
             }
-            guard record.mealTypeRaw != entry.mealType.rawValue || record.sortOrder != entry.sortOrder else {
+            guard record.mealID != entry.mealID || record.sortOrder != entry.sortOrder else {
                 continue
             }
             updates.append((record, entry))
@@ -876,7 +874,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         }
 
         for (record, entry) in updates {
-            record.mealTypeRaw = entry.mealType.rawValue
+            record.mealID = entry.mealID
             record.sortOrder = entry.sortOrder
             record.updatedAt = entry.updatedAt
         }
@@ -931,7 +929,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
     private func matchesRebaseIdentityFields(_ record: DiaryEntryRecord, _ entry: DiaryEntry) -> Bool {
         record.dayKey == entry.day.rawValue
-            && record.mealTypeRaw == entry.mealType.rawValue
+            && record.mealID == entry.mealID
             && record.sortOrder == entry.sortOrder
             && record.sourceTypeRaw == entry.sourceType.rawValue
             && record.sourceID == entry.sourceID
@@ -940,7 +938,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
     private func matchesManualSnapshotIdentityFields(_ record: DiaryEntryRecord, _ entry: DiaryEntry) -> Bool {
         record.dayKey == entry.day.rawValue
-            && record.mealTypeRaw == entry.mealType.rawValue
+            && record.mealID == entry.mealID
             && record.sortOrder == entry.sortOrder
             && record.sourceTypeRaw == SourceType.manual.rawValue
             && entry.sourceType == .manual
@@ -955,7 +953,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         DiaryEntryRecord(
             id: entry.id,
             dayKey: entry.day.rawValue,
-            mealTypeRaw: entry.mealType.rawValue,
+            mealID: entry.mealID,
             sortOrder: entry.sortOrder,
             sourceTypeRaw: entry.sourceType.rawValue,
             sourceID: entry.sourceID,

@@ -98,7 +98,7 @@ final class TodayViewModel {
         }
     }
 
-    func reorder(meal: MealType, orderedEntryIDs: [UUID]) async {
+    func reorder(meal: UUID, orderedEntryIDs: [UUID]) async {
         errorMessage = nil
 
         do {
@@ -111,7 +111,7 @@ final class TodayViewModel {
 
     func move(
         entryID: UUID,
-        to meal: MealType,
+        to meal: UUID,
         displayedTargetIndex: Int,
     ) async {
         errorMessage = nil
@@ -123,7 +123,7 @@ final class TodayViewModel {
                 displayedTargetIndex: displayedTargetIndex,
             )
             try await diaryService.move(
-                MoveDiaryEntryCommand(entryID: entryID, targetMeal: meal, targetIndex: targetIndex),
+                MoveDiaryEntryCommand(entryID: entryID, targetMealID: meal, targetIndex: targetIndex),
             )
             await load()
         } catch {
@@ -133,7 +133,7 @@ final class TodayViewModel {
 
     private func targetIndex(
         for entryID: UUID,
-        movingTo targetMeal: MealType,
+        movingTo targetMealID: UUID,
         displayedTargetIndex: Int,
     ) -> Int {
         guard displayedTargetIndex >= 0,
@@ -141,7 +141,7 @@ final class TodayViewModel {
               let sourceMeal = day.meals.first(where: { meal in
                   meal.entries.contains(where: { $0.id == entryID })
               }),
-              sourceMeal.mealType == targetMeal,
+              sourceMeal.mealID == targetMealID,
               let sourceIndex = sourceMeal.entries.firstIndex(where: { $0.id == entryID })
         else {
             return displayedTargetIndex

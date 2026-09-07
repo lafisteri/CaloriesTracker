@@ -13,7 +13,7 @@ enum CaloriesTrackerSchemaV1: VersionedSchema {
             RecipeRecord.self,
             RecipeVersionRecord.self,
             RecipeIngredientRecord.self,
-            DiaryEntryRecord.self,
+            CaloriesTrackerSchemaV5.DiaryEntryRecord.self,
             WeeklyGoalRecord.self,
             DailyMacroGoalRecord.self,
         ]
