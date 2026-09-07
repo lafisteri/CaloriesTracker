@@ -367,13 +367,17 @@ private struct ProductListView: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             } else if model.products.isEmpty, model.errorMessage == nil {
-                ContentUnavailableView(
-                    "Продуктов пока нет",
-                    systemImage: "shippingbox",
-                    description: Text("Добавьте первый продукт с помощью кнопки выше."),
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+                if hasSearchQuery {
+                    CatalogSearchEmptyMessage()
+                } else {
+                    ContentUnavailableView(
+                        "Продуктов пока нет",
+                        systemImage: "shippingbox",
+                        description: Text("Добавьте первый продукт с помощью кнопки выше."),
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
             } else {
                 ForEach(model.products) { item in
                     switch mode {
@@ -502,6 +506,10 @@ private struct ProductListView: View {
     private func isQuickAdding(source: FoodSourceReference, context: FoodSelectionContext) -> Bool {
         context.quickAddState?.activeSource == source || quickAddingProductID == source.sourceID
     }
+
+    private var hasSearchQuery: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 struct CatalogInlineSearchField: View {
@@ -551,6 +559,16 @@ extension View {
             )
         )
         .listRowBackground(AppStyle.background)
+    }
+}
+
+struct CatalogSearchEmptyMessage: View {
+    var body: some View {
+        Text("Ничего не найдено")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .catalogListRow()
     }
 }
 

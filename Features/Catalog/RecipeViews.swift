@@ -51,13 +51,17 @@ struct RecipeListView: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             } else if model.recipes.isEmpty, model.errorMessage == nil {
-                ContentUnavailableView(
-                    "У вас пока нет рецептов",
-                    systemImage: "book.closed",
-                    description: Text("Создайте первый рецепт с помощью кнопки выше."),
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+                if hasSearchQuery {
+                    CatalogSearchEmptyMessage()
+                } else {
+                    ContentUnavailableView(
+                        "У вас пока нет рецептов",
+                        systemImage: "book.closed",
+                        description: Text("Создайте первый рецепт с помощью кнопки выше."),
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
             } else {
                 ForEach(model.recipes) { item in
                     switch mode {
@@ -186,6 +190,10 @@ struct RecipeListView: View {
 
     private func isQuickAdding(source: FoodSourceReference, context: FoodSelectionContext) -> Bool {
         context.quickAddState?.activeSource == source || quickAddingRecipeID == source.sourceID
+    }
+
+    private var hasSearchQuery: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
