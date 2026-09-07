@@ -2,7 +2,7 @@
 
 **Статус:** актуальная техническая архитектура
 
-**Обновлено:** 2026-08-31
+**Обновлено:** 2026-09-07
 **Граница документа:** нативное Swift/SwiftUI-приложение. Пользовательское
 поведение описано в PRODUCT_SPEC.md.
 
@@ -29,14 +29,16 @@ truth, а Supabase — необязательная инфраструктура
 - **Application services** координируют validation, разрешение версий,
   расчёты, snapshot, сортировку и сохранение.
 - **Domain** содержит value types, LocalDay, перечисления, calculators и
-  repository protocols. Он не зависит от SwiftUI или SwiftData.
+  repository protocols. Он не зависит от SwiftUI; syncable MealConfiguration и
+  ChartSettings используют canonical identity/timestamp helpers на границе
+  синхронизации, чтобы валидировать один и тот же payload на каждом устройстве.
 - **Data** содержит SwiftData models, mappers, repositories, миграции и
   sync-инфраструктуру. Persistent models не пересекают границу repository.
 
 ## 2. Composition root и навигация
 
 AppDependencies — единственный composition root. Он создаёт один
-ModelContainer на схеме V5, SwiftData repositories, application services и,
+ModelContainer на схеме V7, SwiftData repositories, application services и,
 только при наличии конфигурации Supabase, auth, transport и sync-компоненты.
 Зависимости передаются в feature roots, а не создаются во Views.
 
@@ -69,7 +71,9 @@ ProductVersion неизменяем. Начальная версия имеет 
 следующая принадлежит тому же Product, ссылается на предшествующую и имеет
 строго следующий номер. Unit, base amount и nutrition принадлежат версии.
 Изменение только logical metadata не создаёт версию; изменение versioned
-значений создаёт новую.
+значений создаёт новую. Непустое нормализованное имя — единственное
+обязательное пользовательское поле; nutrition может состоять из нулей при
+сохранении технически корректных unit и base amount.
 
 ### Recipe, RecipeVersion и RecipeIngredient
 
@@ -81,19 +85,42 @@ RecipeVersion неизменяем и имеет ту же последоват�
 упорядоченный состав. RecipeIngredient — дочерняя immutable позиция с
 позицией в списке и exact ProductVersion. В системе не существует вложенной
 ссылки recipe-to-recipe: выбор рецепта для состава разворачивается в его
-закреплённые product ingredients.
+закреплённые product ingredients. Рецепт может иметь пустой состав и нулевую
+total nutrition; обязательное пользовательское поле — только непустое
+нормализованное имя.
 
 ### DiaryEntry
 
-DiaryEntry сохраняет nutrition snapshot, source name, source version, amount и
-unit на момент сохранения. Позднее изменение источника не пересчитывает
+DiaryEntry сохраняет nutrition snapshot, source name, source version, amount,
+unit и стабильный mealID на момент сохранения. SourceType бывает product,
+recipe или manual: «Добавить калории» создаёт самостоятельный manual snapshot
+без Product или Recipe. Позднее изменение источника не пересчитывает
 исторические записи автоматически.
 
 Постоянная идентичность записи включает id, LocalDay, sourceType, sourceID и
-createdAt. Meal, sort order, amount, unit, nutrition snapshot, updatedAt и
+createdAt. mealID, sort order, amount, unit, nutrition snapshot, updatedAt и
 tombstone изменяемы. sourceVersionID и sourceName могут измениться только
 явным contextual rebase существующей product-записи, после проверки
-принадлежности новой версии тому же Product.
+принадлежности новой версии тому же Product. legacy mealTypeRaw и
+LegacyMealType существуют только для миграции старых stores и обратного
+декодирования старых sync payloads.
+
+### MealConfiguration
+
+MealConfiguration — syncable aggregate именованных упорядоченных приёмов пищи
+с effectiveFrom. Его идентичность детерминирована от effectiveFrom. Каждый
+приём имеет стабильный mealID; изменение названия или позиции не переписывает
+DiaryEntry. Минимум один приём пищи обязателен. Исходная конфигурация содержит
+«Завтрак», «Обед» и «Ужин»; legacy snack сохраняется только ради совместимости.
+
+### ChartSettings
+
+ChartSettings — syncable singleton-предпочтение с детерминированной
+идентичностью. Оно хранит упорядоченные элементы со stable raw chart type ID и
+признаком включённости для calories, protein, fat и carbs. Все известные типы
+присутствуют ровно один раз; все могут быть выключены. Неизвестные будущие ID
+сохраняются при редактировании и не отображаются старым клиентом. Это не
+модель рассчитанной статистики.
 
 ### WeeklyGoal
 
@@ -111,11 +138,13 @@ aggregate. Goals не имеют soft delete. UI отсекает no-op save д�
 ### SwiftData source of truth
 
 Production ModelContainer локальный: CloudKit mirroring выключен. Текущая
-версионированная схема — V5 и содержит:
+версионированная схема — V7 и содержит:
 
 - ProductRecord, ProductVersionRecord;
 - RecipeRecord, RecipeVersionRecord, RecipeIngredientRecord;
 - DiaryEntryRecord;
+- MealConfigurationRecord;
+- ChartSettingsRecord;
 - WeeklyGoalRecord и DailyMacroGoalRecord;
 - SyncOutboxRecord, SyncRemoteStateRecord, SyncPullStateRecord,
   SyncBootstrapStateRecord.
@@ -138,22 +167,25 @@ Pull coordinator, чтобы локальная merge, metadata и outbox effect
 
 ### Миграции
 
-Migration plan содержит V1–V5 и четыре lightweight stages. V2 добавила outbox,
-V3 — account-scoped remote revision и pull cursor, V4 — bootstrap marker, V5
-добавила updatedAt к WeeklyGoal persistence model. Обычная миграция не
-backfill-ит существующие доменные записи в outbox.
+Migration plan содержит V1–V7. V2 добавила outbox, V3 — account-scoped remote
+revision и pull cursor, V4 — bootstrap marker, V5 — updatedAt к WeeklyGoal.
+V6 ввела mealID и MealConfiguration, нормализовав исторические записи без их
+удаления. V7 добавила ChartSettingsRecord.
 
-Перед следующей structural migration historical schemas Product/Recipe/Diary
-records нужно отдельно пересмотреть и зафиксировать. Это планируемое
-ограничение миграционной стратегии, а не текущий defect.
+Миграции неразрушающие: исторические DiaryEntry, их nutrition/source snapshots
+и совместимые legacy mealTypeRaw сохраняются. После миграции стартовая
+конфигурация приёмов пищи и singleton ChartSettings создаются при необходимости
+и становятся обычными локальными syncable aggregates. ChartSettings не хранит
+рассчитанные WeekStatistics или точки графиков.
 
 ## 5. Sync architecture
 
 ### Роль и граница
 
 SwiftData остаётся активным local source of truth. Supabase хранит canonical
-payloads для backup/restore и не участвует в UI live sync между устройствами.
-Нет CloudKit sync, Realtime subscription, silent push, BGTaskScheduler или
+payloads для backup/restore. Изменения с другого устройства становятся видны
+после orchestrated Pull и обычного перечитывания feature state; Realtime
+subscription нет. Нет CloudKit sync, silent push, BGTaskScheduler или
 background fetch.
 
 SupabaseAuthService предоставляет passwordless email OTP и восстановление
@@ -164,30 +196,43 @@ expected account до и после каждого запроса.
 
 ### Identity и canonical payload
 
-Каждая переносимая сущность имеет SyncEntityKey из entity type и UUID. Ровно
-шесть top-level entity types участвуют в sync:
+Каждая переносимая сущность имеет SyncEntityKey из entity type и UUID. В
+generic sync pipeline участвуют восемь top-level entity types и их canonical
+SyncPayload:
 
 - product и productVersion;
 - recipe и recipeVersion;
 - diaryEntry;
-- weeklyGoal.
+- weeklyGoal;
+- mealConfiguration;
+- chartSettings.
 
 RecipeVersion содержит упорядоченные закреплённые ингредиенты внутри payload,
-WeeklyGoal — семь дневных целей. Operational metadata не входит в payload.
+WeeklyGoal — семь дневных целей, MealConfiguration — действующие с даты
+приёмы пищи, а ChartSettings — только порядок и включённость графиков.
+Operational metadata и рассчитанная недельная статистика не входят в payload.
 Все domain Date на sync-границе нормализуются до canonical Unix milliseconds;
 wire dates кодируются из этой величины. LocalDay остаётся civil-date value.
 
 Remote payload — недоверенный input. Перед insertion или mutation local store
-валидирует schema version, UUID и owner identity, конечность значений, unit,
-lineage immutable versions, pins ингредиентов, derived recipe totals и
+валидирует schema version, ожидаемую entity identity, конечность значений,
+unit, lineage immutable versions, pins ингредиентов, derived recipe totals и
 dependencies. Неизменяемая версия с тем же UUID должна иметь идентичное
 canonical content; иначе это invariant violation.
 
-Mutable Product, Recipe, DiaryEntry и WeeklyGoal используют deterministic
-whole-record last-writer-wins по canonical updatedAt. Tombstone побеждает
-активное состояние. При равном timestamp canonical sorted-key JSON payload
-даёт детерминированный tie-break. Missing ProductVersion, RecipeVersion или
-source version откладывает remote record, не создавая placeholder.
+Mutable Product, Recipe, DiaryEntry, WeeklyGoal, MealConfiguration и
+ChartSettings используют deterministic whole-record last-writer-wins по
+canonical updatedAt. Tombstone побеждает активное состояние там, где он
+допустим. При равном timestamp canonical sorted-key JSON payload даёт
+детерминированный tie-break. Missing ProductVersion, RecipeVersion или source
+version откладывает remote record, не создавая placeholder. Некорректный или
+неподдерживаемый remote payload блокирует безопасное продвижение pull cursor и
+не пропускается молча.
+
+MealConfiguration и ChartSettings не имеют отдельного механизма
+синхронизации: local mutation создаёт Outbox marker, а Push, Pull и Bootstrap
+обрабатывают их тем же generic pipeline. Для ChartSettings переносится только
+предпочтение видимости и порядка, не вычисленные данные Statistics.
 
 ### SyncOutbox и Push
 
