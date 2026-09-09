@@ -59,7 +59,7 @@ struct StatisticsView: View {
 
             if let errorMessage = model.errorMessage, model.statistics != nil {
                 Section {
-                    StatisticsInlineErrorView(message: errorMessage)
+                    InlineErrorView(message: errorMessage)
                 }
             }
         }
@@ -439,15 +439,5 @@ private extension View {
                 }
             }
             .frame(height: StatisticsChartLayout.chartHeight)
-    }
-}
-
-private struct StatisticsInlineErrorView: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote)
-            .foregroundStyle(.red)
     }
 }

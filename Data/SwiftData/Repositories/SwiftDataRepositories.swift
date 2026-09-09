@@ -656,26 +656,6 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             }
     }
 
-    func activeEntries(for sources: [FoodSourceReference]) async throws -> [DiaryEntry] {
-        let sourceSet = Set(sources)
-        guard !sourceSet.isEmpty else {
-            return []
-        }
-        let sourceIDs = Array(Set(sources.map(\.sourceID)))
-        let descriptor = FetchDescriptor<DiaryEntryRecord>(
-            predicate: #Predicate { $0.deletedAt == nil && sourceIDs.contains($0.sourceID) },
-        )
-
-        return try modelContext
-            .fetch(descriptor)
-            .map { try $0.toDomain() }
-            .filter { entry in
-                sourceSet.contains(
-                    FoodSourceReference(sourceType: entry.sourceType, sourceID: entry.sourceID),
-                )
-            }
-    }
-
     func latestActiveUsages(for sources: [FoodSourceReference]) async throws -> [LatestDiaryUsage] {
         let sourceSet = Set(sources)
         guard !sourceSet.isEmpty else {
@@ -763,13 +743,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
             throw DiaryRepositoryError.invalidAmountUpdate
         }
 
-        record.amount = entry.amount
-        record.unitToken = entry.unitToken
-        record.calories = entry.nutrition.calories
-        record.protein = entry.nutrition.protein
-        record.fat = entry.nutrition.fat
-        record.carbs = entry.nutrition.carbs
-        record.updatedAt = entry.updatedAt
+        applyAmountSnapshot(entry, to: record)
 
         do {
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
@@ -791,21 +765,13 @@ final class SwiftDataDiaryRepository: DiaryRepository {
               entry.amount.isFinite,
               entry.amount > 0,
               ProductBaseUnit(rawValue: entry.unitToken) != nil,
-              entry.nutrition.isFinite,
-              [entry.nutrition.calories, entry.nutrition.protein, entry.nutrition.fat, entry.nutrition.carbs]
-                .allSatisfy({ $0 >= 0 })
+              entry.nutrition.isNonnegativeAndFinite
         else {
             throw DiaryRepositoryError.invalidManualSnapshotUpdate
         }
 
         record.sourceName = entry.sourceName
-        record.amount = entry.amount
-        record.unitToken = entry.unitToken
-        record.calories = entry.nutrition.calories
-        record.protein = entry.nutrition.protein
-        record.fat = entry.nutrition.fat
-        record.carbs = entry.nutrition.carbs
-        record.updatedAt = entry.updatedAt
+        applyAmountSnapshot(entry, to: record)
 
         do {
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
@@ -829,13 +795,7 @@ final class SwiftDataDiaryRepository: DiaryRepository {
 
         record.sourceVersionID = entry.sourceVersionID
         record.sourceName = entry.sourceName
-        record.amount = entry.amount
-        record.unitToken = entry.unitToken
-        record.calories = entry.nutrition.calories
-        record.protein = entry.nutrition.protein
-        record.fat = entry.nutrition.fat
-        record.carbs = entry.nutrition.carbs
-        record.updatedAt = entry.updatedAt
+        applyAmountSnapshot(entry, to: record)
 
         do {
             try SyncOutboxStore.markChanged(type: .diaryEntry, id: entry.id, in: modelContext)
@@ -916,6 +876,16 @@ final class SwiftDataDiaryRepository: DiaryRepository {
         var descriptor = FetchDescriptor<DiaryEntryRecord>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first
+    }
+
+    private func applyAmountSnapshot(_ entry: DiaryEntry, to record: DiaryEntryRecord) {
+        record.amount = entry.amount
+        record.unitToken = entry.unitToken
+        record.calories = entry.nutrition.calories
+        record.protein = entry.nutrition.protein
+        record.fat = entry.nutrition.fat
+        record.carbs = entry.nutrition.carbs
+        record.updatedAt = entry.updatedAt
     }
 
     private func matchesImmutableFields(_ record: DiaryEntryRecord, _ entry: DiaryEntry) -> Bool {

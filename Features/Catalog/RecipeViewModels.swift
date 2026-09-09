@@ -22,7 +22,7 @@ final class RecipeListViewModel {
 
     private(set) var recipes: [RecipeListItem] = []
     private(set) var isLoading = false
-    private var usageDefaults: [FoodSourceReference: DiaryUsageDefault] = [:]
+    private var usageDefaults: [FoodSourceReference: LatestDiaryUsage] = [:]
     private var selectionDisplays: [UUID: FoodSelectionDisplay] = [:]
     var errorMessage: String?
 
@@ -44,7 +44,7 @@ final class RecipeListViewModel {
                 return
             }
 
-            let loadedUsageDefaults: [FoodSourceReference: DiaryUsageDefault]
+            let loadedUsageDefaults: [FoodSourceReference: LatestDiaryUsage]
             if let diaryService {
                 loadedUsageDefaults = try await diaryService.latestUsageDefaults(
                     for: items.map { item in
@@ -424,11 +424,6 @@ final class RecipeEditorViewModel {
             return
         }
         ingredients[index] = RecipeIngredientEditorItem(draft: draft, productName: productName, nutrition: nil)
-        invalidateComposition()
-    }
-
-    func removeIngredients(at offsets: IndexSet) {
-        ingredients.remove(atOffsets: offsets)
         invalidateComposition()
     }
 

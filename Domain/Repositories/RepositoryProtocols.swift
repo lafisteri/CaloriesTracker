@@ -33,7 +33,6 @@ protocol DiaryRepository: Sendable {
     func entry(id: UUID, includingDeleted: Bool) async throws -> DiaryEntry?
     func entries(on day: LocalDay) async throws -> [DiaryEntry]
     func entries(in days: [LocalDay]) async throws -> [DiaryEntry]
-    func activeEntries(for sources: [FoodSourceReference]) async throws -> [DiaryEntry]
     func latestActiveUsages(for sources: [FoodSourceReference]) async throws -> [LatestDiaryUsage]
     func create(_ entry: DiaryEntry) async throws
     func save(_ entry: DiaryEntry) async throws

@@ -140,7 +140,7 @@ struct TodayRootView: View {
             }
 
             if let errorMessage = model.errorMessage {
-                DiaryInlineErrorView(message: errorMessage)
+                InlineErrorView(message: errorMessage)
                     .listRowSeparator(.hidden)
             }
         }
@@ -1067,15 +1067,5 @@ private struct TodayViewPreview: View {
             )
         }
         .modelContainer(dependencies.modelContainer)
-    }
-}
-
-struct DiaryInlineErrorView: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote)
-            .foregroundStyle(.red)
     }
 }

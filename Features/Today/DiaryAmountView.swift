@@ -289,7 +289,7 @@ struct AmountEditorView<HeaderTrailing: View>: View {
                         AmountNutritionPreview(nutrition: preview ?? .zero)
 
                         if let previewErrorMessage {
-                            DiaryInlineErrorView(message: previewErrorMessage)
+                            InlineErrorView(message: previewErrorMessage)
                         }
                     } else {
                         ContentUnavailableView(
@@ -300,7 +300,7 @@ struct AmountEditorView<HeaderTrailing: View>: View {
                     }
 
                     if let errorMessage, isAvailable {
-                        DiaryInlineErrorView(message: errorMessage)
+                        InlineErrorView(message: errorMessage)
                     }
                 }
                 .padding(.horizontal)

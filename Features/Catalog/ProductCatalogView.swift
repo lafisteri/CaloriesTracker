@@ -685,13 +685,3 @@ extension ProductBaseUnit {
         }
     }
 }
-
-struct InlineErrorView: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote)
-            .foregroundStyle(.red)
-    }
-}

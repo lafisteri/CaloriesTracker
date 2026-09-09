@@ -40,11 +40,6 @@ struct DiaryAmountSource: Hashable, Sendable {
     let initialUnitToken: String
 }
 
-struct DiaryUsageDefault: Hashable, Sendable {
-    let amount: Double
-    let unitToken: String
-}
-
 enum DiaryAmountCalculationSource: Hashable, Sendable {
     case product(ProductVersion)
     case recipe(RecipeVersion)
@@ -80,23 +75,22 @@ final class DiaryService {
     func day(for day: LocalDay) async throws -> DiaryDayReadModel {
         let entries = try await diaryRepository.entries(on: day)
         let configuration = try await mealConfigurationService.configuration(for: day)
+        let entriesByMeal = Dictionary(grouping: entries, by: \.mealID)
         let meals = try configuration.meals.sorted { $0.position < $1.position }.map { item in
             let mealID = item.mealID
-            let mealEntries = entries
-                .filter { $0.mealID == mealID }
-                .sorted(by: diaryEntryOrder)
+            let mealEntries = (entriesByMeal[mealID] ?? []).sorted(by: diaryEntryOrder)
             return DiaryMealReadModel(
                 mealID: mealID,
                 name: item.name,
                 entries: mealEntries,
-                totalNutrition: try nutritionTotal(for: mealEntries),
+                totalNutrition: try mealEntries.nutritionTotal(),
             )
         }
 
         return DiaryDayReadModel(
             day: day,
             meals: meals,
-            totalNutrition: try nutritionTotal(for: entries),
+            totalNutrition: try entries.nutritionTotal(),
         )
     }
 
@@ -112,17 +106,16 @@ final class DiaryService {
         let resolved = try await historicalSource(for: entry)
         return makeAmountSource(
             from: resolved,
-            sourceName: entry.sourceName,
             initialAmount: entry.amount,
             initialUnitToken: entry.unitToken,
         )
     }
 
-    func latestUsageDefaults(for sources: [FoodSourceReference]) async throws -> [FoodSourceReference: DiaryUsageDefault] {
+    func latestUsageDefaults(for sources: [FoodSourceReference]) async throws -> [FoodSourceReference: LatestDiaryUsage] {
         let usages = try await diaryRepository.latestActiveUsages(for: sources)
         return Dictionary(
             uniqueKeysWithValues: usages.map { usage in
-                (usage.source, DiaryUsageDefault(amount: usage.amount, unitToken: usage.unitToken))
+                (usage.source, usage)
             },
         )
     }
@@ -132,18 +125,7 @@ final class DiaryService {
         amount: Double,
         unitToken: String,
     ) throws -> Nutrition {
-        try preview(source: source.calculationSource, amount: amount, unitToken: unitToken)
-    }
-
-    /// Calculates nutrition from an already-resolved immutable source version.
-    /// This is used by selection UI that already has the current version and
-    /// must match the Amount preview without resolving the source again.
-    func preview(
-        calculationSource: DiaryAmountCalculationSource,
-        amount: Double,
-        unitToken: String,
-    ) throws -> Nutrition {
-        try preview(source: calculationSource, amount: amount, unitToken: unitToken)
+        try preview(calculationSource: source.calculationSource, amount: amount, unitToken: unitToken)
     }
 
     func create(_ command: CreateDiaryEntryCommand) async throws {
@@ -203,21 +185,12 @@ final class DiaryService {
         try validateManualUnit(command.unitToken)
         try validateManualNutrition(command.nutrition)
         let entry = try await manualEntry(for: command.entryID)
-        let updatedEntry = DiaryEntry(
-            id: entry.id,
-            day: entry.day,
-            mealID: entry.mealID,
-            sortOrder: entry.sortOrder,
-            sourceType: entry.sourceType,
-            sourceID: entry.sourceID,
-            sourceVersionID: entry.sourceVersionID,
+        let updatedEntry = updatedSnapshot(
+            from: entry,
             sourceName: sourceName,
             amount: command.amount,
             unitToken: command.unitToken,
             nutrition: command.nutrition,
-            createdAt: entry.createdAt,
-            updatedAt: Date(),
-            deletedAt: entry.deletedAt,
         )
 
         try await diaryRepository.saveManualSnapshot(updatedEntry)
@@ -259,7 +232,7 @@ final class DiaryService {
     ) async throws {
         try validatePositiveAmount(amount)
         let nutrition = try preview(
-            source: source.calculationSource,
+            calculationSource: source.calculationSource,
             amount: amount,
             unitToken: unitToken,
         )
@@ -292,22 +265,12 @@ final class DiaryService {
             throw DiaryServiceError.entryNotFound
         }
         let source = try await historicalSource(for: entry)
-        let nutrition = try preview(source: source.calculationSource, amount: command.amount, unitToken: command.unitToken)
-        let updatedEntry = DiaryEntry(
-            id: entry.id,
-            day: entry.day,
-            mealID: entry.mealID,
-            sortOrder: entry.sortOrder,
-            sourceType: entry.sourceType,
-            sourceID: entry.sourceID,
-            sourceVersionID: entry.sourceVersionID,
-            sourceName: entry.sourceName,
+        let nutrition = try preview(calculationSource: source.calculationSource, amount: command.amount, unitToken: command.unitToken)
+        let updatedEntry = updatedSnapshot(
+            from: entry,
             amount: command.amount,
             unitToken: command.unitToken,
             nutrition: nutrition,
-            createdAt: entry.createdAt,
-            updatedAt: Date(),
-            deletedAt: entry.deletedAt,
         )
 
         try await diaryRepository.save(updatedEntry)
@@ -328,25 +291,17 @@ final class DiaryService {
         let unitToken = compatibleUnitToken(entry.unitToken, options: amountSource.unitOptions)
             ?? amountSource.initialUnitToken
         let nutrition = try preview(
-            source: source.calculationSource,
+            calculationSource: source.calculationSource,
             amount: entry.amount,
             unitToken: unitToken,
         )
-        let rebasedEntry = DiaryEntry(
-            id: entry.id,
-            day: entry.day,
-            mealID: entry.mealID,
-            sortOrder: entry.sortOrder,
-            sourceType: entry.sourceType,
-            sourceID: entry.sourceID,
+        let rebasedEntry = updatedSnapshot(
+            from: entry,
             sourceVersionID: source.sourceVersionID,
             sourceName: source.sourceName,
             amount: entry.amount,
             unitToken: unitToken,
             nutrition: nutrition,
-            createdAt: entry.createdAt,
-            updatedAt: Date(),
-            deletedAt: entry.deletedAt,
         )
 
         try await diaryRepository.rebaseSourceSnapshot(rebasedEntry)
@@ -490,29 +445,23 @@ final class DiaryService {
 
     private func makeAmountSource(
         from source: ResolvedDiarySource,
-        sourceName: String? = nil,
         initialAmount: Double?,
         initialUnitToken: String?,
     ) -> DiaryAmountSource {
+        let options: [DiaryUnitOption]
         switch source.calculationSource {
         case let .product(version):
-            return DiaryAmountSource(
-                sourceName: sourceName ?? source.sourceName,
-                calculationSource: source.calculationSource,
-                unitOptions: productUnitOptions(for: version),
-                initialAmount: initialAmount,
-                initialUnitToken: initialUnitToken ?? version.baseUnit.rawValue,
-            )
+            options = productUnitOptions(for: version)
         case let .recipe(version):
-            let options = recipeUnitOptions(for: version)
-            return DiaryAmountSource(
-                sourceName: sourceName ?? source.sourceName,
-                calculationSource: source.calculationSource,
-                unitOptions: options,
-                initialAmount: initialAmount,
-                initialUnitToken: initialUnitToken ?? options.first?.token ?? "",
-            )
+            options = recipeUnitOptions(for: version)
         }
+        return DiaryAmountSource(
+            sourceName: source.sourceName,
+            calculationSource: source.calculationSource,
+            unitOptions: options,
+            initialAmount: initialAmount,
+            initialUnitToken: initialUnitToken ?? options.first?.token ?? "",
+        )
     }
 
     private func compatibleUnitToken(_ preferredToken: String, options: [DiaryUnitOption]) -> String? {
@@ -522,8 +471,11 @@ final class DiaryService {
         return nil
     }
 
-    private func preview(
-        source: DiaryAmountCalculationSource,
+    /// Calculates nutrition from an already-resolved immutable source version.
+    /// This is used by selection UI that already has the current version and
+    /// must match the Amount preview without resolving the source again.
+    func preview(
+        calculationSource source: DiaryAmountCalculationSource,
         amount: Double,
         unitToken: String,
     ) throws -> Nutrition {
@@ -593,9 +545,7 @@ final class DiaryService {
     }
 
     private func validateManualNutrition(_ nutrition: Nutrition) throws {
-        guard nutrition.isFinite,
-              [nutrition.calories, nutrition.protein, nutrition.fat, nutrition.carbs].allSatisfy({ $0 >= 0 })
-        else {
+        guard nutrition.isNonnegativeAndFinite else {
             throw DiaryServiceError.invalidManualNutrition
         }
     }
@@ -606,10 +556,30 @@ final class DiaryService {
         }
     }
 
-    private func nutritionTotal(for entries: [DiaryEntry]) throws -> Nutrition {
-        try entries.reduce(.zero) { partial, entry in
-            try partial.adding(entry.nutrition)
-        }
+    private func updatedSnapshot(
+        from entry: DiaryEntry,
+        sourceVersionID: UUID? = nil,
+        sourceName: String? = nil,
+        amount: Double,
+        unitToken: String,
+        nutrition: Nutrition,
+    ) -> DiaryEntry {
+        DiaryEntry(
+            id: entry.id,
+            day: entry.day,
+            mealID: entry.mealID,
+            sortOrder: entry.sortOrder,
+            sourceType: entry.sourceType,
+            sourceID: entry.sourceID,
+            sourceVersionID: sourceVersionID ?? entry.sourceVersionID,
+            sourceName: sourceName ?? entry.sourceName,
+            amount: amount,
+            unitToken: unitToken,
+            nutrition: nutrition,
+            createdAt: entry.createdAt,
+            updatedAt: Date(),
+            deletedAt: entry.deletedAt,
+        )
     }
 
     private func nextSortOrder(for entries: [DiaryEntry]) -> Int {

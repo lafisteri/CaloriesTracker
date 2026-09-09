@@ -25,7 +25,6 @@ struct RecipeOutputPreview: Hashable, Sendable {
 }
 
 enum RecipeCalculatorError: LocalizedError {
-    case noIngredients
     case invalidAmount
     case invalidUnit
     case invalidCookedWeight
@@ -34,8 +33,6 @@ enum RecipeCalculatorError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noIngredients:
-            "Добавьте хотя бы один ингредиент."
         case .invalidAmount:
             "Количество должно быть больше нуля."
         case .invalidUnit:

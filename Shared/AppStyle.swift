@@ -127,3 +127,13 @@ extension View {
         modifier(AppNavigationChromeModifier(showsBackButton: showsBackButton))
     }
 }
+
+struct InlineErrorView: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.circle")
+            .font(.footnote)
+            .foregroundStyle(.red)
+    }
+}

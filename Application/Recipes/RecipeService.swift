@@ -367,7 +367,7 @@ final class RecipeService {
     @discardableResult
     func create(draft: RecipeDraft) async throws -> UUID {
         let name = try validatedName(draft.name)
-        try validate(draft)
+        try validateOutputs(cookedWeight: draft.cookedWeight, servingsCount: draft.servingsCount)
         let calculation = try await calculation(for: draft.ingredients)
         let now = Date()
         let recipeID = UUID()
@@ -400,7 +400,7 @@ final class RecipeService {
         }
         let currentVersion = try await currentVersion(for: recipe)
         let name = try validatedName(draft.name)
-        try validate(draft)
+        try validateOutputs(cookedWeight: draft.cookedWeight, servingsCount: draft.servingsCount)
         let calculation = try await calculation(for: draft.ingredients)
         let versionedChange = versionedContentChanged(
             currentVersion: currentVersion,
@@ -707,10 +707,6 @@ final class RecipeService {
         return currentVersion.totalNutrition != calculation.totalNutrition
     }
 
-    private func validate(_ draft: RecipeDraft) throws {
-        try validateOutputs(cookedWeight: draft.cookedWeight, servingsCount: draft.servingsCount)
-    }
-
     private func validateOutputs(cookedWeight: Double?, servingsCount: Double?) throws {
         if let cookedWeight {
             guard cookedWeight.isFinite, cookedWeight > 0 else {
@@ -748,7 +744,6 @@ enum RecipeServiceError: LocalizedError {
     case currentRecipeVersionNotFound
     case pinnedProductVersionNotFound
     case nameRequired
-    case noIngredients
     case outputRequired
     case invalidCookedWeight
     case invalidServingsCount
@@ -772,8 +767,6 @@ enum RecipeServiceError: LocalizedError {
             "Не удалось найти закреплённую версию продукта."
         case .nameRequired:
             "Введите название рецепта."
-        case .noIngredients:
-            "Добавьте хотя бы один ингредиент."
         case .outputRequired:
             "Укажите готовый вес или количество порций."
         case .invalidCookedWeight:

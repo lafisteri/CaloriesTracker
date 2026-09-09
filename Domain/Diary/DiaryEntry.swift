@@ -33,3 +33,11 @@ struct DiaryEntry: Identifiable, Hashable, Codable, Sendable {
     let updatedAt: Date
     let deletedAt: Date?
 }
+
+extension Sequence where Element == DiaryEntry {
+    func nutritionTotal() throws -> Nutrition {
+        try reduce(.zero) { total, entry in
+            try total.adding(entry.nutrition)
+        }
+    }
+}

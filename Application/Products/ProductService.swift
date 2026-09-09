@@ -164,7 +164,7 @@ final class ProductService {
         guard draft.baseAmount.isFinite, draft.baseAmount > 0 else {
             throw ProductServiceError.invalidBaseAmount
         }
-        guard nutritionIsValid(draft.nutrition) else {
+        guard draft.nutrition.isNonnegativeAndFinite else {
             throw ProductServiceError.invalidNutrition
         }
 
@@ -183,11 +183,6 @@ final class ProductService {
             baseAmount: draft.baseAmount,
             nutrition: draft.nutrition,
         )
-    }
-
-    private func nutritionIsValid(_ nutrition: Nutrition) -> Bool {
-        [nutrition.calories, nutrition.protein, nutrition.fat, nutrition.carbs]
-            .allSatisfy { $0.isFinite && $0 >= 0 }
     }
 }
 

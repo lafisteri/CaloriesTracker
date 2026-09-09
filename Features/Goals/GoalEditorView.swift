@@ -73,7 +73,7 @@ struct GoalEditorView: View {
 
                 if let errorMessage = model.errorMessage {
                     Section {
-                        GoalInlineErrorView(message: errorMessage)
+                        InlineErrorView(message: errorMessage)
                     }
                 }
             }
@@ -116,15 +116,5 @@ private struct WeekdaySelector: View {
         }
         .padding(3)
         .background(AppStyle.selectedControlBackground, in: Capsule())
-    }
-}
-
-private struct GoalInlineErrorView: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote)
-            .foregroundStyle(.red)
     }
 }

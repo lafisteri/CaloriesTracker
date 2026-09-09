@@ -23,6 +23,10 @@ struct Nutrition: Hashable, Codable, Sendable {
         [calories, protein, fat, carbs].allSatisfy(\.isFinite)
     }
 
+    var isNonnegativeAndFinite: Bool {
+        [calories, protein, fat, carbs].allSatisfy { $0.isFinite && $0 >= 0 }
+    }
+
     func scaled(by factor: Double) throws -> Nutrition {
         guard factor.isFinite, isFinite else {
             throw NutritionError.nonFiniteResult

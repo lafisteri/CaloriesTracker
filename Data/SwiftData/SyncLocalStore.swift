@@ -1031,9 +1031,7 @@ final class SyncLocalStore {
     }
 
     private func validateNutrition(_ nutrition: Nutrition, key: SyncEntityKey) throws {
-        guard nutrition.isFinite,
-              [nutrition.calories, nutrition.protein, nutrition.fat, nutrition.carbs].allSatisfy({ $0 >= 0 })
-        else {
+        guard nutrition.isNonnegativeAndFinite else {
             throw SyncLocalStoreError.invalidPayload(key, reason: "nutrition must be finite and nonnegative")
         }
     }

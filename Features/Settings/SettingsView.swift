@@ -147,7 +147,7 @@ struct SyncSettingsView: View {
                     }
 
                     if let errorMessage = model.errorMessage {
-                        SettingsInlineErrorView(message: errorMessage)
+                        InlineErrorView(message: errorMessage)
                     }
                     } else {
                         Text("Синхронизация недоступна")
@@ -192,7 +192,7 @@ struct SyncSettingsView: View {
         .disabled(model.isAuthActionInFlight || currentSyncStatus == .syncing)
 
         if currentSyncStatus == .blocked {
-            SettingsInlineErrorView(message: "Не удалось выполнить синхронизацию. Попробуйте позже.")
+            InlineErrorView(message: "Не удалось выполнить синхронизацию. Попробуйте позже.")
         }
 
         Button(role: .destructive) {
@@ -491,15 +491,5 @@ final class SettingsViewModel {
             category = "unexpected"
         }
         Self.logger.error("Settings operation \(operation, privacy: .public) failed category=\(category, privacy: .public)")
-    }
-}
-
-private struct SettingsInlineErrorView: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote)
-            .foregroundStyle(.red)
     }
 }

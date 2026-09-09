@@ -11,7 +11,7 @@ struct DailyMacroGoal: Hashable, Codable, Sendable {
     }
 
     var isValid: Bool {
-        [calories, protein, fat, carbs].allSatisfy { $0.isFinite && $0 >= 0 }
+        nutrition.isNonnegativeAndFinite
     }
 }
 
